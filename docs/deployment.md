@@ -34,6 +34,8 @@ git clone https://github.com/jamesjhs/CNAM-VMS.git
 cd CNAM-VMS
 
 # 2. Install dependencies
+# Note: --legacy-peer-deps is required due to peer dependency constraints
+# in the Auth.js v5 beta package.
 npm ci --legacy-peer-deps
 
 # 3. Configure environment

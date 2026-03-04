@@ -30,7 +30,7 @@ fi
 
 # Restore database
 echo "Restoring database from: ${DB_BACKUP}"
-pg_restore "${DATABASE_URL}" --clean --no-privileges --no-owner --format=custom "${DB_BACKUP}"
+pg_restore --dbname="${DATABASE_URL}" --clean --no-privileges --no-owner --format=custom "${DB_BACKUP}"
 echo "Database restore complete."
 
 # Restore uploads

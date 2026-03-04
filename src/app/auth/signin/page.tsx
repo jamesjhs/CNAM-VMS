@@ -1,6 +1,5 @@
 import { signIn } from '@/auth';
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 import { auth } from '@/auth';
 
 export default async function SignInPage({
@@ -70,10 +69,7 @@ export default async function SignInPage({
           </form>
 
           <p className="mt-6 text-center text-xs text-gray-400">
-            Don&apos;t have an account?{' '}
-            <Link href="/auth/signup" className="text-[#1a3a5c] hover:underline font-medium">
-              Request access
-            </Link>
+            Don&apos;t have an account? Contact your administrator to request access.
           </p>
         </div>
       </div>
