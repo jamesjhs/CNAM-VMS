@@ -416,3 +416,22 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Node
+node_modules/
+.next/
+dist-seed/
+uploads/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Prisma
+prisma/migrations/dev.db
+
+# OS
+.DS_Store
+Thumbs.db
+tsconfig.tsbuildinfo
