@@ -27,9 +27,9 @@ npm ci --legacy-peer-deps
 cp .env.example .env
 # Edit .env with your values
 
-# Generate Prisma client and run migrations
+# Generate Prisma client and apply migrations
 npx prisma generate
-npx prisma migrate dev --name init
+npx prisma migrate deploy
 
 # Seed database (creates root user and roles)
 npm run db:seed
