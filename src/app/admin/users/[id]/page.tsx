@@ -5,12 +5,12 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
   updateUserStatus,
-  deleteUser,
   assignRole,
   removeRole,
   assignTeam,
   removeTeam,
 } from '../actions';
+import DeleteUserButton from './DeleteUserButton';
 import type { UserStatus } from '@prisma/client';
 
 const STATUS_STYLES: Record<UserStatus, string> = {
@@ -109,19 +109,7 @@ export default async function UserDetailPage({
             <p className="text-gray-500 text-sm mb-4">
               Permanently delete this user account and all associated data. This cannot be undone.
             </p>
-            <form action={deleteUser.bind(null, user.id)}>
-              <button
-                type="submit"
-                className="w-full bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
-                onClick={(e) => {
-                  if (!confirm(`Delete user ${user.email}? This cannot be undone.`)) {
-                    e.preventDefault();
-                  }
-                }}
-              >
-                Delete User Account
-              </button>
-            </form>
+            <DeleteUserButton userId={user.id} userEmail={user.email ?? ''} />
           </div>
         </div>
 
