@@ -17,6 +17,66 @@ Entries are listed in reverse chronological order (newest first). Each entry rec
 
 ---
 
+## 5 March 2026 — Bug Fix: "auth is not a function" on Home Page
+
+**Agent session:** GitHub Copilot Coding Agent
+
+**Bug reported:**
+
+```
+⨯ src\app\page.tsx (6:29) @ auth
+⨯ TypeError: (0 , _auth__WEBPACK_IMPORTED_MODULE_3__.auth) is not a function
+    at Home (./src/app/page.tsx:15:70)
+```
+
+**Root cause:**
+
+`PrismaAdapter` was being used without an explicit session strategy. In NextAuth v5 beta, when a database adapter is present, the session strategy defaults to `"database"`. With database sessions, `auth()` requires the HTTP `Request` object to look up the session token from the cookie — it is not a simple no-argument callable. When called as `await auth()` in a Next.js Server Component (which is the standard pattern for Auth.js v5), the runtime could not resolve the function signature correctly and threw the error.
+
+**Fix applied:**
+
+Two files changed:
+
+1. **`src/auth.ts`** — Added `session: { strategy: 'jwt' }` to the `NextAuth()` configuration. This switches session storage from the database to a signed JWT cookie, making `auth()` a proper no-argument callable in Server Components, API routes, and middleware.
+
+   Also added a `jwt` callback to persist the user's database ID into the JWT token on first sign-in, and updated the `session` callback to read from `token` (the JWT payload) instead of `user` (the database session user object), since the callback signature changes with JWT strategy.
+
+2. **`src/types/next-auth.d.ts`** — Added `declare module 'next-auth/jwt'` block augmenting the `JWT` interface with an `id?: string` field, so TypeScript correctly types `token.id` throughout.
+
+**Impact of the change:**
+
+- `auth()` now works correctly in all Server Components and API routes
+- All authentication, authorisation, and capability checks continue to work as before
+- User data (users, accounts, verification tokens) is still stored in the database via PrismaAdapter — only active session storage moves from the database to JWT cookies
+- The `Session` table in the database is no longer written to for active sessions (it remains in the schema for forward compatibility)
+- TypeScript type-check and ESLint both pass with zero errors or warnings
+- `npm run build` completes successfully, generating all 12 pages
+
+**Decisions:**
+
+- JWT strategy chosen over the alternative approaches (e.g. passing a Request object to `auth()`, or using middleware) because it is the simplest fix with the least impact on the rest of the codebase, and is the approach recommended in the Auth.js v5 documentation for the "universal auth" pattern.
+- The PrismaAdapter is retained so that users, accounts, and magic-link verification tokens continue to be stored in the database.
+
+**Known limitations at this stage:**
+
+- Task management, scheduling, and announcements remain as UI placeholders.
+- No user management UI in the admin panel.
+- No role management UI.
+
+**Next steps identified:**
+
+- [ ] Build user management screens in the admin panel (list users, approve/suspend, assign roles)
+- [ ] Build role and capability management screens
+- [ ] Implement task management (create, assign, complete tasks)
+- [ ] Implement scheduling / shift calendar
+- [ ] Implement announcements
+- [ ] Add a "request access" form so new volunteers can self-register (pending admin approval)
+- [ ] Build a file library page so uploaded documents can be browsed and downloaded
+- [ ] Add profile page where volunteers can update their name and contact details
+- [ ] Set up automated testing
+
+---
+
 ## 4 March 2026 — Initial Documentation
 
 **Agent session:** GitHub Copilot Coding Agent
@@ -195,3 +255,4 @@ Capabilities are attached to the user's session when they sign in, so page-level
 ---
 
 *This log is maintained by the GitHub Copilot Agent. Each development session adds a new entry at the top.*
+

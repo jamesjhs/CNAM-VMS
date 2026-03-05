@@ -6,6 +6,7 @@ import type { UserStatus } from '@prisma/client';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
+  session: { strategy: 'jwt' },
   providers: [
     Email({
       server: {
@@ -44,13 +45,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       return true;
     },
-    async session({ session, user }) {
-      if (session.user && user) {
-        session.user.id = user.id;
+    async jwt({ token, user }) {
+      // On initial sign-in, persist the user ID into the JWT
+      if (user?.id) {
+        token.id = user.id;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user && token.id) {
+        session.user.id = token.id;
 
         // Attach status and capabilities to session
         const dbUser = await prisma.user.findUnique({
-          where: { id: user.id },
+          where: { id: token.id },
           select: {
             status: true,
             userRoles: {
