@@ -1,19 +1,7 @@
 import { PrismaClient, UserStatus } from '@prisma/client';
+import { CAPABILITIES } from '../src/lib/capabilities';
 
 const prisma = new PrismaClient();
-
-const CAPABILITIES = [
-  { key: 'admin:users.read', description: 'View all users' },
-  { key: 'admin:users.write', description: 'Create, update, delete users' },
-  { key: 'admin:roles.read', description: 'View roles and capabilities' },
-  { key: 'admin:roles.write', description: 'Create, update, delete roles' },
-  { key: 'admin:audit.read', description: 'View audit logs' },
-  { key: 'admin:files.read', description: 'View all uploaded files' },
-  { key: 'admin:files.write', description: 'Upload and manage files' },
-  { key: 'admin:theme.write', description: 'Manage site theme and settings' },
-  { key: 'volunteer:tasks.read', description: 'View tasks' },
-  { key: 'volunteer:tasks.write', description: 'Create and update tasks' },
-];
 
 async function main() {
   console.log('🌱 Seeding database...');

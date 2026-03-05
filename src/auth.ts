@@ -2,23 +2,44 @@ import NextAuth from 'next-auth';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import Email from 'next-auth/providers/email';
 import { prisma } from '@/lib/prisma';
+import { CAPABILITIES } from '@/lib/capabilities';
 import type { UserStatus } from '@prisma/client';
 
 /**
  * Promote a user to ACTIVE status and assign them the Root role.
- * The Root role is created if it does not already exist.
+ * The Root role is created if it does not already exist, and all capabilities
+ * are upserted and assigned to it so the admin can access protected pages
+ * without requiring a separate seed step.
  * This is called automatically for the ROOT_USER_EMAIL on sign-in.
  */
 async function promoteToRootUser(userId: string): Promise<void> {
+  // Ensure every capability exists in the database (run concurrently)
+  await Promise.all(
+    CAPABILITIES.map((cap) =>
+      prisma.capability.upsert({
+        where: { key: cap.key },
+        update: { description: cap.description },
+        create: { key: cap.key, description: cap.description },
+      }),
+    ),
+  );
+
   // Ensure the Root role exists
   const rootRole = await prisma.role.upsert({
     where: { name: 'Root' },
-    update: {},
+    update: { description: 'Superadmin with all capabilities', isSystem: true },
     create: {
       name: 'Root',
       description: 'Superadmin with all capabilities',
       isSystem: true,
     },
+  });
+
+  // Assign all capabilities to the Root role (skip any that already exist)
+  const allCapabilities = await prisma.capability.findMany();
+  await prisma.roleCapability.createMany({
+    data: allCapabilities.map((cap) => ({ roleId: rootRole.id, capabilityId: cap.id })),
+    skipDuplicates: true,
   });
 
   // Promote user to ACTIVE and assign Root role atomically
@@ -81,9 +102,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
         return '/auth/error?error=AccountSuspended';
       }
 
-      // Auto-promote the configured root user if they are still PENDING
+      // Ensure the root user always has the Root role and all capabilities assigned.
+      // This is idempotent (all upserts / skipDuplicates) so it is safe to run on
+      // every sign-in, which is necessary to repair an existing ACTIVE account that
+      // was created before capabilities were seeded into the database.
       const rootEmail = getRootEmail();
-      if (rootEmail && email === rootEmail && dbUser.status !== 'ACTIVE') {
+      if (rootEmail && email === rootEmail) {
         await promoteToRootUser(dbUser.id);
       }
 
