@@ -4,7 +4,7 @@ import Email from 'next-auth/providers/email';
 import { prisma } from '@/lib/prisma';
 import type { UserStatus } from '@prisma/client';
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
   adapter: PrismaAdapter(prisma),
   session: { strategy: 'jwt' },
   providers: [
@@ -122,4 +122,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
     },
   },
-});
+}));
