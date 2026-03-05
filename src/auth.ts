@@ -4,6 +4,42 @@ import Email from 'next-auth/providers/email';
 import { prisma } from '@/lib/prisma';
 import type { UserStatus } from '@prisma/client';
 
+/**
+ * Promote a user to ACTIVE status and assign them the Root role.
+ * The Root role is created if it does not already exist.
+ * This is called automatically for the ROOT_USER_EMAIL on sign-in.
+ */
+async function promoteToRootUser(userId: string): Promise<void> {
+  // Ensure the Root role exists
+  const rootRole = await prisma.role.upsert({
+    where: { name: 'Root' },
+    update: {},
+    create: {
+      name: 'Root',
+      description: 'Superadmin with all capabilities',
+      isSystem: true,
+    },
+  });
+
+  // Promote user to ACTIVE and assign Root role atomically
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: { status: 'ACTIVE' },
+    }),
+    prisma.userRole.upsert({
+      where: { userId_roleId: { userId, roleId: rootRole.id } },
+      update: {},
+      create: { userId, roleId: rootRole.id },
+    }),
+  ]);
+}
+
+/** Return the normalised ROOT_USER_EMAIL, or undefined if not configured. */
+function getRootEmail(): string | undefined {
+  return process.env.ROOT_USER_EMAIL?.toLowerCase().trim();
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
   adapter: PrismaAdapter(prisma),
   session: { strategy: 'jwt' },
@@ -28,11 +64,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
     async signIn({ user }) {
       if (!user.email) return false;
 
+      const email = user.email.toLowerCase().trim();
+
       const dbUser = await prisma.user.findUnique({
-        where: { email: user.email.toLowerCase().trim() },
+        where: { email },
       });
 
-      // Allow first-time sign-in to create PENDING user (they'll need approval)
+      // Allow first-time sign-in to create PENDING user (handled via createUser event)
       if (!dbUser) {
         return true;
       }
@@ -41,6 +79,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
       const status: UserStatus = dbUser.status;
       if (status === 'SUSPENDED') {
         return '/auth/error?error=AccountSuspended';
+      }
+
+      // Auto-promote the configured root user if they are still PENDING
+      const rootEmail = getRootEmail();
+      if (rootEmail && email === rootEmail && dbUser.status !== 'ACTIVE') {
+        await promoteToRootUser(dbUser.id);
       }
 
       return true;
@@ -96,17 +140,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
   },
   events: {
     async createUser({ user }) {
+      if (!user.id) return;
+
       // Log new user creation
-      if (user.id) {
-        await prisma.auditLog.create({
-          data: {
-            userId: user.id,
-            action: 'USER_CREATED',
-            resource: 'User',
-            resourceId: user.id,
-            detail: { email: user.email },
-          },
-        });
+      await prisma.auditLog.create({
+        data: {
+          userId: user.id,
+          action: 'USER_CREATED',
+          resource: 'User',
+          resourceId: user.id,
+          detail: { email: user.email },
+        },
+      });
+
+      // Auto-promote the root user on their very first sign-in.
+      // PrismaAdapter creates the user (status=PENDING) before this event fires,
+      // so we can safely promote them here.
+      const rootEmail = getRootEmail();
+      if (rootEmail && user.email?.toLowerCase().trim() === rootEmail) {
+        await promoteToRootUser(user.id);
       }
     },
     async signIn({ user }) {

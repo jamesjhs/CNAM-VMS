@@ -143,7 +143,7 @@ ROOT_USER_EMAIL="your-email@example.com"
 ROOT_USER_NAME="Your Name"
 ```
 
-Enter the email address of the first administrator. This person will automatically be given full access when you run the seeding step below.
+Enter the email address of the first administrator. This person will automatically be given full access when you run the seeding step below, **or on their very first sign-in** if the seeding step is skipped.
 
 ### File Uploads
 
