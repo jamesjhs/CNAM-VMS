@@ -1,13 +1,15 @@
 import { requireCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
 import { prisma } from '@/lib/prisma';
+import Link from 'next/link';
 
 export default async function AdminPage() {
   const user = await requireCapability('admin:users.read');
 
-  const [userCount, roleCount, auditCount] = await Promise.all([
+  const [userCount, roleCount, teamCount, auditCount] = await Promise.all([
     prisma.user.count(),
     prisma.role.count(),
+    prisma.team.count(),
     prisma.auditLog.count(),
   ]);
 
@@ -24,6 +26,54 @@ export default async function AdminPage() {
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Admin Panel</h1>
           <p className="text-gray-500">System overview and management.</p>
+        </div>
+
+        {/* Quick-access admin sections */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <AdminCard
+            href="/admin/users"
+            icon="👥"
+            title="User Management"
+            description="Add, remove and manage volunteer accounts. Assign roles, teams and administration rights."
+            badge={`${userCount} users`}
+          />
+          <AdminCard
+            href="/admin/roles"
+            icon="🎭"
+            title="Roles & Permissions"
+            description="Define roles and assign capabilities to control what each role can access."
+            badge={`${roleCount} roles`}
+          />
+          <AdminCard
+            href="#"
+            icon="🏷️"
+            title="Teams"
+            description="Manage volunteer teams and group assignments."
+            badge={`${teamCount} teams`}
+            comingSoon
+          />
+          <AdminCard
+            href="#"
+            icon="📊"
+            title="Audit Logs"
+            description="View a full audit trail of all actions taken in the system."
+            badge={`${auditCount} events`}
+            comingSoon
+          />
+          <AdminCard
+            href="#"
+            icon="📁"
+            title="File Assets"
+            description="View and manage uploaded files and documents."
+            comingSoon
+          />
+          <AdminCard
+            href="#"
+            icon="⚙️"
+            title="System Settings"
+            description="Configure site-wide settings and appearance."
+            comingSoon
+          />
         </div>
 
         {/* Current user info */}
@@ -69,9 +119,10 @@ export default async function AdminPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-6 mb-8">
           <StatCard label="Total Users" value={userCount} icon="👥" />
           <StatCard label="Roles" value={roleCount} icon="🎭" />
+          <StatCard label="Teams" value={teamCount} icon="🏷️" />
           <StatCard label="Audit Events" value={auditCount} icon="📊" />
         </div>
 
@@ -112,6 +163,39 @@ export default async function AdminPage() {
       </main>
     </div>
   );
+}
+
+function AdminCard({
+  href,
+  icon,
+  title,
+  description,
+  badge,
+  comingSoon,
+}: {
+  href: string;
+  icon: string;
+  title: string;
+  description: string;
+  badge?: string;
+  comingSoon?: boolean;
+}) {
+  const inner = (
+    <div className={`bg-white rounded-xl border p-6 h-full transition-shadow ${comingSoon ? 'border-gray-100 opacity-60' : 'border-gray-200 hover:shadow-md'}`}>
+      <div className="flex items-start justify-between mb-3">
+        <span className="text-2xl">{icon}</span>
+        <div className="flex items-center gap-2">
+          {badge && <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{badge}</span>}
+          {comingSoon && <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Coming soon</span>}
+        </div>
+      </div>
+      <h3 className="font-semibold text-gray-900 mb-1">{title}</h3>
+      <p className="text-gray-500 text-sm">{description}</p>
+    </div>
+  );
+
+  if (comingSoon) return <div>{inner}</div>;
+  return <Link href={href}>{inner}</Link>;
 }
 
 function StatCard({ label, value, icon }: { label: string; value: number; icon: string }) {
