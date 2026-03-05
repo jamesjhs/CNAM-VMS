@@ -2,12 +2,19 @@ import { requireCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
-import type { UserStatus } from '@prisma/client';
+import type { UserStatus, UserAccountType } from '@prisma/client';
+import { createUser } from './actions';
 
 const STATUS_STYLES: Record<UserStatus, string> = {
   ACTIVE: 'bg-green-100 text-green-800',
   SUSPENDED: 'bg-red-100 text-red-800',
   PENDING: 'bg-yellow-100 text-yellow-800',
+};
+
+const ACCOUNT_TYPE_STYLES: Record<UserAccountType, string> = {
+  VOLUNTEER: 'bg-blue-50 text-blue-700',
+  STAFF: 'bg-purple-50 text-purple-700',
+  MEMBER: 'bg-teal-50 text-teal-700',
 };
 
 export default async function UsersAdminPage() {
@@ -40,6 +47,49 @@ export default async function UsersAdminPage() {
           <span className="text-sm text-gray-500">{users.length} user{users.length !== 1 ? 's' : ''}</span>
         </div>
 
+        {/* Add User Form */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
+          <h2 className="font-semibold text-gray-900 mb-4">Add User Account</h2>
+          <form
+            action={async (formData: FormData) => {
+              'use server';
+              const email = formData.get('email') as string;
+              const name = formData.get('name') as string;
+              const accountType = (formData.get('accountType') as UserAccountType) ?? 'VOLUNTEER';
+              await createUser(email, name, accountType);
+            }}
+            className="flex flex-col sm:flex-row gap-3"
+          >
+            <input
+              name="email"
+              type="email"
+              required
+              placeholder="Email address"
+              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <input
+              name="name"
+              type="text"
+              placeholder="Full name (optional)"
+              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <select
+              name="accountType"
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="VOLUNTEER">Volunteer</option>
+              <option value="STAFF">Staff</option>
+              <option value="MEMBER">Member</option>
+            </select>
+            <button
+              type="submit"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+            >
+              Add User
+            </button>
+          </form>
+        </div>
+
         {users.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
             <p className="text-gray-500">No users found.</p>
@@ -51,6 +101,7 @@ export default async function UsersAdminPage() {
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="text-left py-3 px-4 text-gray-500 font-medium">Name / Email</th>
+                    <th className="text-left py-3 px-4 text-gray-500 font-medium">Type</th>
                     <th className="text-left py-3 px-4 text-gray-500 font-medium">Status</th>
                     <th className="text-left py-3 px-4 text-gray-500 font-medium">Roles</th>
                     <th className="text-left py-3 px-4 text-gray-500 font-medium">Teams</th>
@@ -64,6 +115,11 @@ export default async function UsersAdminPage() {
                       <td className="py-3 px-4">
                         <div className="font-medium text-gray-900">{user.name ?? <span className="text-gray-400 italic">No name</span>}</div>
                         <div className="text-gray-500">{user.email}</div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${ACCOUNT_TYPE_STYLES[user.accountType]}`}>
+                          {user.accountType.charAt(0) + user.accountType.slice(1).toLowerCase()}
+                        </span>
                       </td>
                       <td className="py-3 px-4">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUS_STYLES[user.status]}`}>

@@ -23,6 +23,9 @@ export default async function NavBar() {
                 <Link href="/dashboard" className="text-gray-300 hover:text-white text-sm transition-colors">
                   Dashboard
                 </Link>
+                <Link href="/volunteer/availability" className="text-gray-300 hover:text-white text-sm transition-colors">
+                  My Availability
+                </Link>
                 {isAdmin && (
                   <div className="relative group">
                     <button className="text-gray-300 hover:text-white text-sm transition-colors flex items-center gap-1 py-5">
@@ -43,6 +46,11 @@ export default async function NavBar() {
                       {capabilities.includes('admin:roles.read') && (
                         <Link href="/admin/roles" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                           Roles
+                        </Link>
+                      )}
+                      {capabilities.includes('admin:teams.read') && (
+                        <Link href="/admin/teams" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          Teams
                         </Link>
                       )}
                     </div>

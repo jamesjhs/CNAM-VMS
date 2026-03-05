@@ -5,18 +5,27 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
   updateUserStatus,
+  updateUserProfile,
+  addUserPhone,
+  removeUserPhone,
   assignRole,
   removeRole,
   assignTeam,
   removeTeam,
 } from '../actions';
 import DeleteUserButton from './DeleteUserButton';
-import type { UserStatus } from '@prisma/client';
+import type { UserStatus, UserAccountType } from '@prisma/client';
 
 const STATUS_STYLES: Record<UserStatus, string> = {
   ACTIVE: 'bg-green-100 text-green-800',
   SUSPENDED: 'bg-red-100 text-red-800',
   PENDING: 'bg-yellow-100 text-yellow-800',
+};
+
+const ACCOUNT_TYPE_LABELS: Record<UserAccountType, string> = {
+  VOLUNTEER: 'Volunteer',
+  STAFF: 'Staff',
+  MEMBER: 'Member',
 };
 
 export default async function UserDetailPage({
@@ -34,6 +43,7 @@ export default async function UserDetailPage({
       include: {
         userRoles: { include: { role: true } },
         userTeams: { include: { team: true } },
+        phones: { orderBy: { createdAt: 'asc' } },
         auditLogs: {
           orderBy: { createdAt: 'desc' },
           take: 10,
@@ -70,10 +80,122 @@ export default async function UserDetailPage({
               <p className="text-gray-500 mt-0.5">{user.email}</p>
               <p className="text-gray-400 text-xs mt-1">Member since {user.createdAt.toLocaleDateString('en-GB')}</p>
             </div>
-            <span className={`inline-flex items-center px-2.5 py-1 rounded text-sm font-medium ${STATUS_STYLES[user.status]}`}>
-              {user.status}
-            </span>
+            <div className="flex flex-col items-end gap-2">
+              <span className={`inline-flex items-center px-2.5 py-1 rounded text-sm font-medium ${STATUS_STYLES[user.status]}`}>
+                {user.status}
+              </span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                {ACCOUNT_TYPE_LABELS[user.accountType]}
+              </span>
+            </div>
           </div>
+        </div>
+
+        {/* Edit Profile */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+          <h2 className="font-semibold text-gray-900 mb-4">Edit Profile</h2>
+          <form
+            action={async (formData: FormData) => {
+              'use server';
+              const name = formData.get('name') as string;
+              const email = formData.get('email') as string;
+              const accountType = formData.get('accountType') as UserAccountType;
+              await updateUserProfile(user.id, name, email, accountType);
+            }}
+            className="space-y-4"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Full Name</label>
+                <input
+                  name="name"
+                  type="text"
+                  defaultValue={user.name ?? ''}
+                  placeholder="Full name"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Email Address</label>
+                <input
+                  name="email"
+                  type="email"
+                  required
+                  defaultValue={user.email ?? ''}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Account Type</label>
+              <select
+                name="accountType"
+                defaultValue={user.accountType}
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="VOLUNTEER">Volunteer</option>
+                <option value="STAFF">Staff</option>
+                <option value="MEMBER">Member</option>
+              </select>
+            </div>
+            <button
+              type="submit"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              Save Changes
+            </button>
+          </form>
+        </div>
+
+        {/* Phone Numbers */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+          <h2 className="font-semibold text-gray-900 mb-4">Telephone Numbers</h2>
+          {user.phones.length > 0 && (
+            <ul className="mb-4 space-y-2">
+              {user.phones.map((phone) => (
+                <li key={phone.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 bg-gray-50">
+                  <div>
+                    <span className="font-medium text-sm text-gray-900">{phone.number}</span>
+                    {phone.label && <span className="ml-2 text-xs text-gray-500">({phone.label})</span>}
+                  </div>
+                  <form action={removeUserPhone.bind(null, user.id, phone.id)}>
+                    <button type="submit" className="text-xs text-red-600 hover:text-red-800 font-medium whitespace-nowrap">
+                      Remove
+                    </button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          )}
+          <form
+            action={async (formData: FormData) => {
+              'use server';
+              const number = formData.get('number') as string;
+              const label = formData.get('label') as string;
+              await addUserPhone(user.id, number, label);
+            }}
+            className="flex flex-col sm:flex-row gap-3"
+          >
+            <input
+              name="number"
+              type="tel"
+              required
+              placeholder="Telephone number"
+              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <input
+              name="label"
+              type="text"
+              placeholder="Label (e.g. Mobile, Home)"
+              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              type="submit"
+              className="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+            >
+              Add Number
+            </button>
+          </form>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -215,3 +337,4 @@ export default async function UserDetailPage({
     </div>
   );
 }
+

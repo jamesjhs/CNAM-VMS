@@ -5,7 +5,110 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { requireCapability } from '@/lib/auth-helpers';
 import { logAudit } from '@/lib/audit';
-import type { UserStatus } from '@prisma/client';
+import type { UserStatus, UserAccountType } from '@prisma/client';
+
+// ---------------------------------------------------------------------------
+// User creation
+// ---------------------------------------------------------------------------
+
+export async function createUser(email: string, name: string, accountType: UserAccountType) {
+  const actor = await requireCapability('admin:users.write');
+
+  const trimmedEmail = email.trim().toLowerCase();
+  const trimmedName = name.trim();
+  if (!trimmedEmail) return;
+
+  const user = await prisma.user.create({
+    data: {
+      email: trimmedEmail,
+      name: trimmedName || null,
+      accountType,
+      status: 'PENDING',
+    },
+  });
+
+  await logAudit({
+    userId: actor.id,
+    action: 'USER_CREATED',
+    resource: 'User',
+    resourceId: user.id,
+    detail: { email: trimmedEmail, accountType },
+  });
+
+  revalidatePath('/admin/users');
+}
+
+// ---------------------------------------------------------------------------
+// User profile actions
+// ---------------------------------------------------------------------------
+
+export async function updateUserProfile(userId: string, name: string, email: string, accountType: UserAccountType) {
+  const actor = await requireCapability('admin:users.write');
+
+  const trimmedName = name.trim() || null;
+  const trimmedEmail = email.trim().toLowerCase();
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { name: trimmedName, email: trimmedEmail, accountType },
+  });
+
+  await logAudit({
+    userId: actor.id,
+    action: 'USER_PROFILE_UPDATED',
+    resource: 'User',
+    resourceId: userId,
+    detail: { name: trimmedName, email: trimmedEmail, accountType },
+  });
+
+  revalidatePath('/admin/users');
+  revalidatePath(`/admin/users/${userId}`);
+}
+
+// ---------------------------------------------------------------------------
+// Phone number actions
+// ---------------------------------------------------------------------------
+
+export async function addUserPhone(userId: string, number: string, label: string) {
+  const actor = await requireCapability('admin:users.write');
+
+  const trimmedNumber = number.trim();
+  if (!trimmedNumber) return;
+
+  await prisma.userPhone.create({
+    data: {
+      userId,
+      number: trimmedNumber,
+      label: label.trim() || null,
+    },
+  });
+
+  await logAudit({
+    userId: actor.id,
+    action: 'USER_PHONE_ADDED',
+    resource: 'User',
+    resourceId: userId,
+    detail: { number: trimmedNumber, label: label.trim() || null },
+  });
+
+  revalidatePath(`/admin/users/${userId}`);
+}
+
+export async function removeUserPhone(userId: string, phoneId: string) {
+  const actor = await requireCapability('admin:users.write');
+
+  await prisma.userPhone.delete({ where: { id: phoneId } });
+
+  await logAudit({
+    userId: actor.id,
+    action: 'USER_PHONE_REMOVED',
+    resource: 'User',
+    resourceId: userId,
+    detail: { phoneId },
+  });
+
+  revalidatePath(`/admin/users/${userId}`);
+}
 
 // ---------------------------------------------------------------------------
 // User actions
@@ -189,4 +292,83 @@ export async function removeCapabilityFromRole(roleId: string, capabilityId: str
   });
 
   revalidatePath('/admin/roles');
+}
+
+// ---------------------------------------------------------------------------
+// Team management actions
+// ---------------------------------------------------------------------------
+
+export async function createTeam(name: string, description: string) {
+  const actor = await requireCapability('admin:teams.write');
+
+  const trimmedName = name.trim();
+  if (!trimmedName) return;
+
+  const team = await prisma.team.create({
+    data: { name: trimmedName, description: description.trim() || null },
+  });
+
+  await logAudit({
+    userId: actor.id,
+    action: 'TEAM_CREATED',
+    resource: 'Team',
+    resourceId: team.id,
+    detail: { name: trimmedName },
+  });
+
+  revalidatePath('/admin/teams');
+}
+
+export async function updateTeam(teamId: string, name: string, description: string) {
+  const actor = await requireCapability('admin:teams.write');
+
+  const trimmedName = name.trim();
+  if (!trimmedName) return;
+
+  await prisma.team.update({
+    where: { id: teamId },
+    data: { name: trimmedName, description: description.trim() || null },
+  });
+
+  await logAudit({
+    userId: actor.id,
+    action: 'TEAM_UPDATED',
+    resource: 'Team',
+    resourceId: teamId,
+    detail: { name: trimmedName },
+  });
+
+  revalidatePath('/admin/teams');
+}
+
+export async function deleteTeam(teamId: string) {
+  const actor = await requireCapability('admin:teams.write');
+
+  await prisma.team.delete({ where: { id: teamId } });
+
+  await logAudit({
+    userId: actor.id,
+    action: 'TEAM_DELETED',
+    resource: 'Team',
+    resourceId: teamId,
+  });
+
+  revalidatePath('/admin/teams');
+}
+
+// ---------------------------------------------------------------------------
+// Volunteer availability actions
+// ---------------------------------------------------------------------------
+
+export async function updateVolunteerAvailability(activities: string[], notes: string) {
+  const { requireAuth } = await import('@/lib/auth-helpers');
+  const actor = await requireAuth();
+
+  await prisma.volunteerAvailability.upsert({
+    where: { userId: actor.id },
+    update: { activities, notes: notes.trim() || null },
+    create: { userId: actor.id, activities, notes: notes.trim() || null },
+  });
+
+  revalidatePath('/volunteer/availability');
 }

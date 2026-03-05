@@ -16,24 +16,58 @@ enum UserStatus {
   SUSPENDED
 }
 
+enum UserAccountType {
+  VOLUNTEER
+  STAFF
+  MEMBER
+}
+
 model User {
-  id            String     @id @default(cuid())
-  email         String     @unique
+  id            String          @id @default(cuid())
+  email         String          @unique
   name          String?
   emailVerified DateTime?
   image         String?
-  status        UserStatus @default(PENDING)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  status        UserStatus      @default(PENDING)
+  accountType   UserAccountType @default(VOLUNTEER)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
-  accounts   Account[]
-  sessions   Session[]
-  userRoles  UserRole[]
-  userTeams  UserTeam[]
-  auditLogs  AuditLog[]
-  fileAssets FileAsset[]
+  accounts      Account[]
+  sessions      Session[]
+  userRoles     UserRole[]
+  userTeams     UserTeam[]
+  auditLogs     AuditLog[]
+  fileAssets    FileAsset[]
+  phones        UserPhone[]
+  availability  VolunteerAvailability?
 
   @@map("users")
+}
+
+model UserPhone {
+  id        String   @id @default(cuid())
+  userId    String
+  number    String
+  label     String?
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_phones")
+}
+
+model VolunteerAvailability {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  activities     String[]
+  notes          String?
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("volunteer_availability")
 }
 
 model Account {
