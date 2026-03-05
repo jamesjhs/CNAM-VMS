@@ -102,9 +102,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
         return '/auth/error?error=AccountSuspended';
       }
 
-      // Auto-promote the configured root user if they are still PENDING
+      // Ensure the root user always has the Root role and all capabilities assigned.
+      // This is idempotent (all upserts / skipDuplicates) so it is safe to run on
+      // every sign-in, which is necessary to repair an existing ACTIVE account that
+      // was created before capabilities were seeded into the database.
       const rootEmail = getRootEmail();
-      if (rootEmail && email === rootEmail && dbUser.status !== 'ACTIVE') {
+      if (rootEmail && email === rootEmail) {
         await promoteToRootUser(dbUser.id);
       }
 
