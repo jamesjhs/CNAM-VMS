@@ -62,6 +62,55 @@ async function main() {
   }
   console.log(`✅ Volunteer role configured`);
 
+  // Create admin role with user/team/role management capabilities
+  const adminRole = await prisma.role.upsert({
+    where: { name: 'Admin' },
+    update: { description: 'Administrator with user management rights', isSystem: true },
+    create: {
+      name: 'Admin',
+      description: 'Administrator with user management rights',
+      isSystem: true,
+    },
+  });
+
+  const adminCapKeys = [
+    'admin:users.read',
+    'admin:users.write',
+    'admin:roles.read',
+    'admin:teams.read',
+    'admin:teams.write',
+    'admin:audit.read',
+  ];
+  for (const key of adminCapKeys) {
+    const cap = allCapabilities.find((c) => c.key === key);
+    if (cap) {
+      await prisma.roleCapability.upsert({
+        where: { roleId_capabilityId: { roleId: adminRole.id, capabilityId: cap.id } },
+        update: {},
+        create: { roleId: adminRole.id, capabilityId: cap.id },
+      });
+    }
+  }
+  console.log(`✅ Admin role configured`);
+
+  // Create default teams
+  const defaultTeams = [
+    { name: 'Aircraft Restoration', description: 'Restoring and maintaining the museum aircraft collection' },
+    { name: 'Visitor Services', description: 'Front-of-house and visitor experience' },
+    { name: 'Education & Outreach', description: 'School visits and community engagement' },
+    { name: 'Grounds & Facilities', description: 'Site maintenance and facilities management' },
+    { name: 'Events & Fundraising', description: 'Special events and fundraising activities' },
+  ];
+
+  for (const team of defaultTeams) {
+    await prisma.team.upsert({
+      where: { name: team.name },
+      update: { description: team.description },
+      create: team,
+    });
+  }
+  console.log(`✅ ${defaultTeams.length} default teams created`);
+
   // Create root user
   const rootEmail = process.env.ROOT_USER_EMAIL;
   const rootName = process.env.ROOT_USER_NAME ?? 'Root Admin';

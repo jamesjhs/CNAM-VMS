@@ -4,6 +4,12 @@ import { auth, signOut } from '@/auth';
 export default async function NavBar() {
   const session = await auth();
 
+  const capabilities: string[] = (session?.user as { capabilities?: string[] })?.capabilities ?? [];
+  const isAdmin =
+    capabilities.includes('admin:users.read') ||
+    capabilities.includes('admin:roles.read') ||
+    capabilities.includes('admin:audit.read');
+
   return (
     <nav className="bg-[#1a3a5c] text-white shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -17,9 +23,31 @@ export default async function NavBar() {
                 <Link href="/dashboard" className="text-gray-300 hover:text-white text-sm transition-colors">
                   Dashboard
                 </Link>
-                <Link href="/admin" className="text-gray-300 hover:text-white text-sm transition-colors">
-                  Admin
-                </Link>
+                {isAdmin && (
+                  <div className="relative group">
+                    <button className="text-gray-300 hover:text-white text-sm transition-colors flex items-center gap-1 py-5">
+                      Admin
+                      <svg className="w-3 h-3 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    <div className="absolute left-0 top-full hidden group-hover:block bg-white rounded-lg shadow-lg border border-gray-100 min-w-40 py-1 z-50">
+                      <Link href="/admin" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                        Overview
+                      </Link>
+                      {capabilities.includes('admin:users.read') && (
+                        <Link href="/admin/users" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          Users
+                        </Link>
+                      )}
+                      {capabilities.includes('admin:roles.read') && (
+                        <Link href="/admin/roles" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          Roles
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                )}
                 <Link href="/upload" className="text-gray-300 hover:text-white text-sm transition-colors">
                   Upload
                 </Link>
