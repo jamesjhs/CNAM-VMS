@@ -9,12 +9,13 @@ const ERROR_MESSAGES: Record<string, string> = {
   Default: 'An error occurred during sign in. Please try again.',
 };
 
-export default function AuthErrorPage({
+export default async function AuthErrorPage({
   searchParams,
 }: {
-  searchParams: { error?: string };
+  searchParams: Promise<{ error?: string }>;
 }) {
-  const errorKey = searchParams.error ?? 'Default';
+  const { error } = await searchParams;
+  const errorKey = error ?? 'Default';
   const message = ERROR_MESSAGES[errorKey] ?? ERROR_MESSAGES.Default;
 
   return (

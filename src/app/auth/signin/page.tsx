@@ -5,10 +5,11 @@ import { auth } from '@/auth';
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: { callbackUrl?: string; error?: string };
+  searchParams: Promise<{ callbackUrl?: string; error?: string }>;
 }) {
+  const { callbackUrl, error } = await searchParams;
   const session = await auth();
-  if (session) redirect(searchParams.callbackUrl ?? '/dashboard');
+  if (session) redirect(callbackUrl ?? '/dashboard');
 
   return (
     <div className="min-h-screen bg-[#1a3a5c] flex items-center justify-center px-4">
@@ -26,9 +27,9 @@ export default async function SignInPage({
             Enter your email address and we&apos;ll send you a magic link.
           </p>
 
-          {searchParams.error && (
+          {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              {searchParams.error === 'OAuthAccountNotLinked'
+              {error === 'OAuthAccountNotLinked'
                 ? 'This email is already associated with another account.'
                 : 'Something went wrong. Please try again.'}
             </div>
@@ -40,7 +41,7 @@ export default async function SignInPage({
               const email = formData.get('email') as string;
               await signIn('email', {
                 email: email.toLowerCase().trim(),
-                redirectTo: searchParams.callbackUrl ?? '/dashboard',
+                redirectTo: callbackUrl ?? '/dashboard',
               });
             }}
             className="space-y-4"
