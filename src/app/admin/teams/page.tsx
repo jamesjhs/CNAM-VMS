@@ -125,7 +125,6 @@ export default async function TeamsAdminPage() {
                       <button
                         type="submit"
                         className="text-xs text-red-600 hover:text-red-800 font-medium px-3 py-1.5 rounded-lg border border-red-100 hover:bg-red-50 transition-colors whitespace-nowrap"
-                        onClick={undefined}
                       >
                         Delete
                       </button>
