@@ -61,6 +61,15 @@ scripts/               # Backup and restore scripts
 docs/                  # Documentation
 ```
 
+## Documentation
+
+| Document | Audience | Description |
+|---|---|---|
+| [docs/startup-guide.md](docs/startup-guide.md) | Administrators | Step-by-step guide to installing and starting the system on a server |
+| [docs/user-manual.md](docs/user-manual.md) | All users | Plain-English guide to using the system as a volunteer or administrator |
+| [docs/deployment.md](docs/deployment.md) | Administrators | Technical deployment reference (Nginx, PM2, backups) |
+| [docs/development-log.md](docs/development-log.md) | Developers | Chronological record of what has been built and what is planned next |
+
 ## Environment Variables
 
 See `.env.example` for all required variables and documentation.
