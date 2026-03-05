@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --brand: #1a3a5c;
+    --brand-light: #2d5986;
+    --brand-accent: #e8a020;
+  }
+}
