@@ -28,6 +28,12 @@ enum CalendarEventType {
   HELP_NEEDED
 }
 
+enum JobScheduleType {
+  ONE_OFF
+  WEEKLY
+  MONTHLY
+}
+
 model User {
   id            String          @id @default(cuid())
   email         String          @unique
@@ -244,13 +250,20 @@ model UserTeam {
 // ---------------------------------------------------------------------------
 
 model Job {
-  id          String   @id @default(cuid())
-  title       String   @unique
+  id          String          @id @default(cuid())
+  title       String          @unique
   description String?
-  isRolling   Boolean  @default(false)
-  colour      String   @default("#6366f1")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isRolling   Boolean         @default(false)
+  colour      String          @default("#6366f1")
+  // Recurrence
+  scheduleType      JobScheduleType @default(ONE_OFF)
+  weekDays          Int[]           // 0=Mon … 6=Sun; used when scheduleType=WEEKLY
+  monthDays         Int[]           // 1..31; used when scheduleType=MONTHLY
+  defaultStartTime  String?
+  defaultEndTime    String?
+  defaultMaxSignups Int?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
   calendarEvents CalendarEvent[]
 

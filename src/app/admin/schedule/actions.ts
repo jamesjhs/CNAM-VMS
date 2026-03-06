@@ -82,6 +82,12 @@ export async function createJob(
   description: string,
   isRolling: boolean,
   colour: string,
+  scheduleType: string,
+  weekDays: number[],
+  monthDays: number[],
+  defaultStartTime: string,
+  defaultEndTime: string,
+  defaultMaxSignupsStr: string,
 ) {
   const actor = await requireCapability('admin:calendar.write');
 
@@ -94,6 +100,12 @@ export async function createJob(
       description: description.trim() || null,
       isRolling,
       colour: colour || '#6366f1',
+      scheduleType: (scheduleType as 'ONE_OFF' | 'WEEKLY' | 'MONTHLY') || 'ONE_OFF',
+      weekDays,
+      monthDays,
+      defaultStartTime: defaultStartTime.trim() || null,
+      defaultEndTime: defaultEndTime.trim() || null,
+      defaultMaxSignups: defaultMaxSignupsStr ? parseInt(defaultMaxSignupsStr, 10) : null,
     },
   });
 
@@ -102,7 +114,7 @@ export async function createJob(
     action: 'JOB_CREATED',
     resource: 'Job',
     resourceId: job.id,
-    detail: { title: trimmedTitle, isRolling },
+    detail: { title: trimmedTitle, isRolling, scheduleType },
   });
 
   revalidatePath('/admin/schedule/jobs');
@@ -116,6 +128,12 @@ export async function updateJob(
   description: string,
   isRolling: boolean,
   colour: string,
+  scheduleType: string,
+  weekDays: number[],
+  monthDays: number[],
+  defaultStartTime: string,
+  defaultEndTime: string,
+  defaultMaxSignupsStr: string,
 ) {
   const actor = await requireCapability('admin:calendar.write');
 
@@ -129,6 +147,12 @@ export async function updateJob(
       description: description.trim() || null,
       isRolling,
       colour: colour || '#6366f1',
+      scheduleType: (scheduleType as 'ONE_OFF' | 'WEEKLY' | 'MONTHLY') || 'ONE_OFF',
+      weekDays,
+      monthDays,
+      defaultStartTime: defaultStartTime.trim() || null,
+      defaultEndTime: defaultEndTime.trim() || null,
+      defaultMaxSignups: defaultMaxSignupsStr ? parseInt(defaultMaxSignupsStr, 10) : null,
     },
   });
 
@@ -137,7 +161,7 @@ export async function updateJob(
     action: 'JOB_UPDATED',
     resource: 'Job',
     resourceId: jobId,
-    detail: { title: trimmedTitle, isRolling },
+    detail: { title: trimmedTitle, isRolling, scheduleType },
   });
 
   revalidatePath('/admin/schedule/jobs');
@@ -158,6 +182,55 @@ export async function deleteJob(jobId: string) {
   });
 
   revalidatePath('/admin/schedule/jobs');
+  revalidatePath('/admin/schedule');
+  revalidatePath('/schedule');
+}
+
+// ---------------------------------------------------------------------------
+// Recurring job occurrence — find or create a CalendarEvent for a specific
+// job+date, then create an EventSignup for the current user.
+// ---------------------------------------------------------------------------
+
+export async function adminSignupForJobOccurrence(jobId: string, dateStr: string) {
+  const actor = await requireCapability('admin:calendar.write');
+
+  const date = parseDate(dateStr);
+  if (!date) return;
+
+  const job = await prisma.job.findUnique({ where: { id: jobId } });
+  if (!job) return;
+
+  let event = await prisma.calendarEvent.findFirst({ where: { jobId, date } });
+
+  if (!event) {
+    event = await prisma.calendarEvent.create({
+      data: {
+        title: job.title,
+        description: job.description,
+        eventType: 'HELP_NEEDED',
+        date,
+        startTime: job.defaultStartTime,
+        endTime: job.defaultEndTime,
+        maxSignups: job.defaultMaxSignups,
+        jobId,
+        createdById: actor.id,
+      },
+    });
+  }
+
+  await prisma.eventSignup.upsert({
+    where: { eventId_userId: { eventId: event.id, userId: actor.id } },
+    update: {},
+    create: { eventId: event.id, userId: actor.id },
+  });
+
+  await logAudit({
+    userId: actor.id,
+    action: 'EVENT_SIGNUP',
+    resource: 'CalendarEvent',
+    resourceId: event.id,
+  });
+
   revalidatePath('/admin/schedule');
   revalidatePath('/schedule');
 }

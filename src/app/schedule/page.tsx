@@ -16,12 +16,16 @@ import {
   EVENT_TYPE_BG,
   EVENT_TYPE_LABELS,
   monthDateRange,
+  getJobOccurrenceDates,
+  WEEK_DAY_LABELS,
 } from '@/lib/calendar';
 import {
   signupForEvent,
   withdrawFromEvent,
   saveVolunteerDateSlot,
   deleteVolunteerDateSlot,
+  signupForJobOccurrence,
+  withdrawFromJobOccurrence,
 } from './actions';
 
 export default async function SchedulePage({
@@ -51,7 +55,7 @@ export default async function SchedulePage({
         userId: user.id,
         event: { date: monthDateRange(year, month) },
       },
-      select: { eventId: true },
+      select: { eventId: true, event: { select: { jobId: true, date: true } } },
     }),
     prisma.volunteerDateSlot.findMany({
       where: {
@@ -80,11 +84,51 @@ export default async function SchedulePage({
   ]);
 
   const mySignupIds = new Set(mySignups.map((s) => s.eventId));
+
+  // Build a set of jobId+dateKey combinations the user is already signed up for
+  // (covers both explicit events and auto-created events from recurring jobs)
+  const mySignedJobDates = new Set<string>();
+  for (const s of mySignups) {
+    if (s.event.jobId) {
+      mySignedJobDates.add(`${s.event.jobId}__${dateToParam(s.event.date)}`);
+    }
+  }
+
   const mySlotsByDate = new Map<string, typeof mySlots[0]>();
   for (const slot of mySlots) {
     mySlotsByDate.set(dateToParam(slot.date), slot);
   }
 
+  // Build a set of (jobId + dateKey) pairs that already have a CalendarEvent
+  const existingJobDateKeys = new Set<string>();
+  for (const ev of events) {
+    if (ev.job) existingJobDateKeys.add(`${ev.job.id}__${dateToParam(ev.date)}`);
+  }
+
+  // Compute recurring job occurrences for this month (not already covered by a CalendarEvent)
+  const recurringJobs = allJobs.filter((j) => j.scheduleType !== 'ONE_OFF');
+  type Occurrence = {
+    job: typeof recurringJobs[0];
+    date: Date;
+    dateKey: string;
+  };
+  const occurrences: Occurrence[] = [];
+  for (const job of recurringJobs) {
+    for (const date of getJobOccurrenceDates(job, year, month)) {
+      const dk = dateToParam(date);
+      if (!existingJobDateKeys.has(`${job.id}__${dk}`)) {
+        occurrences.push({ job, date, dateKey: dk });
+      }
+    }
+  }
+
+  const occurrencesByDate = new Map<string, Occurrence[]>();
+  for (const occ of occurrences) {
+    if (!occurrencesByDate.has(occ.dateKey)) occurrencesByDate.set(occ.dateKey, []);
+    occurrencesByDate.get(occ.dateKey)!.push(occ);
+  }
+
+  // Group events by date
   const eventsByDate = new Map<string, typeof events>();
   for (const ev of events) {
     const key = dateToParam(ev.date);
@@ -94,6 +138,7 @@ export default async function SchedulePage({
 
   const selectedDateKey = selectedDate ? dateToParam(selectedDate) : null;
   const selectedEvents = selectedDate ? (eventsByDate.get(selectedDateKey!) ?? []) : [];
+  const selectedOccurrences = selectedDate ? (occurrencesByDate.get(selectedDateKey!) ?? []) : [];
   const mySlotForDay = selectedDateKey ? mySlotsByDate.get(selectedDateKey) : null;
 
   const today = new Date();
@@ -101,6 +146,12 @@ export default async function SchedulePage({
 
   const rollingJobs = allJobs.filter((j) => j.isRolling);
   const rosteredJobs = allJobs.filter((j) => !j.isRolling);
+
+  function scheduleLabel(job: typeof recurringJobs[0]): string {
+    if (job.scheduleType === 'WEEKLY') return 'Every ' + job.weekDays.map((d) => WEEK_DAY_LABELS[d]).join(', ');
+    if (job.scheduleType === 'MONTHLY') return job.monthDays.map((d) => `${d}`).join(', ') + ' of month';
+    return '';
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -124,6 +175,9 @@ export default async function SchedulePage({
           </span>
           <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-100 text-amber-800">
             <span className="w-2 h-2 rounded-full bg-amber-500"></span>Help needed
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 text-gray-700">
+            <span className="w-2 h-2 rounded-full bg-gray-400"></span>Recurring job
           </span>
           <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-100 text-green-800">
             <span className="w-2 h-2 rounded-full bg-green-500"></span>My availability
@@ -163,6 +217,7 @@ export default async function SchedulePage({
                   }
                   const dayKey = dateToParam(day);
                   const dayEvents = eventsByDate.get(dayKey) ?? [];
+                  const dayOccs = occurrencesByDate.get(dayKey) ?? [];
                   const hasMySlot = mySlotsByDate.has(dayKey);
                   const isToday = isSameDate(day, today);
                   const isSelected = selectedDate ? isSameDate(day, selectedDate) : false;
@@ -201,8 +256,20 @@ export default async function SchedulePage({
                             {ev.title}
                           </div>
                         ))}
-                        {dayEvents.length > 2 && (
-                          <div className="text-xs text-gray-400">+{dayEvents.length - 2} more</div>
+                        {dayOccs.slice(0, Math.max(0, 2 - dayEvents.length)).map((occ) => {
+                          const key = `${occ.job.id}__${occ.dateKey}`;
+                          return (
+                            <div
+                              key={key}
+                              className="text-xs px-1 py-0.5 rounded truncate border border-dashed bg-gray-50 text-gray-600 border-gray-300"
+                            >
+                              {mySignedJobDates.has(key) && <span className="mr-0.5">✓</span>}
+                              🔁 {occ.job.title}
+                            </div>
+                          );
+                        })}
+                        {dayEvents.length + dayOccs.length > 2 && (
+                          <div className="text-xs text-gray-400">+{dayEvents.length + dayOccs.length - 2} more</div>
                         )}
                       </div>
                     </Link>
@@ -233,12 +300,13 @@ export default async function SchedulePage({
               <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
                 Scheduled Events &amp; Requests
               </h4>
-              {selectedEvents.length === 0 ? (
+              {selectedEvents.length === 0 && selectedOccurrences.length === 0 ? (
                 <p className="text-gray-400 text-sm">
                   No events scheduled for this day — but you can still record your availability below.
                 </p>
               ) : (
                 <div className="space-y-3">
+                  {/* Explicit CalendarEvents */}
                   {selectedEvents.map((ev) => {
                     const isSignedUp = mySignupIds.has(ev.id);
                     const isFull =
@@ -309,6 +377,73 @@ export default async function SchedulePage({
                                   }`}
                                 >
                                   {isFull ? 'Full' : 'Sign up'}
+                                </button>
+                              </form>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Recurring job occurrences */}
+                  {selectedOccurrences.map((occ) => {
+                    const key = `${occ.job.id}__${occ.dateKey}`;
+                    const isSignedUp = mySignedJobDates.has(key);
+
+                    return (
+                      <div
+                        key={key}
+                        className={`p-4 rounded-lg border transition-colors ${
+                          isSignedUp ? 'border-green-200 bg-green-50' : 'border-dashed border-gray-300 bg-gray-50 hover:border-gray-400'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 border border-dashed border-gray-300">
+                                🔁 Recurring Job
+                              </span>
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-white"
+                                style={{ backgroundColor: occ.job.colour }}
+                              >
+                                {occ.job.title}
+                              </span>
+                              {isSignedUp && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                  ✓ Signed up
+                                </span>
+                              )}
+                            </div>
+                            <div className="font-medium text-gray-900 text-sm">{occ.job.title}</div>
+                            {occ.job.description && (
+                              <div className="text-xs text-gray-500 mt-0.5">{occ.job.description}</div>
+                            )}
+                            <div className="text-xs text-gray-400 mt-1">
+                              {scheduleLabel(occ.job)}
+                              {(occ.job.defaultStartTime || occ.job.defaultEndTime) &&
+                                ` · ${occ.job.defaultStartTime ?? ''}${occ.job.defaultEndTime ? `–${occ.job.defaultEndTime}` : ''}`}
+                              {occ.job.defaultMaxSignups && ` · Max ${occ.job.defaultMaxSignups} volunteers`}
+                            </div>
+                          </div>
+                          <div className="shrink-0">
+                            {isSignedUp ? (
+                              <form action={withdrawFromJobOccurrence.bind(null, occ.job.id, occ.dateKey)}>
+                                <button
+                                  type="submit"
+                                  className="text-xs text-red-600 hover:text-red-800 font-medium px-3 py-1.5 rounded-lg border border-red-100 hover:bg-red-50 transition-colors whitespace-nowrap"
+                                >
+                                  Withdraw
+                                </button>
+                              </form>
+                            ) : (
+                              <form action={signupForJobOccurrence.bind(null, occ.job.id, occ.dateKey)}>
+                                <button
+                                  type="submit"
+                                  className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap text-blue-600 hover:text-blue-800 border border-blue-200 hover:bg-blue-50"
+                                >
+                                  Sign up
                                 </button>
                               </form>
                             )}
@@ -394,7 +529,7 @@ export default async function SchedulePage({
                   </div>
                 </div>
 
-                {/* Rolling duties — always show these general duties */}
+                {/* Rolling duties */}
                 {rollingJobs.length > 0 && (
                   <div>
                     <p className="text-xs font-medium text-gray-500 mb-1">
@@ -489,7 +624,7 @@ export default async function SchedulePage({
           </div>
         )}
 
-        {/* Rolling duties info — always visible, explains what&apos;s always available */}
+        {/* General duties info */}
         {rollingJobs.length > 0 && (
           <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
             <h3 className="font-semibold text-gray-900 mb-1">General Volunteering Duties</h3>
@@ -507,6 +642,9 @@ export default async function SchedulePage({
                   <div>
                     <div className="text-sm font-medium text-gray-900">{job.title}</div>
                     {job.description && <div className="text-xs text-gray-500 mt-0.5">{job.description}</div>}
+                    {job.scheduleType !== 'ONE_OFF' && (
+                      <div className="text-xs text-blue-600 mt-0.5">🔁 Recurring: {scheduleLabel(job)}</div>
+                    )}
                   </div>
                 </div>
               ))}
