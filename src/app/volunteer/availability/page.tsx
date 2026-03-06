@@ -1,6 +1,7 @@
 import { requireActiveUser } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
 import { prisma } from '@/lib/prisma';
+import Link from 'next/link';
 import { updateVolunteerAvailability } from '@/app/admin/users/actions';
 
 export const VOLUNTEER_ACTIVITIES = [
@@ -27,11 +28,27 @@ export default async function AvailabilityPage() {
       <NavBar />
       <main className="flex-1 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">My Availability</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">General Activity Preferences</h1>
           <p className="text-gray-500">
-            Select the volunteer activities you are available and willing to help with.
-            Your preferences will be visible to team coordinators.
+            Select the types of activities you are generally willing to help with.
+            Coordinators use this to understand your broad interests.
           </p>
+        </div>
+
+        {/* Call-to-action to use the Schedule for date-specific availability */}
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-3">
+          <span className="text-blue-500 text-xl mt-0.5">📅</span>
+          <div>
+            <p className="text-sm font-medium text-blue-900 mb-0.5">Want to volunteer on a specific day?</p>
+            <p className="text-sm text-blue-700">
+              Use the{' '}
+              <Link href="/schedule" className="font-medium underline hover:text-blue-900">
+                Schedule &amp; Availability calendar
+              </Link>{' '}
+              to pick a date, choose what you can help with (grass cutting, airframe washing, front of house,
+              shop staffing, and more), and sign up for specific events.
+            </p>
+          </div>
         </div>
 
         <form
@@ -46,9 +63,9 @@ export default async function AvailabilityPage() {
           className="space-y-6"
         >
           <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="font-semibold text-gray-900 mb-4">Volunteer Activities</h2>
+            <h2 className="font-semibold text-gray-900 mb-4">General Activity Preferences</h2>
             <p className="text-sm text-gray-500 mb-5">
-              Tick all activities you would like to help with:
+              Tick all activity types you would generally like to help with:
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {VOLUNTEER_ACTIVITIES.map((activity) => {

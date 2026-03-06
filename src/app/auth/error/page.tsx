@@ -6,6 +6,9 @@ const ERROR_MESSAGES: Record<string, string> = {
   Verification: 'The sign-in link is invalid or has expired. Please request a new one.',
   AccountSuspended: 'Your account has been suspended. Please contact the administrator.',
   AccountPending: 'Your account is pending approval. Please contact the administrator.',
+  InvalidCredentials: 'Incorrect email address or password.',
+  NoPassword: 'No password has been set for this account. Please contact your administrator.',
+  OtpInvalid: 'Your verification code was incorrect or has expired. Please sign in again.',
   Default: 'An error occurred during sign in. Please try again.',
 };
 

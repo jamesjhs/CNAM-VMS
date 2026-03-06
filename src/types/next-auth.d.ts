@@ -7,6 +7,7 @@ declare module 'next-auth' {
       id: string;
       status: string;
       capabilities: string[];
+      mustChangePassword: boolean;
     } & DefaultSession['user'];
   }
 }

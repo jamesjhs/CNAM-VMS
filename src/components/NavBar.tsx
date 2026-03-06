@@ -8,7 +8,9 @@ export default async function NavBar() {
   const isAdmin =
     capabilities.includes('admin:users.read') ||
     capabilities.includes('admin:roles.read') ||
-    capabilities.includes('admin:audit.read');
+    capabilities.includes('admin:audit.read') ||
+    capabilities.includes('admin:announcements.write') ||
+    capabilities.includes('admin:calendar.write');
 
   return (
     <nav className="bg-[#1a3a5c] text-white shadow-md">
@@ -23,8 +25,11 @@ export default async function NavBar() {
                 <Link href="/dashboard" className="text-gray-300 hover:text-white text-sm transition-colors">
                   Dashboard
                 </Link>
-                <Link href="/volunteer/availability" className="text-gray-300 hover:text-white text-sm transition-colors">
-                  My Availability
+                <Link href="/schedule" className="text-gray-300 hover:text-white text-sm transition-colors">
+                  Schedule &amp; Availability
+                </Link>
+                <Link href="/announcements" className="text-gray-300 hover:text-white text-sm transition-colors">
+                  Announcements
                 </Link>
                 {isAdmin && (
                   <div className="relative group">
@@ -34,7 +39,7 @@ export default async function NavBar() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                       </svg>
                     </button>
-                    <div className="absolute left-0 top-full hidden group-hover:block bg-white rounded-lg shadow-lg border border-gray-100 min-w-40 py-1 z-50">
+                    <div className="absolute left-0 top-full hidden group-hover:block bg-white rounded-lg shadow-lg border border-gray-100 min-w-44 py-1 z-50">
                       <Link href="/admin" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                         Overview
                       </Link>
@@ -53,6 +58,31 @@ export default async function NavBar() {
                           Teams
                         </Link>
                       )}
+                      {capabilities.includes('admin:audit.read') && (
+                        <Link href="/admin/audit" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          Audit Log
+                        </Link>
+                      )}
+                      {capabilities.includes('admin:files.read') && (
+                        <Link href="/admin/files" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          Files
+                        </Link>
+                      )}
+                      {capabilities.includes('admin:announcements.write') && (
+                        <Link href="/admin/announcements" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          Announcements
+                        </Link>
+                      )}
+                      {capabilities.includes('admin:calendar.write') && (
+                        <Link href="/admin/schedule" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          Schedule
+                        </Link>
+                      )}
+                      {capabilities.includes('admin:calendar.write') && (
+                        <Link href="/admin/schedule/availability" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          Volunteer Availability
+                        </Link>
+                      )}
                     </div>
                   </div>
                 )}
@@ -65,7 +95,9 @@ export default async function NavBar() {
           <div className="flex items-center gap-4">
             {session ? (
               <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-300">{session.user?.email}</span>
+                <Link href="/profile" className="text-sm text-gray-300 hover:text-white transition-colors">
+                  {session.user?.name ?? session.user?.email}
+                </Link>
                 <form
                   action={async () => {
                     'use server';

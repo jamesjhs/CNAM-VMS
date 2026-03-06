@@ -8,6 +8,7 @@ export type SessionUser = {
   image?: string | null;
   status: string;
   capabilities: string[];
+  mustChangePassword: boolean;
 };
 
 /**

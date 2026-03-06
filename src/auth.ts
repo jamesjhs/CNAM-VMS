@@ -1,6 +1,6 @@
 import NextAuth from 'next-auth';
 import { PrismaAdapter } from '@auth/prisma-adapter';
-import Email from 'next-auth/providers/email';
+import Credentials from 'next-auth/providers/credentials';
 import { prisma } from '@/lib/prisma';
 import { CAPABILITIES } from '@/lib/capabilities';
 import type { UserStatus } from '@prisma/client';
@@ -65,47 +65,63 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
   adapter: PrismaAdapter(prisma),
   session: { strategy: 'jwt' },
   providers: [
-    Email({
-      server: {
-        host: process.env.EMAIL_SERVER_HOST,
-        port: Number(process.env.EMAIL_SERVER_PORT ?? 587),
-        auth: {
-          user: process.env.EMAIL_SERVER_USER,
-          pass: process.env.EMAIL_SERVER_PASSWORD,
-        },
+    /**
+     * Credentials provider — used for the two-step auth flow:
+     *  1. submitPassword server action validates email + password and sends OTP
+     *  2. submitOtp server action verifies OTP and creates a one-time completion token
+     *  3. This provider validates that completion token and creates the JWT session
+     */
+    Credentials({
+      credentials: {
+        userId: { type: 'text' },
+        completionToken: { type: 'text' },
       },
-      from: process.env.EMAIL_FROM ?? 'noreply@example.com',
-      normalizeIdentifier(identifier: string): string {
-        // Normalize email to lowercase
-        return identifier.toLowerCase().trim();
+      async authorize(credentials) {
+        const userId = credentials?.userId as string | undefined;
+        const completionToken = credentials?.completionToken as string | undefined;
+
+        if (!userId || !completionToken) return null;
+
+        const identifier = `auth:complete:${userId}`;
+
+        // Find the one-time completion token (valid for 2 minutes)
+        const tokenRecord = await prisma.verificationToken.findFirst({
+          where: { identifier, expires: { gt: new Date() } },
+        });
+
+        if (!tokenRecord || tokenRecord.token !== completionToken) return null;
+
+        // Delete immediately — single-use token
+        await prisma.verificationToken.deleteMany({ where: { identifier } });
+
+        // Fetch the user
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) return null;
+        if (user.status === 'SUSPENDED') return null;
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          image: user.image,
+        };
       },
     }),
   ],
   callbacks: {
-    async signIn({ user }) {
+    async signIn({ user, account }) {
+      // Only run for credentials provider (other providers skip this)
+      if (account?.provider !== 'credentials') return true;
       if (!user.email) return false;
 
       const email = user.email.toLowerCase().trim();
+      const dbUser = await prisma.user.findUnique({ where: { email } });
+      if (!dbUser) return false;
 
-      const dbUser = await prisma.user.findUnique({
-        where: { email },
-      });
-
-      // Allow first-time sign-in to create PENDING user (handled via createUser event)
-      if (!dbUser) {
-        return true;
-      }
-
-      // Block suspended users
       const status: UserStatus = dbUser.status;
-      if (status === 'SUSPENDED') {
-        return '/auth/error?error=AccountSuspended';
-      }
+      if (status === 'SUSPENDED') return '/auth/error?error=AccountSuspended';
 
       // Ensure the root user always has the Root role and all capabilities assigned.
-      // This is idempotent (all upserts / skipDuplicates) so it is safe to run on
-      // every sign-in, which is necessary to repair an existing ACTIVE account that
-      // was created before capabilities were seeded into the database.
       const rootEmail = getRootEmail();
       if (rootEmail && email === rootEmail) {
         await promoteToRootUser(dbUser.id);
@@ -114,7 +130,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
       return true;
     },
     async jwt({ token, user }) {
-      // On initial sign-in, persist the user ID into the JWT
       if (user?.id) {
         token.id = user.id;
       }
@@ -124,11 +139,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
       if (session.user && token.id) {
         session.user.id = token.id;
 
-        // Attach status and capabilities to session
+        // Attach status, mustChangePassword, and capabilities to session
         const dbUser = await prisma.user.findUnique({
           where: { id: token.id },
           select: {
             status: true,
+            mustChangePassword: true,
             userRoles: {
               include: {
                 role: {
@@ -145,6 +161,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
 
         if (dbUser) {
           session.user.status = dbUser.status;
+          session.user.mustChangePassword = dbUser.mustChangePassword;
           const caps = new Set<string>();
           for (const ur of dbUser.userRoles) {
             for (const rc of ur.role.roleCapabilities) {
@@ -159,32 +176,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
   },
   pages: {
     signIn: '/auth/signin',
-    verifyRequest: '/auth/verify-request',
     error: '/auth/error',
   },
   events: {
-    async createUser({ user }) {
-      if (!user.id) return;
-
-      // Log new user creation
-      await prisma.auditLog.create({
-        data: {
-          userId: user.id,
-          action: 'USER_CREATED',
-          resource: 'User',
-          resourceId: user.id,
-          detail: { email: user.email },
-        },
-      });
-
-      // Auto-promote the root user on their very first sign-in.
-      // PrismaAdapter creates the user (status=PENDING) before this event fires,
-      // so we can safely promote them here.
-      const rootEmail = getRootEmail();
-      if (rootEmail && user.email?.toLowerCase().trim() === rootEmail) {
-        await promoteToRootUser(user.id);
-      }
-    },
     async signIn({ user }) {
       if (user.id) {
         await prisma.auditLog.create({
