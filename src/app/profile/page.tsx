@@ -1,6 +1,7 @@
 import { requireAuth } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
 import { prisma } from '@/lib/prisma';
+import Link from 'next/link';
 import { updateOwnProfile, addOwnPhone, removeOwnPhone } from './actions';
 
 const STATUS_STYLES: Record<string, string> = {
@@ -31,7 +32,7 @@ export default async function ProfilePage() {
       <main className="flex-1 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-1">My Profile</h1>
-          <p className="text-gray-500">Update your name and contact details.</p>
+          <p className="text-gray-500">Update your name, contact details, and general activity preferences.</p>
         </div>
 
         {/* Account info */}
@@ -148,6 +149,23 @@ export default async function ProfilePage() {
             </div>
           </div>
         )}
+
+        {/* Activity preferences shortcut */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="font-semibold text-gray-900 mb-1">Activity Preferences</h2>
+            <p className="text-sm text-gray-500">
+              Set the types of volunteering activities you are generally available for. These help coordinators
+              understand your interests.
+            </p>
+          </div>
+          <Link
+            href="/volunteer/availability"
+            className="shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+          >
+            Edit preferences →
+          </Link>
+        </div>
 
         {/* Teams */}
         {user.userTeams.length > 0 && (

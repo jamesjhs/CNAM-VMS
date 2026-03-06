@@ -26,13 +26,10 @@ export default async function NavBar() {
                   Dashboard
                 </Link>
                 <Link href="/schedule" className="text-gray-300 hover:text-white text-sm transition-colors">
-                  Schedule
+                  Schedule &amp; Availability
                 </Link>
                 <Link href="/announcements" className="text-gray-300 hover:text-white text-sm transition-colors">
                   Announcements
-                </Link>
-                <Link href="/volunteer/availability" className="text-gray-300 hover:text-white text-sm transition-colors">
-                  My Availability
                 </Link>
                 {isAdmin && (
                   <div className="relative group">

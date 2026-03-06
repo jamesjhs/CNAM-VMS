@@ -36,7 +36,6 @@ export default async function SchedulePage({
   const currentMonthStr = fmtMonth(year, month);
   const selectedDate = dayParam ? parseDate(dayParam) : null;
 
-  // Fetch events, user signups, user date slots for this month
   const [events, mySignups, mySlots, allJobs, myUpcomingSignups] = await Promise.all([
     prisma.calendarEvent.findMany({
       where: { date: monthDateRange(year, month) },
@@ -86,7 +85,6 @@ export default async function SchedulePage({
     mySlotsByDate.set(dateToParam(slot.date), slot);
   }
 
-  // Group events by date
   const eventsByDate = new Map<string, typeof events>();
   for (const ev of events) {
     const key = dateToParam(ev.date);
@@ -107,10 +105,13 @@ export default async function SchedulePage({
   return (
     <div className="min-h-screen flex flex-col">
       <NavBar />
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
+      <main className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Schedule &amp; Availability</h1>
-          <p className="text-gray-500">Browse events, sign up for shifts, and record your availability.</p>
+          <p className="text-gray-500">
+            Browse upcoming events and sign up for shifts. Click any day to record your availability
+            and choose what you can help with.
+          </p>
         </div>
 
         {/* Legend */}
@@ -129,8 +130,8 @@ export default async function SchedulePage({
           </span>
         </div>
 
+        {/* Calendar */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
-          {/* Month navigation */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <Link
               href={`/schedule?month=${prevMonth(year, month)}`}
@@ -138,9 +139,7 @@ export default async function SchedulePage({
             >
               ← Previous
             </Link>
-            <h2 className="font-semibold text-gray-900">
-              {MONTH_NAMES[month]} {year}
-            </h2>
+            <h2 className="font-semibold text-gray-900">{MONTH_NAMES[month]} {year}</h2>
             <Link
               href={`/schedule?month=${nextMonth(year, month)}`}
               className="text-gray-500 hover:text-gray-900 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors text-sm"
@@ -149,16 +148,12 @@ export default async function SchedulePage({
             </Link>
           </div>
 
-          {/* Day headers */}
           <div className="grid grid-cols-7 border-b border-gray-100">
             {DAY_NAMES_SHORT.map((d) => (
-              <div key={d} className="py-2 text-center text-xs font-medium text-gray-500">
-                {d}
-              </div>
+              <div key={d} className="py-2 text-center text-xs font-medium text-gray-500">{d}</div>
             ))}
           </div>
 
-          {/* Calendar weeks */}
           <div>
             {weeks.map((week, wi) => (
               <div key={wi} className="grid grid-cols-7 border-b border-gray-50 last:border-b-0">
@@ -193,7 +188,7 @@ export default async function SchedulePage({
                           {day.getUTCDate()}
                         </span>
                         {hasMySlot && (
-                          <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" title="My availability" />
+                          <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" title="My availability recorded" />
                         )}
                       </div>
                       <div className="space-y-0.5">
@@ -218,12 +213,11 @@ export default async function SchedulePage({
           </div>
         </div>
 
-        {/* Day detail panel */}
+        {/* ── Unified day detail panel ───────────────────────────────────────── */}
         {selectedDate && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Events for the selected day */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
+            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+              <h3 className="font-semibold text-gray-900">
                 {selectedDate.toLocaleDateString('en-GB', {
                   weekday: 'long',
                   day: 'numeric',
@@ -232,9 +226,17 @@ export default async function SchedulePage({
                   timeZone: 'UTC',
                 })}
               </h3>
+            </div>
 
+            {/* ── Section 1: Scheduled events ──────────────────────────────── */}
+            <div className="px-6 py-5 border-b border-gray-100">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
+                Scheduled Events &amp; Requests
+              </h4>
               {selectedEvents.length === 0 ? (
-                <p className="text-gray-500 text-sm">No events on this day.</p>
+                <p className="text-gray-400 text-sm">
+                  No events scheduled for this day — but you can still record your availability below.
+                </p>
               ) : (
                 <div className="space-y-3">
                   {selectedEvents.map((ev) => {
@@ -243,7 +245,12 @@ export default async function SchedulePage({
                       ev.maxSignups !== null && ev._count.signups >= ev.maxSignups && !isSignedUp;
 
                     return (
-                      <div key={ev.id} className="p-4 rounded-lg border border-gray-100 hover:border-gray-200 transition-colors">
+                      <div
+                        key={ev.id}
+                        className={`p-4 rounded-lg border transition-colors ${
+                          isSignedUp ? 'border-green-200 bg-green-50' : 'border-gray-100 hover:border-gray-200'
+                        }`}
+                      >
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
@@ -270,7 +277,9 @@ export default async function SchedulePage({
                               )}
                             </div>
                             <div className="font-medium text-gray-900 text-sm">{ev.title}</div>
-                            {ev.description && <div className="text-xs text-gray-500 mt-0.5">{ev.description}</div>}
+                            {ev.description && (
+                              <div className="text-xs text-gray-500 mt-0.5">{ev.description}</div>
+                            )}
                             <div className="text-xs text-gray-400 mt-1">
                               {ev.startTime && `${ev.startTime}${ev.endTime ? `–${ev.endTime}` : ''} · `}
                               {ev._count.signups} signed up
@@ -312,46 +321,37 @@ export default async function SchedulePage({
               )}
             </div>
 
-            {/* My availability for this day */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">
-                My Availability on{' '}
-                {selectedDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })}
-              </h3>
+            {/* ── Section 2: My availability for this day ───────────────────── */}
+            <div className="px-6 py-5">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                  My Availability on This Day
+                </h4>
+                {mySlotForDay && (
+                  <form action={deleteVolunteerDateSlot.bind(null, selectedDateKey!)}>
+                    <button
+                      type="submit"
+                      className="text-xs text-red-500 hover:text-red-700 font-medium"
+                    >
+                      Remove availability
+                    </button>
+                  </form>
+                )}
+              </div>
 
-              {mySlotForDay ? (
-                <div className="mb-5 p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-medium text-green-800">
-                        {mySlotForDay.startTime || mySlotForDay.endTime
-                          ? `${mySlotForDay.startTime ?? ''}${mySlotForDay.endTime ? `–${mySlotForDay.endTime}` : ''}`
-                          : 'All day'}
-                      </div>
-                      {mySlotForDay.jobIds.length > 0 && (
-                        <div className="text-xs text-green-700 mt-1">
-                          Jobs: {mySlotForDay.jobIds
-                            .map((id) => allJobs.find((j) => j.id === id)?.title ?? id)
-                            .join(', ')}
-                        </div>
-                      )}
-                      {mySlotForDay.notes && (
-                        <div className="text-xs text-green-600 mt-1">{mySlotForDay.notes}</div>
-                      )}
-                    </div>
-                    <form action={deleteVolunteerDateSlot.bind(null, selectedDateKey!)}>
-                      <button
-                        type="submit"
-                        className="text-xs text-red-600 hover:text-red-800 font-medium whitespace-nowrap"
-                      >
-                        Remove
-                      </button>
-                    </form>
-                  </div>
+              {mySlotForDay && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800 flex items-center gap-2">
+                  <span className="text-green-500">✓</span>
+                  <span>
+                    You have recorded availability for this day
+                    {mySlotForDay.startTime || mySlotForDay.endTime
+                      ? `: ${mySlotForDay.startTime ?? ''}${mySlotForDay.endTime ? `–${mySlotForDay.endTime}` : ''}`
+                      : ' (all day)'}.
+                    {' '}Update using the form below.
+                  </span>
                 </div>
-              ) : null}
+              )}
 
-              {/* Add / update availability form */}
               <form
                 action={async (formData: FormData) => {
                   'use server';
@@ -364,89 +364,119 @@ export default async function SchedulePage({
                     .filter((id) => formData.get(`job_${id}`) === 'on');
                   await saveVolunteerDateSlot(dateStr, startTime, endTime, jobIds, notes);
                 }}
-                className="space-y-4"
+                className="space-y-5"
               >
                 <input type="hidden" name="date" value={selectedDateKey!} />
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">From</label>
-                    <input
-                      name="startTime"
-                      type="time"
-                      defaultValue={mySlotForDay?.startTime ?? ''}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Until</label>
-                    <input
-                      name="endTime"
-                      type="time"
-                      defaultValue={mySlotForDay?.endTime ?? ''}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                {/* Time */}
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-2">What time are you available?</p>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <label className="block text-xs text-gray-400 mb-1">From</label>
+                      <input
+                        name="startTime"
+                        type="time"
+                        defaultValue={mySlotForDay?.startTime ?? ''}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <span className="text-gray-400 text-sm mt-4">–</span>
+                    <div className="flex-1">
+                      <label className="block text-xs text-gray-400 mb-1">Until</label>
+                      <input
+                        name="endTime"
+                        type="time"
+                        defaultValue={mySlotForDay?.endTime ?? ''}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                {/* Rolling jobs */}
+                {/* Rolling duties — always show these general duties */}
                 {rollingJobs.length > 0 && (
                   <div>
-                    <p className="text-xs font-medium text-gray-500 mb-2">Rolling duties I can help with:</p>
-                    <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-gray-500 mb-1">
+                      General duties I can help with on this day:
+                    </p>
+                    <p className="text-xs text-gray-400 mb-3">
+                      These happen regularly at the museum and any extra hands are always welcome.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {rollingJobs.map((job) => (
-                        <label key={job.id} className="flex items-center gap-2 cursor-pointer">
+                        <label key={job.id} className={`flex items-center gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors ${mySlotForDay?.jobIds.includes(job.id)
+                            ? 'border-blue-200 bg-blue-50'
+                            : 'border-gray-100 bg-gray-50 hover:bg-gray-100'}`}>
                           <input
                             type="checkbox"
                             name={`job_${job.id}`}
                             defaultChecked={mySlotForDay?.jobIds.includes(job.id)}
-                            className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                           />
-                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: job.colour }} />
-                          <span className="text-sm text-gray-700">{job.title}</span>
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: job.colour }} />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-gray-900">{job.title}</div>
+                            {job.description && (
+                              <div className="text-xs text-gray-500 truncate">{job.description}</div>
+                            )}
+                          </div>
                         </label>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Rostered jobs */}
+                {/* Rostered roles */}
                 {rosteredJobs.length > 0 && (
                   <div>
-                    <p className="text-xs font-medium text-gray-500 mb-2">Rostered roles I&apos;m willing to do:</p>
-                    <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-gray-500 mb-1">
+                      Rostered roles I&apos;m willing to be assigned to:
+                    </p>
+                    <p className="text-xs text-gray-400 mb-3">
+                      These roles are organised by administrators for specific events.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {rosteredJobs.map((job) => (
-                        <label key={job.id} className="flex items-center gap-2 cursor-pointer">
+                        <label key={job.id} className={`flex items-center gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors ${mySlotForDay?.jobIds.includes(job.id)
+                            ? 'border-violet-200 bg-violet-50'
+                            : 'border-gray-100 bg-gray-50 hover:bg-gray-100'}`}>
                           <input
                             type="checkbox"
                             name={`job_${job.id}`}
                             defaultChecked={mySlotForDay?.jobIds.includes(job.id)}
-                            className="h-3.5 w-3.5 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                            className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
                           />
-                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: job.colour }} />
-                          <span className="text-sm text-gray-700">{job.title}</span>
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: job.colour }} />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-gray-900">{job.title}</div>
+                            {job.description && (
+                              <div className="text-xs text-gray-500 truncate">{job.description}</div>
+                            )}
+                          </div>
                         </label>
                       ))}
                     </div>
                   </div>
                 )}
 
+                {/* Notes */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Notes <span className="text-gray-400 font-normal">(optional)</span></label>
                   <input
                     name="notes"
                     type="text"
                     defaultValue={mySlotForDay?.notes ?? ''}
-                    placeholder="Any additional notes (optional)"
+                    placeholder="e.g. I can only make the morning, or any relevant details"
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+                  className="w-full bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
                 >
-                  {mySlotForDay ? 'Update My Availability' : 'Save My Availability'}
+                  {mySlotForDay ? '✓ Update My Availability' : 'Save My Availability for This Day'}
                 </button>
               </form>
             </div>
@@ -454,25 +484,26 @@ export default async function SchedulePage({
         )}
 
         {!selectedDate && (
-          <div className="bg-blue-50 border border-blue-100 rounded-xl p-6 text-sm text-blue-700">
-            👆 Click on a day to see events, sign up for shifts, or record your availability.
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-5 mb-6 text-sm text-blue-700">
+            👆 Click on any day in the calendar to sign up for events and record what you can help with on that day.
           </div>
         )}
 
-        {/* Rolling jobs info panel */}
+        {/* Rolling duties info — always visible, explains what&apos;s always available */}
         {rollingJobs.length > 0 && (
-          <div className="mt-6 bg-white rounded-xl border border-gray-200 p-6">
-            <h3 className="font-semibold text-gray-900 mb-3">Rolling Duties</h3>
+          <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+            <h3 className="font-semibold text-gray-900 mb-1">General Volunteering Duties</h3>
             <p className="text-sm text-gray-500 mb-4">
-              These duties happen regularly and always need volunteers. Click on any day to indicate you can help with them.
+              These activities happen regularly at the museum and always benefit from extra volunteers.
+              Click any day on the calendar above to indicate you can help — no specific event needed.
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {rollingJobs.map((job) => (
                 <div
                   key={job.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 bg-gray-50"
+                  className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 bg-gray-50"
                 >
-                  <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: job.colour }} />
+                  <span className="w-3 h-3 rounded-full shrink-0 mt-0.5" style={{ backgroundColor: job.colour }} />
                   <div>
                     <div className="text-sm font-medium text-gray-900">{job.title}</div>
                     {job.description && <div className="text-xs text-gray-500 mt-0.5">{job.description}</div>}
@@ -484,11 +515,13 @@ export default async function SchedulePage({
         )}
 
         {/* My upcoming sign-ups */}
-        <div className="mt-6 bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h3 className="font-semibold text-gray-900 mb-1">My Upcoming Sign-ups</h3>
           <p className="text-sm text-gray-500 mb-4">All events you are signed up for in the coming days.</p>
           {myUpcomingSignups.length === 0 ? (
-            <p className="text-gray-400 text-sm">You haven&apos;t signed up for any upcoming events yet. Browse the calendar above to find events.</p>
+            <p className="text-gray-400 text-sm">
+              You haven&apos;t signed up for any upcoming events yet. Browse the calendar above to find events and sign up.
+            </p>
           ) : (
             <div className="space-y-2">
               {myUpcomingSignups.map((signup) => (

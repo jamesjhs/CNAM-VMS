@@ -114,12 +114,13 @@ async function main() {
   // Create default jobs (rolling and rostered)
   const defaultJobs = [
     // Rolling — always available for volunteers to sign up for
-    { title: 'Interior Cleaning', description: 'Cleaning inside the museum buildings and facilities', isRolling: true, colour: '#22c55e' },
-    { title: 'Grass Cutting', description: 'Maintaining the museum grounds and lawns', isRolling: true, colour: '#14b8a6' },
+    { title: 'Grass Cutting', description: 'Maintaining the museum grounds and lawns', isRolling: true, colour: '#22c55e' },
+    { title: 'Airframe Washing', description: 'Washing and cleaning aircraft airframes', isRolling: true, colour: '#3b82f6' },
     { title: 'Front of House Greeting', description: 'Welcoming visitors at the museum entrance', isRolling: true, colour: '#f59e0b' },
+    { title: 'Interior Cleaning', description: 'Cleaning inside the museum buildings and facilities', isRolling: true, colour: '#14b8a6' },
     // Rostered — specific shifts set by administrators
-    { title: 'Aircraft Guide', description: 'Guiding visitors around the aircraft collection', isRolling: false, colour: '#6366f1' },
     { title: 'Shop Staff', description: 'Serving customers in the museum gift shop', isRolling: false, colour: '#ec4899' },
+    { title: 'Aircraft Guide', description: 'Guiding visitors around the aircraft collection', isRolling: false, colour: '#6366f1' },
     { title: 'Tearoom Helper', description: 'Helping in the museum tearoom/café', isRolling: false, colour: '#a855f7' },
   ];
 
