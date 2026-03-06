@@ -17,6 +17,104 @@ Entries are listed in reverse chronological order (newest first). Each entry rec
 
 ---
 
+## 6 March 2026 — Schedule & Calendar System
+
+**Agent session:** GitHub Copilot Coding Agent
+
+**What was done:**
+
+### Core calendar/scheduling feature
+
+Implemented a full volunteer scheduling and availability system, covering all requirements from the brief:
+
+#### New database models (migration `20240105000000_add_schedule`)
+
+| Model | Purpose |
+|---|---|
+| `Job` | Defines roles that need filling. `isRolling=true` means the duty always needs doing (e.g. grass cutting); `isRolling=false` means it appears on a specific rostered event. |
+| `CalendarEvent` | An admin-created entry on the calendar. Type can be `EVENT`, `ROSTER` (a specific shift to fill), or `HELP_NEEDED`. Has an optional job reference, optional time range, and optional maximum sign-up cap. Stored with PostgreSQL `DATE` type so time zones do not affect which day is displayed. |
+| `EventSignup` | Records a volunteer's sign-up for a `CalendarEvent`. Enforces a unique constraint on (event, user) so a user can only sign up once. |
+| `VolunteerDateSlot` | A volunteer's self-declared availability on a specific date: time range (from/until), job preferences (array of Job IDs), and optional notes. Unique per (user, date). |
+
+#### Capabilities
+
+- Added `admin:calendar.write` to `src/lib/capabilities.ts`
+- The Root role automatically receives this capability on next sign-in (via the `promoteToRootUser` mechanism in `src/auth.ts`)
+
+#### New pages
+
+| Path | Access | Purpose |
+|---|---|---|
+| `/schedule` | Any signed-in user | Month calendar grid. Click a day → event detail + sign-up + add/edit own availability for that day. Rolling duties panel at the bottom. |
+| `/admin/schedule` | `admin:calendar.write` | Same calendar, admin view. Click a day → see events + event creation form. Delete any event. |
+| `/admin/schedule/jobs` | `admin:calendar.write` | Create, edit and delete jobs (rolling and rostered). |
+
+#### How the calendar works
+
+- Pure server-rendered month grid (no JS calendar library) — navigation via URL params `?month=YYYY-MM`
+- Clicking a day appends `&day=YYYY-MM-DD` to the URL and reveals a detail panel below the grid
+- All interactions (sign-up, withdraw, save availability, create event, delete event) use Next.js Server Actions with `revalidatePath` so data refreshes without a client-side router
+- Week starts Monday (UK convention)
+- Each day cell shows up to 2–3 event pills (colour-coded by type) plus a green dot if the user has availability recorded for that day; a ✓ tick on pills where the user is signed up
+- `isSameDate()` comparisons are done in UTC throughout to avoid timezone drift
+
+#### Volunteer schedule page features
+
+- **Event sign-up**: "Sign up" / "Withdraw" buttons on each event in the day panel. Server-side capacity check ensures no overbooking.
+- **Date availability**: From/until time inputs, checkboxes for every job (rolling and rostered), free-text notes. Saved via upsert so editing is seamless. Can be removed with a "Remove" button.
+- **Rolling duties panel**: Shows all rolling jobs at the bottom of the page so volunteers know what duties are always available to volunteer for.
+
+#### Admin schedule features
+
+- Create events with: title, description, type (Event / Roster slot / Help needed), start/end time, linked job, max sign-ups
+- Delete any event
+- See signup count per event
+- Navigate to `/admin/schedule/jobs` to manage jobs
+
+#### Job management (`/admin/schedule/jobs`)
+
+- Create new jobs (title, description, type, colour)
+- Eight preset colours (Indigo, Blue, Green, Amber, Red, Pink, Teal, Purple)
+- Edit existing jobs (name, type, colour) inline
+- Delete jobs
+
+#### Seed data
+
+Six default jobs added to `prisma/seed.ts`:
+- **Rolling**: Interior Cleaning, Grass Cutting, Front of House Greeting
+- **Rostered**: Aircraft Guide, Shop Staff, Tearoom Helper
+
+#### Updated pages / components
+
+- **Dashboard** (`/dashboard`): Schedule card now links to `/schedule` (was "Coming soon"). Added "Upcoming Events" panel showing the next 5 events in the next 30 days, with the user's sign-up status. Removed "My Tasks" placeholder card.
+- **Admin panel** (`/admin`): Added "Schedule" card linking to `/admin/schedule`. Stats row now includes Events count.
+- **NavBar**: Added "Schedule" link for all signed-in users. Added "Schedule" entry to Admin dropdown (gated on `admin:calendar.write`). Updated `isAdmin` check to include `admin:calendar.write`.
+
+**Decisions:**
+
+- **No JS calendar library**: The calendar grid is pure server-rendered HTML with Tailwind CSS. Navigation is via `<Link>` components and URL params. This keeps the codebase consistent with the existing pattern of using Server Components + Server Actions, avoids adding a new npm dependency, and ensures the calendar is accessible without JavaScript.
+- **PostgreSQL `DATE` type via Prisma `@db.Date`**: Storing just the date (not datetime) avoids timezone confusion. All date comparisons use UTC throughout.
+- **Job colours as hex strings**: Stored in the DB, displayed inline. Admin picks from 8 preset colours — enough variety without needing a full colour picker.
+- **Unique (userId, date) constraint on `VolunteerDateSlot`**: A user can only have one availability entry per day, which simplifies edits (upsert) and avoids confusion.
+- **`admin:calendar.write` covers both read and write**: Since any admin viewing the schedule also needs to be able to create events, a single capability covers both.
+
+**Known limitations at this stage:**
+
+- No recurring/repeating events. Each calendar event is a one-off. Repeating patterns (e.g. "grass cutting every Saturday") would need a separate model.
+- No email notifications when a user signs up or when capacity changes.
+- The admin cannot currently see a list of who has signed up for an event from the admin schedule page (only the count). A full sign-up list per event could be added.
+- Volunteer date slots are per-day only — there is no support for recurring weekly availability patterns (e.g. "I'm always free on Tuesdays").
+
+**Next steps identified:**
+
+- [ ] Send email notifications to users when an event they're signed up for changes or is cancelled
+- [ ] Admin view: click an event to see the full list of signed-up volunteers
+- [ ] Recurring availability patterns (e.g. "every Tuesday morning")
+- [ ] Task management (create, assign, track individual tasks with due dates)
+- [ ] System Settings page
+
+---
+
 ## 6 March 2026 — Announcements, Audit Log Page, File Library, and Profile Page
 
 **Agent session:** GitHub Copilot Coding Agent

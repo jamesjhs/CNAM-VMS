@@ -9,7 +9,8 @@ export default async function NavBar() {
     capabilities.includes('admin:users.read') ||
     capabilities.includes('admin:roles.read') ||
     capabilities.includes('admin:audit.read') ||
-    capabilities.includes('admin:announcements.write');
+    capabilities.includes('admin:announcements.write') ||
+    capabilities.includes('admin:calendar.write');
 
   return (
     <nav className="bg-[#1a3a5c] text-white shadow-md">
@@ -23,6 +24,9 @@ export default async function NavBar() {
               <>
                 <Link href="/dashboard" className="text-gray-300 hover:text-white text-sm transition-colors">
                   Dashboard
+                </Link>
+                <Link href="/schedule" className="text-gray-300 hover:text-white text-sm transition-colors">
+                  Schedule
                 </Link>
                 <Link href="/announcements" className="text-gray-300 hover:text-white text-sm transition-colors">
                   Announcements
@@ -70,6 +74,11 @@ export default async function NavBar() {
                       {capabilities.includes('admin:announcements.write') && (
                         <Link href="/admin/announcements" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                           Announcements
+                        </Link>
+                      )}
+                      {capabilities.includes('admin:calendar.write') && (
+                        <Link href="/admin/schedule" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          Schedule
                         </Link>
                       )}
                     </div>

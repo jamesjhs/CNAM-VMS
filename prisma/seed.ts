@@ -111,6 +111,27 @@ async function main() {
   }
   console.log(`✅ ${defaultTeams.length} default teams created`);
 
+  // Create default jobs (rolling and rostered)
+  const defaultJobs = [
+    // Rolling — always available for volunteers to sign up for
+    { title: 'Interior Cleaning', description: 'Cleaning inside the museum buildings and facilities', isRolling: true, colour: '#22c55e' },
+    { title: 'Grass Cutting', description: 'Maintaining the museum grounds and lawns', isRolling: true, colour: '#14b8a6' },
+    { title: 'Front of House Greeting', description: 'Welcoming visitors at the museum entrance', isRolling: true, colour: '#f59e0b' },
+    // Rostered — specific shifts set by administrators
+    { title: 'Aircraft Guide', description: 'Guiding visitors around the aircraft collection', isRolling: false, colour: '#6366f1' },
+    { title: 'Shop Staff', description: 'Serving customers in the museum gift shop', isRolling: false, colour: '#ec4899' },
+    { title: 'Tearoom Helper', description: 'Helping in the museum tearoom/café', isRolling: false, colour: '#a855f7' },
+  ];
+
+  for (const job of defaultJobs) {
+    await prisma.job.upsert({
+      where: { title: job.title },
+      update: { description: job.description, isRolling: job.isRolling, colour: job.colour },
+      create: job,
+    });
+  }
+  console.log(`✅ ${defaultJobs.length} default jobs created`);
+
   // Create root user
   const rootEmail = process.env.ROOT_USER_EMAIL;
   const rootName = process.env.ROOT_USER_NAME ?? 'Root Admin';
