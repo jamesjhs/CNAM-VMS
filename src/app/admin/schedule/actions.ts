@@ -20,6 +20,7 @@ export async function createCalendarEvent(
   endTime: string,
   jobId: string,
   maxSignupsStr: string,
+  teamId: string,
 ) {
   const actor = await requireCapability('admin:calendar.write');
 
@@ -38,6 +39,7 @@ export async function createCalendarEvent(
       startTime: startTime.trim() || null,
       endTime: endTime.trim() || null,
       jobId: jobId || null,
+      teamId: teamId || null,
       maxSignups: maxSignupsStr ? parseInt(maxSignupsStr, 10) : null,
       createdById: actor.id,
     },

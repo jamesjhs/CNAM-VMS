@@ -37,12 +37,13 @@ export default async function SchedulePage({
   const selectedDate = dayParam ? parseDate(dayParam) : null;
 
   // Fetch events, user signups, user date slots for this month
-  const [events, mySignups, mySlots, allJobs] = await Promise.all([
+  const [events, mySignups, mySlots, allJobs, myUpcomingSignups] = await Promise.all([
     prisma.calendarEvent.findMany({
       where: { date: monthDateRange(year, month) },
       orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
       include: {
         job: { select: { id: true, title: true, colour: true } },
+        team: { select: { id: true, name: true } },
         _count: { select: { signups: true } },
       },
     }),
@@ -60,6 +61,23 @@ export default async function SchedulePage({
       },
     }),
     prisma.job.findMany({ orderBy: [{ isRolling: 'desc' }, { title: 'asc' }] }),
+    // All future sign-ups (up to next 20, sorted by date)
+    prisma.eventSignup.findMany({
+      where: {
+        userId: user.id,
+        event: { date: { gte: new Date() } },
+      },
+      orderBy: { event: { date: 'asc' } },
+      take: 20,
+      include: {
+        event: {
+          include: {
+            job: { select: { title: true, colour: true } },
+            team: { select: { name: true } },
+          },
+        },
+      },
+    }),
   ]);
 
   const mySignupIds = new Set(mySignups.map((s) => s.eventId));
@@ -232,6 +250,11 @@ export default async function SchedulePage({
                               <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border ${EVENT_TYPE_BG[ev.eventType]}`}>
                                 {EVENT_TYPE_LABELS[ev.eventType]}
                               </span>
+                              {ev.team && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                                  🏷️ {ev.team.name}
+                                </span>
+                              )}
                               {ev.job && (
                                 <span
                                   className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-white"
@@ -459,6 +482,54 @@ export default async function SchedulePage({
             </div>
           </div>
         )}
+
+        {/* My upcoming sign-ups */}
+        <div className="mt-6 bg-white rounded-xl border border-gray-200 p-6">
+          <h3 className="font-semibold text-gray-900 mb-1">My Upcoming Sign-ups</h3>
+          <p className="text-sm text-gray-500 mb-4">All events you are signed up for in the coming days.</p>
+          {myUpcomingSignups.length === 0 ? (
+            <p className="text-gray-400 text-sm">You haven&apos;t signed up for any upcoming events yet. Browse the calendar above to find events.</p>
+          ) : (
+            <div className="space-y-2">
+              {myUpcomingSignups.map((signup) => (
+                <Link
+                  key={signup.id}
+                  href={`/schedule?month=${fmtMonth(signup.event.date.getUTCFullYear(), signup.event.date.getUTCMonth())}&day=${dateToParam(signup.event.date)}`}
+                  className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="text-center w-10 shrink-0">
+                    <div className="text-lg font-bold text-[#1a3a5c] leading-none">
+                      {signup.event.date.getUTCDate()}
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {signup.event.date.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' })}
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border ${EVENT_TYPE_BG[signup.event.eventType]}`}>
+                        {EVENT_TYPE_LABELS[signup.event.eventType]}
+                      </span>
+                      {signup.event.team && (
+                        <span className="text-xs text-gray-500">🏷️ {signup.event.team.name}</span>
+                      )}
+                    </div>
+                    <div className="text-sm font-medium text-gray-900 truncate">{signup.event.title}</div>
+                    {signup.event.startTime && (
+                      <div className="text-xs text-gray-400">
+                        {signup.event.startTime}{signup.event.endTime ? `–${signup.event.endTime}` : ''}
+                        {signup.event.job && ` · ${signup.event.job.title}`}
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-xs text-gray-400 shrink-0">
+                    {signup.event.date.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' })}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
