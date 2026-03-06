@@ -45,12 +45,11 @@ export default async function AdminPage() {
             badge={`${roleCount} roles`}
           />
           <AdminCard
-            href="#"
+            href="/admin/teams"
             icon="🏷️"
             title="Teams"
             description="Manage volunteer teams and group assignments."
             badge={`${teamCount} teams`}
-            comingSoon
           />
           <AdminCard
             href="#"
