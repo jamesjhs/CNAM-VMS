@@ -17,6 +17,99 @@ Entries are listed in reverse chronological order (newest first). Each entry rec
 
 ---
 
+## 6 March 2026 — Announcements, Audit Log Page, File Library, and Profile Page
+
+**Agent session:** GitHub Copilot Coding Agent
+
+**What was done:**
+
+Implemented four new features that were previously listed as "coming soon" or placeholder links in the dashboard and admin panel:
+
+### 1. Announcements
+
+A new `Announcement` model was added to `prisma/schema.prisma` with fields for `title`, `body`, `pinned`, and `authorId`. A Prisma migration (`20240104000000_add_announcements`) was created.
+
+A new capability `admin:announcements.write` was added to `src/lib/capabilities.ts`.
+
+Three new pages and an actions file were created:
+
+| Path | Who can access | What it does |
+|---|---|---|
+| `/admin/announcements` | Users with `admin:announcements.write` | Create, pin/unpin, and delete announcements |
+| `/announcements` | Any signed-in user | Read all announcements (pinned ones shown first) |
+
+The dashboard (`/dashboard`) was updated to:
+- Link the "Announcements" card to `/announcements` (was `#`)
+- Show a preview of the three most recent announcements
+
+### 2. Audit Log Page (`/admin/audit`)
+
+A full-page audit log viewer was added at `/admin/audit`. Features:
+- Paginated table (50 events per page) showing timestamp, user, action, resource, and details
+- Free-text filter by action keyword (e.g. `USER_CREATED`)
+- Free-text filter by user email or name
+- Accessible to users with the `admin:audit.read` capability
+
+The "Audit Logs" card on the admin panel (`/admin`) was updated to link to `/admin/audit` (it was previously marked "Coming soon").
+
+### 3. File Library Page (`/admin/files`)
+
+A file management page was added at `/admin/files`. Features:
+- Table of all uploaded files with original name, MIME type, size, uploader, and upload date
+- Download button for each file (served via new API route `GET /api/files/[id]`)
+- Delete button (removes the database record and the physical file from disk)
+- Accessible to users with the `admin:files.read` capability; delete requires `admin:files.write`
+
+A new API route `GET /api/files/[id]` was created to securely serve file downloads. It:
+- Validates the user is authenticated and has `admin:files.read` or `admin:files.write`
+- Looks up the `FileAsset` record and resolves the file path via the existing `safeUploadPath` helper (preventing path traversal)
+- Sets the correct `Content-Disposition` header so the browser downloads the file with its original name
+
+The "File Assets" card on the admin panel was updated to link to `/admin/files` (was "Coming soon").
+
+### 4. Profile Page (`/profile`)
+
+A self-service profile page was added at `/profile`, accessible to any signed-in user. Features:
+- View account details (email, status, account type, join date)
+- Edit display name
+- Add and remove own telephone numbers (enforced ownership check — users can only remove their own numbers)
+- View assigned roles and teams
+- View own capabilities/permissions
+
+### NavBar improvements
+
+- Added links to `/announcements` and changed the user name/email in the top-right to a clickable link to `/profile`
+- Added Audit Log, Files, and Announcements to the Admin dropdown (each shown only when the user has the relevant capability)
+- Updated the `isAdmin` check to include `admin:announcements.write`
+
+### Dashboard improvements
+
+- Added "My Availability" and "My Profile" cards linking to real pages
+- "Announcements" card now links to `/announcements`
+- "My Tasks" and "Schedule" remain as "Coming soon" placeholders until those features are implemented
+
+**Decisions:**
+
+- The announcements feature was implemented as a simple, flat list (not threaded comments or categories) to match the scale and needs of a small volunteer organisation.
+- File downloads are served through a Next.js API route rather than exposing the `uploads/` directory directly, so that access control is always enforced by the application.
+- The profile page uses separate server actions from the admin user management actions, so that a volunteer can only update their own profile and cannot elevate their own status or role.
+
+**Known limitations at this stage:**
+
+- Task management and scheduling/shift calendar remain unimplemented — dashboard cards for these are still "Coming soon" placeholders.
+- There is no in-app "request access" form for new volunteers; they must still contact an administrator.
+- System Settings page is not yet implemented.
+
+**Next steps identified:**
+
+- [ ] Implement task management (create, assign, complete tasks with due dates and priorities)
+- [ ] Implement scheduling / shift calendar
+- [ ] Add a "request access" form so new volunteers can self-register (pending admin approval)
+- [ ] Build System Settings page (e.g. site name, contact details)
+- [ ] Set up automated testing
+
+---
+
 ## 5 March 2026 — Bug Fix: "auth is not a function" on Home Page
 
 **Agent session:** GitHub Copilot Coding Agent

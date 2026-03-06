@@ -41,6 +41,7 @@ model User {
   fileAssets    FileAsset[]
   phones        UserPhone[]
   availability  VolunteerAvailability?
+  announcements Announcement[]
 
   @@map("users")
 }
@@ -200,6 +201,20 @@ model Team {
   userTeams UserTeam[]
 
   @@map("teams")
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  pinned    Boolean  @default(false)
+  authorId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@map("announcements")
 }
 
 model UserTeam {

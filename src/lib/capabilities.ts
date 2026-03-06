@@ -9,6 +9,7 @@ export const CAPABILITIES = [
   { key: 'admin:audit.read', description: 'View audit logs' },
   { key: 'admin:files.read', description: 'View all uploaded files' },
   { key: 'admin:files.write', description: 'Upload and manage files' },
+  { key: 'admin:announcements.write', description: 'Create and manage announcements' },
   { key: 'admin:theme.write', description: 'Manage site theme and settings' },
   { key: 'volunteer:tasks.read', description: 'View tasks' },
   { key: 'volunteer:tasks.write', description: 'Create and update tasks' },
