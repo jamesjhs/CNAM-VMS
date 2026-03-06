@@ -12,6 +12,7 @@ import {
   removeRole,
   assignTeam,
   removeTeam,
+  adminSetPassword,
 } from '../actions';
 import DeleteUserButton from './DeleteUserButton';
 import type { UserStatus, UserAccountType } from '@prisma/client';
@@ -233,6 +234,37 @@ export default async function UserDetailPage({
             </p>
             <DeleteUserButton userId={user.id} userEmail={user.email ?? ''} />
           </div>
+        </div>
+
+        {/* Set / reset password */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+          <h2 className="font-semibold text-gray-900 mb-1">Set Password</h2>
+          <p className="text-gray-500 text-sm mb-4">
+            Set a temporary password for this user. They will be required to change it on their next sign-in.
+          </p>
+          <form
+            action={async (formData: FormData) => {
+              'use server';
+              const newPassword = formData.get('newPassword') as string;
+              await adminSetPassword(user.id, newPassword);
+            }}
+            className="flex flex-col sm:flex-row gap-3"
+          >
+            <input
+              name="newPassword"
+              type="password"
+              required
+              minLength={8}
+              placeholder="Temporary password (min. 8 characters)"
+              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              type="submit"
+              className="bg-amber-600 hover:bg-amber-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+            >
+              Set password
+            </button>
+          </form>
         </div>
 
         {/* Roles */}

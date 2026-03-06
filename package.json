@@ -11,6 +11,7 @@
     "db:generate": "npx prisma generate",
     "db:migrate": "npx prisma migrate dev",
     "db:seed": "ts-node --project tsconfig.seed.json prisma/seed.ts",
+    "db:set-initial-password": "ts-node --project tsconfig.seed.json scripts/set-initial-password.ts",
     "db:studio": "npx prisma studio"
   },
   "dependencies": {
