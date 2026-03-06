@@ -6,11 +6,14 @@ import Link from 'next/link';
 export default async function AdminPage() {
   const user = await requireCapability('admin:users.read');
 
-  const [userCount, roleCount, teamCount, auditCount] = await Promise.all([
+  const [userCount, roleCount, teamCount, auditCount, fileCount, announcementCount, eventCount] = await Promise.all([
     prisma.user.count(),
     prisma.role.count(),
     prisma.team.count(),
     prisma.auditLog.count(),
+    prisma.fileAsset.count(),
+    prisma.announcement.count(),
+    prisma.calendarEvent.count(),
   ]);
 
   const recentAuditLogs = await prisma.auditLog.findMany({
@@ -52,19 +55,32 @@ export default async function AdminPage() {
             badge={`${teamCount} teams`}
           />
           <AdminCard
-            href="#"
+            href="/admin/audit"
             icon="📊"
             title="Audit Logs"
             description="View a full audit trail of all actions taken in the system."
             badge={`${auditCount} events`}
-            comingSoon
           />
           <AdminCard
-            href="#"
+            href="/admin/files"
             icon="📁"
             title="File Assets"
             description="View and manage uploaded files and documents."
-            comingSoon
+            badge={`${fileCount} file${fileCount !== 1 ? 's' : ''}`}
+          />
+          <AdminCard
+            href="/admin/announcements"
+            icon="📣"
+            title="Announcements"
+            description="Create and manage announcements for volunteers."
+            badge={`${announcementCount} announcement${announcementCount !== 1 ? 's' : ''}`}
+          />
+          <AdminCard
+            href="/admin/schedule"
+            icon="📅"
+            title="Schedule"
+            description="Create events, roster slots and help requests on the volunteer calendar."
+            badge={`${eventCount} event${eventCount !== 1 ? 's' : ''}`}
           />
           <AdminCard
             href="#"
@@ -118,11 +134,14 @@ export default async function AdminPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-6 mb-8">
-          <StatCard label="Total Users" value={userCount} icon="👥" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4 mb-8">
+          <StatCard label="Users" value={userCount} icon="👥" />
           <StatCard label="Roles" value={roleCount} icon="🎭" />
           <StatCard label="Teams" value={teamCount} icon="🏷️" />
           <StatCard label="Audit Events" value={auditCount} icon="📊" />
+          <StatCard label="Files" value={fileCount} icon="📁" />
+          <StatCard label="Announcements" value={announcementCount} icon="📣" />
+          <StatCard label="Events" value={eventCount} icon="📅" />
         </div>
 
         {/* Recent audit logs */}

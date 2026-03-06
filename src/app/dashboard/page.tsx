@@ -1,9 +1,51 @@
 import { requireAuth } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
 import Link from 'next/link';
+import { prisma } from '@/lib/prisma';
+import { EVENT_TYPE_BG, EVENT_TYPE_LABELS, fmtMonth, dateToParam } from '@/lib/calendar';
 
 export default async function DashboardPage() {
   const user = await requireAuth();
+
+  const now = new Date();
+  const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+
+  // Fetch upcoming events (next 30 days) and user's signups
+  const [announcements, upcomingEvents, mySignupIds] = await Promise.all([
+    prisma.announcement.findMany({
+      orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
+      take: 3,
+      select: { id: true, title: true, pinned: true, createdAt: true },
+    }),
+    prisma.calendarEvent.findMany({
+      where: {
+        date: {
+          gte: todayUTC,
+          lt: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 30)),
+        },
+      },
+      orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
+      take: 5,
+      include: {
+        job: { select: { title: true, colour: true } },
+        _count: { select: { signups: true } },
+      },
+    }),
+    prisma.eventSignup.findMany({
+      where: {
+        userId: user.id,
+        event: {
+          date: {
+            gte: todayUTC,
+            lt: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 30)),
+          },
+        },
+      },
+      select: { eventId: true },
+    }),
+  ]);
+
+  const mySignupSet = new Set(mySignupIds.map((s) => s.eventId));
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -20,10 +62,79 @@ export default async function DashboardPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <DashCard title="My Tasks" icon="📋" href="#" description="View and manage your assigned tasks." />
-          <DashCard title="Schedule" icon="📅" href="#" description="Check your upcoming shifts and availability." />
-          <DashCard title="Announcements" icon="📣" href="#" description="Latest news and updates from the museum." />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+          <DashCard title="Schedule &amp; Availability" icon="📅" href="/schedule" description="Browse events, sign up for shifts, record your availability, and choose what you can help with." />
+          <DashCard title="Announcements" icon="📣" href="/announcements" description="Latest news and updates from the museum." />
+          <DashCard title="My Profile" icon="👤" href="/profile" description="Update your name, contact details, and general activity preferences." />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Upcoming events preview */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-gray-900">Upcoming Events</h2>
+              <Link href="/schedule" className="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                View calendar →
+              </Link>
+            </div>
+            {upcomingEvents.length === 0 ? (
+              <p className="text-gray-500 text-sm">No upcoming events in the next 30 days.</p>
+            ) : (
+              <div className="space-y-3">
+                {upcomingEvents.map((ev) => (
+                  <Link
+                    key={ev.id}
+                    href={`/schedule?month=${fmtMonth(ev.date.getUTCFullYear(), ev.date.getUTCMonth())}&day=${dateToParam(ev.date)}`}
+                    className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border ${EVENT_TYPE_BG[ev.eventType]}`}>
+                          {EVENT_TYPE_LABELS[ev.eventType]}
+                        </span>
+                        {mySignupSet.has(ev.id) && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">✓ Signed up</span>
+                        )}
+                      </div>
+                      <div className="text-sm font-medium text-gray-900 truncate">{ev.title}</div>
+                      <div className="text-xs text-gray-400 mt-0.5">
+                        {ev.date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })}
+                        {ev.startTime && ` · ${ev.startTime}`}
+                        {ev.job && ` · ${ev.job.title}`}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Recent announcements */}
+          {announcements.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-semibold text-gray-900">Recent Announcements</h2>
+                <Link href="/announcements" className="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                  View all →
+                </Link>
+              </div>
+              <div className="space-y-3">
+                {announcements.map((ann) => (
+                  <div key={ann.id} className="flex items-start gap-2">
+                    {ann.pinned && <span className="text-amber-500 text-xs mt-0.5">📌</span>}
+                    <div>
+                      <Link href="/announcements" className="text-sm font-medium text-gray-900 hover:text-blue-600">
+                        {ann.title}
+                      </Link>
+                      <div className="text-xs text-gray-400 mt-0.5">
+                        {ann.createdAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </div>
@@ -42,13 +153,11 @@ function DashCard({
   description: string;
 }) {
   return (
-    <Link
-      href={href}
-      className="block bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow"
-    >
+    <Link href={href} className="block bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
       <div className="text-3xl mb-3">{icon}</div>
       <h2 className="font-semibold text-gray-900 mb-1">{title}</h2>
       <p className="text-gray-500 text-sm">{description}</p>
     </Link>
   );
 }
+

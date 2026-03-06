@@ -357,6 +357,37 @@ export async function deleteTeam(teamId: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Password management (admin)
+// ---------------------------------------------------------------------------
+
+export async function adminSetPassword(userId: string, newPassword: string) {
+  const actor = await requireCapability('admin:users.write');
+
+  const trimmedPassword = newPassword.trim();
+  if (trimmedPassword.length < 8) return;
+
+  const { hashPassword } = await import('@/lib/password');
+  const hash = await hashPassword(trimmedPassword);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      passwordHash: hash,
+      mustChangePassword: true, // Force change on next login
+    },
+  });
+
+  await logAudit({
+    userId: actor.id,
+    action: 'ADMIN_PASSWORD_SET',
+    resource: 'User',
+    resourceId: userId,
+  });
+
+  revalidatePath(`/admin/users/${userId}`);
+}
+
+// ---------------------------------------------------------------------------
 // Volunteer availability actions
 // ---------------------------------------------------------------------------
 

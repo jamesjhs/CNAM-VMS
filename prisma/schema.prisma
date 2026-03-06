@@ -22,6 +22,18 @@ enum UserAccountType {
   MEMBER
 }
 
+enum CalendarEventType {
+  EVENT
+  ROSTER
+  HELP_NEEDED
+}
+
+enum JobScheduleType {
+  ONE_OFF
+  WEEKLY
+  MONTHLY
+}
+
 model User {
   id            String          @id @default(cuid())
   email         String          @unique
@@ -30,6 +42,8 @@ model User {
   image         String?
   status        UserStatus      @default(PENDING)
   accountType   UserAccountType @default(VOLUNTEER)
+  passwordHash       String?
+  mustChangePassword Boolean         @default(false)
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
@@ -41,6 +55,10 @@ model User {
   fileAssets    FileAsset[]
   phones        UserPhone[]
   availability  VolunteerAvailability?
+  announcements Announcement[]
+  calendarEvents CalendarEvent[] @relation("CalendarEventCreator")
+  eventSignups   EventSignup[]
+  dateSlots      VolunteerDateSlot[]
 
   @@map("users")
 }
@@ -197,9 +215,24 @@ model Team {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  userTeams UserTeam[]
+  userTeams      UserTeam[]
+  calendarEvents CalendarEvent[]
 
   @@map("teams")
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  pinned    Boolean  @default(false)
+  authorId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@map("announcements")
 }
 
 model UserTeam {
@@ -212,4 +245,91 @@ model UserTeam {
 
   @@id([userId, teamId])
   @@map("user_teams")
+}
+
+// ---------------------------------------------------------------------------
+// Jobs — rolling duties that always need doing, or rostered slots
+// ---------------------------------------------------------------------------
+
+model Job {
+  id          String          @id @default(cuid())
+  title       String          @unique
+  description String?
+  isRolling   Boolean         @default(false)
+  colour      String          @default("#6366f1")
+  // Recurrence
+  scheduleType      JobScheduleType @default(ONE_OFF)
+  weekDays          Int[]           // 0=Mon … 6=Sun; used when scheduleType=WEEKLY
+  monthDays         Int[]           // 1..31; used when scheduleType=MONTHLY
+  defaultStartTime  String?
+  defaultEndTime    String?
+  defaultMaxSignups Int?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  calendarEvents CalendarEvent[]
+
+  @@map("jobs")
+}
+
+// ---------------------------------------------------------------------------
+// Calendar events — admin-created events, roster slots, help requests
+// ---------------------------------------------------------------------------
+
+model CalendarEvent {
+  id          String            @id @default(cuid())
+  title       String
+  description String?
+  eventType   CalendarEventType @default(EVENT)
+  date        DateTime          @db.Date
+  startTime   String?
+  endTime     String?
+  jobId       String?
+  teamId      String?
+  maxSignups  Int?
+  createdById String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  job       Job?          @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  team      Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  createdBy User?         @relation("CalendarEventCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  signups   EventSignup[]
+
+  @@map("calendar_events")
+}
+
+model EventSignup {
+  id         String   @id @default(cuid())
+  eventId    String
+  userId     String
+  notes      String?
+  signedUpAt DateTime @default(now())
+
+  event CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@map("event_signups")
+}
+
+// ---------------------------------------------------------------------------
+// Volunteer date slots — specific-date availability with optional timings & job prefs
+// ---------------------------------------------------------------------------
+
+model VolunteerDateSlot {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime @db.Date
+  startTime String?
+  endTime   String?
+  jobIds    String[]
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@map("volunteer_date_slots")
 }

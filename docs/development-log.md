@@ -17,6 +17,197 @@ Entries are listed in reverse chronological order (newest first). Each entry rec
 
 ---
 
+## 6 March 2026 — Schedule & Calendar System
+
+**Agent session:** GitHub Copilot Coding Agent
+
+**What was done:**
+
+### Core calendar/scheduling feature
+
+Implemented a full volunteer scheduling and availability system, covering all requirements from the brief:
+
+#### New database models (migration `20240105000000_add_schedule`)
+
+| Model | Purpose |
+|---|---|
+| `Job` | Defines roles that need filling. `isRolling=true` means the duty always needs doing (e.g. grass cutting); `isRolling=false` means it appears on a specific rostered event. |
+| `CalendarEvent` | An admin-created entry on the calendar. Type can be `EVENT`, `ROSTER` (a specific shift to fill), or `HELP_NEEDED`. Has an optional job reference, optional time range, and optional maximum sign-up cap. Stored with PostgreSQL `DATE` type so time zones do not affect which day is displayed. |
+| `EventSignup` | Records a volunteer's sign-up for a `CalendarEvent`. Enforces a unique constraint on (event, user) so a user can only sign up once. |
+| `VolunteerDateSlot` | A volunteer's self-declared availability on a specific date: time range (from/until), job preferences (array of Job IDs), and optional notes. Unique per (user, date). |
+
+#### Capabilities
+
+- Added `admin:calendar.write` to `src/lib/capabilities.ts`
+- The Root role automatically receives this capability on next sign-in (via the `promoteToRootUser` mechanism in `src/auth.ts`)
+
+#### New pages
+
+| Path | Access | Purpose |
+|---|---|---|
+| `/schedule` | Any signed-in user | Month calendar grid. Click a day → event detail + sign-up + add/edit own availability for that day. Rolling duties panel at the bottom. |
+| `/admin/schedule` | `admin:calendar.write` | Same calendar, admin view. Click a day → see events + event creation form. Delete any event. |
+| `/admin/schedule/jobs` | `admin:calendar.write` | Create, edit and delete jobs (rolling and rostered). |
+
+#### How the calendar works
+
+- Pure server-rendered month grid (no JS calendar library) — navigation via URL params `?month=YYYY-MM`
+- Clicking a day appends `&day=YYYY-MM-DD` to the URL and reveals a detail panel below the grid
+- All interactions (sign-up, withdraw, save availability, create event, delete event) use Next.js Server Actions with `revalidatePath` so data refreshes without a client-side router
+- Week starts Monday (UK convention)
+- Each day cell shows up to 2–3 event pills (colour-coded by type) plus a green dot if the user has availability recorded for that day; a ✓ tick on pills where the user is signed up
+- `isSameDate()` comparisons are done in UTC throughout to avoid timezone drift
+
+#### Volunteer schedule page features
+
+- **Event sign-up**: "Sign up" / "Withdraw" buttons on each event in the day panel. Server-side capacity check ensures no overbooking.
+- **Date availability**: From/until time inputs, checkboxes for every job (rolling and rostered), free-text notes. Saved via upsert so editing is seamless. Can be removed with a "Remove" button.
+- **Rolling duties panel**: Shows all rolling jobs at the bottom of the page so volunteers know what duties are always available to volunteer for.
+
+#### Admin schedule features
+
+- Create events with: title, description, type (Event / Roster slot / Help needed), start/end time, linked job, max sign-ups
+- Delete any event
+- See signup count per event
+- Navigate to `/admin/schedule/jobs` to manage jobs
+
+#### Job management (`/admin/schedule/jobs`)
+
+- Create new jobs (title, description, type, colour)
+- Eight preset colours (Indigo, Blue, Green, Amber, Red, Pink, Teal, Purple)
+- Edit existing jobs (name, type, colour) inline
+- Delete jobs
+
+#### Seed data
+
+Six default jobs added to `prisma/seed.ts`:
+- **Rolling**: Interior Cleaning, Grass Cutting, Front of House Greeting
+- **Rostered**: Aircraft Guide, Shop Staff, Tearoom Helper
+
+#### Updated pages / components
+
+- **Dashboard** (`/dashboard`): Schedule card now links to `/schedule` (was "Coming soon"). Added "Upcoming Events" panel showing the next 5 events in the next 30 days, with the user's sign-up status. Removed "My Tasks" placeholder card.
+- **Admin panel** (`/admin`): Added "Schedule" card linking to `/admin/schedule`. Stats row now includes Events count.
+- **NavBar**: Added "Schedule" link for all signed-in users. Added "Schedule" entry to Admin dropdown (gated on `admin:calendar.write`). Updated `isAdmin` check to include `admin:calendar.write`.
+
+**Decisions:**
+
+- **No JS calendar library**: The calendar grid is pure server-rendered HTML with Tailwind CSS. Navigation is via `<Link>` components and URL params. This keeps the codebase consistent with the existing pattern of using Server Components + Server Actions, avoids adding a new npm dependency, and ensures the calendar is accessible without JavaScript.
+- **PostgreSQL `DATE` type via Prisma `@db.Date`**: Storing just the date (not datetime) avoids timezone confusion. All date comparisons use UTC throughout.
+- **Job colours as hex strings**: Stored in the DB, displayed inline. Admin picks from 8 preset colours — enough variety without needing a full colour picker.
+- **Unique (userId, date) constraint on `VolunteerDateSlot`**: A user can only have one availability entry per day, which simplifies edits (upsert) and avoids confusion.
+- **`admin:calendar.write` covers both read and write**: Since any admin viewing the schedule also needs to be able to create events, a single capability covers both.
+
+**Known limitations at this stage:**
+
+- No recurring/repeating events. Each calendar event is a one-off. Repeating patterns (e.g. "grass cutting every Saturday") would need a separate model.
+- No email notifications when a user signs up or when capacity changes.
+- The admin cannot currently see a list of who has signed up for an event from the admin schedule page (only the count). A full sign-up list per event could be added.
+- Volunteer date slots are per-day only — there is no support for recurring weekly availability patterns (e.g. "I'm always free on Tuesdays").
+
+**Next steps identified:**
+
+- [ ] Send email notifications to users when an event they're signed up for changes or is cancelled
+- [ ] Admin view: click an event to see the full list of signed-up volunteers
+- [ ] Recurring availability patterns (e.g. "every Tuesday morning")
+- [ ] Task management (create, assign, track individual tasks with due dates)
+- [ ] System Settings page
+
+---
+
+## 6 March 2026 — Announcements, Audit Log Page, File Library, and Profile Page
+
+**Agent session:** GitHub Copilot Coding Agent
+
+**What was done:**
+
+Implemented four new features that were previously listed as "coming soon" or placeholder links in the dashboard and admin panel:
+
+### 1. Announcements
+
+A new `Announcement` model was added to `prisma/schema.prisma` with fields for `title`, `body`, `pinned`, and `authorId`. A Prisma migration (`20240104000000_add_announcements`) was created.
+
+A new capability `admin:announcements.write` was added to `src/lib/capabilities.ts`.
+
+Three new pages and an actions file were created:
+
+| Path | Who can access | What it does |
+|---|---|---|
+| `/admin/announcements` | Users with `admin:announcements.write` | Create, pin/unpin, and delete announcements |
+| `/announcements` | Any signed-in user | Read all announcements (pinned ones shown first) |
+
+The dashboard (`/dashboard`) was updated to:
+- Link the "Announcements" card to `/announcements` (was `#`)
+- Show a preview of the three most recent announcements
+
+### 2. Audit Log Page (`/admin/audit`)
+
+A full-page audit log viewer was added at `/admin/audit`. Features:
+- Paginated table (50 events per page) showing timestamp, user, action, resource, and details
+- Free-text filter by action keyword (e.g. `USER_CREATED`)
+- Free-text filter by user email or name
+- Accessible to users with the `admin:audit.read` capability
+
+The "Audit Logs" card on the admin panel (`/admin`) was updated to link to `/admin/audit` (it was previously marked "Coming soon").
+
+### 3. File Library Page (`/admin/files`)
+
+A file management page was added at `/admin/files`. Features:
+- Table of all uploaded files with original name, MIME type, size, uploader, and upload date
+- Download button for each file (served via new API route `GET /api/files/[id]`)
+- Delete button (removes the database record and the physical file from disk)
+- Accessible to users with the `admin:files.read` capability; delete requires `admin:files.write`
+
+A new API route `GET /api/files/[id]` was created to securely serve file downloads. It:
+- Validates the user is authenticated and has `admin:files.read` or `admin:files.write`
+- Looks up the `FileAsset` record and resolves the file path via the existing `safeUploadPath` helper (preventing path traversal)
+- Sets the correct `Content-Disposition` header so the browser downloads the file with its original name
+
+The "File Assets" card on the admin panel was updated to link to `/admin/files` (was "Coming soon").
+
+### 4. Profile Page (`/profile`)
+
+A self-service profile page was added at `/profile`, accessible to any signed-in user. Features:
+- View account details (email, status, account type, join date)
+- Edit display name
+- Add and remove own telephone numbers (enforced ownership check — users can only remove their own numbers)
+- View assigned roles and teams
+- View own capabilities/permissions
+
+### NavBar improvements
+
+- Added links to `/announcements` and changed the user name/email in the top-right to a clickable link to `/profile`
+- Added Audit Log, Files, and Announcements to the Admin dropdown (each shown only when the user has the relevant capability)
+- Updated the `isAdmin` check to include `admin:announcements.write`
+
+### Dashboard improvements
+
+- Added "My Availability" and "My Profile" cards linking to real pages
+- "Announcements" card now links to `/announcements`
+- "My Tasks" and "Schedule" remain as "Coming soon" placeholders until those features are implemented
+
+**Decisions:**
+
+- The announcements feature was implemented as a simple, flat list (not threaded comments or categories) to match the scale and needs of a small volunteer organisation.
+- File downloads are served through a Next.js API route rather than exposing the `uploads/` directory directly, so that access control is always enforced by the application.
+- The profile page uses separate server actions from the admin user management actions, so that a volunteer can only update their own profile and cannot elevate their own status or role.
+
+**Known limitations at this stage:**
+
+- Task management and scheduling/shift calendar remain unimplemented — dashboard cards for these are still "Coming soon" placeholders.
+- There is no in-app "request access" form for new volunteers; they must still contact an administrator.
+- System Settings page is not yet implemented.
+
+**Next steps identified:**
+
+- [ ] Implement task management (create, assign, complete tasks with due dates and priorities)
+- [ ] Implement scheduling / shift calendar
+- [ ] Add a "request access" form so new volunteers can self-register (pending admin approval)
+- [ ] Build System Settings page (e.g. site name, contact details)
+- [ ] Set up automated testing
+
+---
+
 ## 5 March 2026 — Bug Fix: "auth is not a function" on Home Page
 
 **Agent session:** GitHub Copilot Coding Agent
