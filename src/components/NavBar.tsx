@@ -81,6 +81,11 @@ export default async function NavBar() {
                           Schedule
                         </Link>
                       )}
+                      {capabilities.includes('admin:calendar.write') && (
+                        <Link href="/admin/schedule/availability" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          Volunteer Availability
+                        </Link>
+                      )}
                     </div>
                   </div>
                 )}

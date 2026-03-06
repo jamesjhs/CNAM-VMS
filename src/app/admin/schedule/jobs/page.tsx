@@ -4,7 +4,6 @@ import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { createJob, updateJob, deleteJob } from '../actions';
 import { JOB_COLOURS } from '@/lib/calendar';
-import type { CalendarEventType } from '@prisma/client';
 
 export default async function JobsAdminPage() {
   await requireCapability('admin:calendar.write');
@@ -196,7 +195,15 @@ function JobRow({
               type="text"
               required
               defaultValue={job.title}
-              className="border border-gray-200 rounded-lg px-2 py-1 text-xs w-36 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Title"
+              className="border border-gray-200 rounded-lg px-2 py-1 text-xs w-32 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <input
+              name="description"
+              type="text"
+              defaultValue={job.description ?? ''}
+              placeholder="Description (optional)"
+              className="border border-gray-200 rounded-lg px-2 py-1 text-xs w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <select
               name="isRolling"
@@ -215,7 +222,6 @@ function JobRow({
                 <option key={c.value} value={c.value}>{c.label}</option>
               ))}
             </select>
-            <input type="hidden" name="description" value={job.description ?? ''} />
             <button
               type="submit"
               className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap"

@@ -207,7 +207,8 @@ model Team {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  userTeams UserTeam[]
+  userTeams      UserTeam[]
+  calendarEvents CalendarEvent[]
 
   @@map("teams")
 }
@@ -269,12 +270,14 @@ model CalendarEvent {
   startTime   String?
   endTime     String?
   jobId       String?
+  teamId      String?
   maxSignups  Int?
   createdById String?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
   job       Job?          @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  team      Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull)
   createdBy User?         @relation("CalendarEventCreator", fields: [createdById], references: [id], onDelete: SetNull)
   signups   EventSignup[]
 

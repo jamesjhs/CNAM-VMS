@@ -17,10 +17,7 @@ import {
   EVENT_TYPE_LABELS,
   monthDateRange,
 } from '@/lib/calendar';
-import {
-  createCalendarEvent,
-  deleteCalendarEvent,
-} from './actions';
+import { createCalendarEvent, deleteCalendarEvent } from './actions';
 import type { CalendarEventType } from '@prisma/client';
 
 export default async function AdminSchedulePage({
@@ -35,22 +32,26 @@ export default async function AdminSchedulePage({
   const currentMonthStr = fmtMonth(year, month);
   const selectedDate = dayParam ? parseDate(dayParam) : null;
 
-  // Load all events for this month
   const events = await prisma.calendarEvent.findMany({
     where: { date: monthDateRange(year, month) },
     orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
     include: {
       job: { select: { id: true, title: true, colour: true } },
-      _count: { select: { signups: true } },
+      team: { select: { id: true, name: true } },
+      signups: {
+        include: { user: { select: { id: true, name: true, email: true } } },
+        orderBy: { signedUpAt: 'asc' },
+      },
     },
   });
 
-  // Load all jobs for the event creation form
-  const jobs = await prisma.job.findMany({ orderBy: { title: 'asc' } });
+  const [teams, jobs] = await Promise.all([
+    prisma.team.findMany({ orderBy: { name: 'asc' } }),
+    prisma.job.findMany({ orderBy: { title: 'asc' } }),
+  ]);
 
   const weeks = getCalendarWeeks(year, month);
 
-  // Group events by date key
   const eventsByDate = new Map<string, typeof events>();
   for (const ev of events) {
     const key = dateToParam(ev.date);
@@ -58,7 +59,6 @@ export default async function AdminSchedulePage({
     eventsByDate.get(key)!.push(ev);
   }
 
-  // Events for the selected day
   const selectedEvents = selectedDate
     ? (eventsByDate.get(dateToParam(selectedDate)) ?? [])
     : [];
@@ -69,7 +69,6 @@ export default async function AdminSchedulePage({
     <div className="min-h-screen flex flex-col">
       <NavBar />
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
-        {/* Breadcrumb */}
         <nav className="text-sm text-gray-500 mb-6 flex items-center gap-2">
           <Link href="/admin" className="hover:text-gray-700">Admin</Link>
           <span>/</span>
@@ -79,17 +78,24 @@ export default async function AdminSchedulePage({
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Schedule Management</h1>
-            <p className="text-gray-500">Create and manage events, roster slots, and help requests.</p>
+            <p className="text-gray-500">Create and manage events, roster slots, and help requests. Click a day to see details.</p>
           </div>
-          <Link
-            href="/admin/schedule/jobs"
-            className="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-          >
-            Manage Jobs →
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/admin/schedule/availability"
+              className="bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              Volunteer Availability →
+            </Link>
+            <Link
+              href="/admin/schedule/jobs"
+              className="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              Manage Jobs →
+            </Link>
+          </div>
         </div>
 
-        {/* Legend */}
         <div className="flex flex-wrap gap-3 mb-6 text-xs">
           <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-100 text-blue-800">
             <span className="w-2 h-2 rounded-full bg-blue-500"></span>Event
@@ -103,7 +109,6 @@ export default async function AdminSchedulePage({
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
-          {/* Month navigation */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <Link
               href={`/admin/schedule?month=${prevMonth(year, month)}`}
@@ -111,9 +116,7 @@ export default async function AdminSchedulePage({
             >
               ← Previous
             </Link>
-            <h2 className="font-semibold text-gray-900">
-              {MONTH_NAMES[month]} {year}
-            </h2>
+            <h2 className="font-semibold text-gray-900">{MONTH_NAMES[month]} {year}</h2>
             <Link
               href={`/admin/schedule?month=${nextMonth(year, month)}`}
               className="text-gray-500 hover:text-gray-900 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors text-sm"
@@ -122,16 +125,12 @@ export default async function AdminSchedulePage({
             </Link>
           </div>
 
-          {/* Day headers */}
           <div className="grid grid-cols-7 border-b border-gray-100">
             {DAY_NAMES_SHORT.map((d) => (
-              <div key={d} className="py-2 text-center text-xs font-medium text-gray-500">
-                {d}
-              </div>
+              <div key={d} className="py-2 text-center text-xs font-medium text-gray-500">{d}</div>
             ))}
           </div>
 
-          {/* Calendar weeks */}
           <div>
             {weeks.map((week, wi) => (
               <div key={wi} className="grid grid-cols-7 border-b border-gray-50 last:border-b-0">
@@ -154,11 +153,7 @@ export default async function AdminSchedulePage({
                     >
                       <span
                         className={`inline-flex items-center justify-center w-6 h-6 text-xs font-medium rounded-full mb-1 ${
-                          isToday
-                            ? 'bg-[#1a3a5c] text-white'
-                            : isSelected
-                            ? 'bg-blue-200 text-blue-900'
-                            : 'text-gray-700'
+                          isToday ? 'bg-[#1a3a5c] text-white' : isSelected ? 'bg-blue-200 text-blue-900' : 'text-gray-700'
                         }`}
                       >
                         {day.getUTCDate()}
@@ -184,26 +179,30 @@ export default async function AdminSchedulePage({
           </div>
         </div>
 
-        {/* Day detail panel */}
         {selectedDate && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Existing events for this day */}
+            {/* Events with signup lists */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <h3 className="font-semibold text-gray-900 mb-4">
-                Events on {selectedDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })}
+                {selectedDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })}
               </h3>
               {selectedEvents.length === 0 ? (
                 <p className="text-gray-500 text-sm">No events on this day. Use the form to add one.</p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {selectedEvents.map((ev) => (
                     <div key={ev.id} className="p-4 rounded-lg border border-gray-100">
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
                             <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border ${EVENT_TYPE_BG[ev.eventType]}`}>
                               {EVENT_TYPE_LABELS[ev.eventType]}
                             </span>
+                            {ev.team && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                                🏷️ {ev.team.name}
+                              </span>
+                            )}
                             {ev.job && (
                               <span
                                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-white"
@@ -217,18 +216,29 @@ export default async function AdminSchedulePage({
                           {ev.description && <div className="text-xs text-gray-500 mt-0.5">{ev.description}</div>}
                           <div className="text-xs text-gray-400 mt-1">
                             {ev.startTime && `${ev.startTime}${ev.endTime ? `–${ev.endTime}` : ''} · `}
-                            {ev._count.signups} signed up{ev.maxSignups ? ` / ${ev.maxSignups} max` : ''}
+                            {ev.signups.length} signed up{ev.maxSignups ? ` / ${ev.maxSignups} max` : ''}
                           </div>
                         </div>
                         <form action={deleteCalendarEvent.bind(null, ev.id)}>
-                          <button
-                            type="submit"
-                            className="text-xs text-red-600 hover:text-red-800 font-medium whitespace-nowrap"
-                          >
+                          <button type="submit" className="text-xs text-red-600 hover:text-red-800 font-medium whitespace-nowrap">
                             Delete
                           </button>
                         </form>
                       </div>
+                      {ev.signups.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-gray-100">
+                          <p className="text-xs font-medium text-gray-500 mb-2">Signed up ({ev.signups.length}):</p>
+                          <div className="space-y-1">
+                            {ev.signups.map((s) => (
+                              <div key={s.id} className="flex items-center gap-2 text-xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
+                                <span className="font-medium text-gray-700">{s.user.name ?? s.user.email}</span>
+                                {s.user.name && <span className="text-gray-400">{s.user.email}</span>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -251,7 +261,8 @@ export default async function AdminSchedulePage({
                   const endTime = formData.get('endTime') as string;
                   const jobId = formData.get('jobId') as string;
                   const maxSignups = formData.get('maxSignups') as string;
-                  await createCalendarEvent(title, description, eventType, dateStr, startTime, endTime, jobId, maxSignups);
+                  const teamId = formData.get('teamId') as string;
+                  await createCalendarEvent(title, description, eventType, dateStr, startTime, endTime, jobId, maxSignups, teamId);
                 }}
                 className="space-y-4"
               >
@@ -288,46 +299,44 @@ export default async function AdminSchedulePage({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Job (optional)</label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Team (optional)</label>
                     <select
-                      name="jobId"
+                      name="teamId"
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="">— None —</option>
-                      {jobs.map((j) => (
-                        <option key={j.id} value={j.id}>
-                          {j.title} {j.isRolling ? '(rolling)' : '(rostered)'}
-                        </option>
+                      <option value="">— All teams —</option>
+                      {teams.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
                       ))}
                     </select>
                   </div>
                 </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Job (optional)</label>
+                  <select
+                    name="jobId"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">— None —</option>
+                    {jobs.map((j) => (
+                      <option key={j.id} value={j.id}>
+                        {j.title} {j.isRolling ? '(rolling)' : '(rostered)'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">Start time</label>
-                    <input
-                      name="startTime"
-                      type="time"
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                    <input name="startTime" type="time" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">End time</label>
-                    <input
-                      name="endTime"
-                      type="time"
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                    <input name="endTime" type="time" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">Max sign-ups</label>
-                    <input
-                      name="maxSignups"
-                      type="number"
-                      min="1"
-                      placeholder="∞"
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                    <input name="maxSignups" type="number" min="1" placeholder="∞" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                 </div>
                 <button
@@ -343,7 +352,7 @@ export default async function AdminSchedulePage({
 
         {!selectedDate && (
           <div className="bg-blue-50 border border-blue-100 rounded-xl p-6 text-sm text-blue-700">
-            👆 Click on a day in the calendar above to view events for that day and add new ones.
+            👆 Click on a day in the calendar above to view events, see who has signed up, and add new ones.
           </div>
         )}
       </main>
