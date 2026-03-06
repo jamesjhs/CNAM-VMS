@@ -59,6 +59,87 @@ export async function withdrawFromEvent(eventId: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Recurring job occurrence sign-up / withdrawal.
+// A CalendarEvent is lazily created on first sign-up so the existing
+// EventSignup model can be reused for tracking.
+// ---------------------------------------------------------------------------
+
+export async function signupForJobOccurrence(jobId: string, dateStr: string) {
+  const actor = await requireAuth();
+
+  const date = parseDate(dateStr);
+  if (!date) return;
+
+  const job = await prisma.job.findUnique({ where: { id: jobId } });
+  if (!job) return;
+
+  // Find or auto-create the CalendarEvent for this job on this date
+  let event = await prisma.calendarEvent.findFirst({ where: { jobId, date } });
+
+  if (!event) {
+    event = await prisma.calendarEvent.create({
+      data: {
+        title: job.title,
+        description: job.description,
+        eventType: 'HELP_NEEDED',
+        date,
+        startTime: job.defaultStartTime,
+        endTime: job.defaultEndTime,
+        maxSignups: job.defaultMaxSignups,
+        jobId,
+        createdById: actor.id,
+      },
+    });
+  }
+
+  if (event.maxSignups !== null) {
+    const count = await prisma.eventSignup.count({ where: { eventId: event.id } });
+    if (count >= event.maxSignups) return; // full
+  }
+
+  await prisma.eventSignup.upsert({
+    where: { eventId_userId: { eventId: event.id, userId: actor.id } },
+    update: {},
+    create: { eventId: event.id, userId: actor.id },
+  });
+
+  await logAudit({
+    userId: actor.id,
+    action: 'EVENT_SIGNUP',
+    resource: 'CalendarEvent',
+    resourceId: event.id,
+    detail: { jobId, dateStr, source: 'recurring_job_occurrence' },
+  });
+
+  revalidatePath('/schedule');
+  revalidatePath('/admin/schedule');
+}
+
+export async function withdrawFromJobOccurrence(jobId: string, dateStr: string) {
+  const actor = await requireAuth();
+
+  const date = parseDate(dateStr);
+  if (!date) return;
+
+  const event = await prisma.calendarEvent.findFirst({ where: { jobId, date } });
+  if (!event) return;
+
+  await prisma.eventSignup.deleteMany({
+    where: { eventId: event.id, userId: actor.id },
+  });
+
+  await logAudit({
+    userId: actor.id,
+    action: 'EVENT_WITHDRAWAL',
+    resource: 'CalendarEvent',
+    resourceId: event.id,
+  });
+
+  revalidatePath('/schedule');
+  revalidatePath('/admin/schedule');
+}
+
+// ---------------------------------------------------------------------------
 // Volunteer date-slot availability
 // ---------------------------------------------------------------------------
 

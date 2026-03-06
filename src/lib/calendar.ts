@@ -124,3 +124,38 @@ export function monthDateRange(year: number, month: number) {
 export function fmtTime(t: string | null | undefined): string {
   return t ?? '';
 }
+
+/** Day-of-week labels for recurrence UI, 0=Mon … 6=Sun. */
+export const WEEK_DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+
+/**
+ * Compute the dates in the given year/month on which a recurring job falls.
+ * - WEEKLY: returns every date whose day-of-week (0=Mon…6=Sun) is in `weekDays`.
+ * - MONTHLY: returns every date whose day-of-month is in `monthDays` (clamped to month length).
+ * - ONE_OFF: returns [] — those jobs appear only via explicit CalendarEvents.
+ */
+export function getJobOccurrenceDates(
+  job: { scheduleType: string; weekDays: number[]; monthDays: number[] },
+  year: number,
+  month: number,
+): Date[] {
+  const dates: Date[] = [];
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+
+  if (job.scheduleType === 'WEEKLY' && job.weekDays.length > 0) {
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(Date.UTC(year, month, d));
+      // JS: Sun=0 … Sat=6 → shift to Mon=0 … Sun=6
+      const dow = (date.getUTCDay() + 6) % 7;
+      if (job.weekDays.includes(dow)) dates.push(date);
+    }
+  } else if (job.scheduleType === 'MONTHLY' && job.monthDays.length > 0) {
+    for (const dom of job.monthDays) {
+      if (dom >= 1 && dom <= daysInMonth) {
+        dates.push(new Date(Date.UTC(year, month, dom)));
+      }
+    }
+  }
+
+  return dates;
+}
