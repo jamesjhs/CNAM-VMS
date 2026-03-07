@@ -204,7 +204,10 @@ export default async function SchedulePage({
 
           <div className="grid grid-cols-7 border-b border-gray-100">
             {DAY_NAMES_SHORT.map((d) => (
-              <div key={d} className="py-2 text-center text-xs font-medium text-gray-500">{d}</div>
+              <div key={d} className="py-2 text-center text-xs font-medium text-gray-500">
+                <span className="sm:hidden">{d[0]}</span>
+                <span className="hidden sm:inline">{d}</span>
+              </div>
             ))}
           </div>
 
@@ -213,7 +216,7 @@ export default async function SchedulePage({
               <div key={wi} className="grid grid-cols-7 border-b border-gray-50 last:border-b-0">
                 {week.map((day, di) => {
                   if (!day) {
-                    return <div key={di} className="min-h-[80px] bg-gray-50/50 border-r border-gray-50 last:border-r-0" />;
+                    return <div key={di} className="min-h-[52px] sm:min-h-[80px] bg-gray-50/50 border-r border-gray-50 last:border-r-0" />;
                   }
                   const dayKey = dateToParam(day);
                   const dayEvents = eventsByDate.get(dayKey) ?? [];
@@ -221,18 +224,19 @@ export default async function SchedulePage({
                   const hasMySlot = mySlotsByDate.has(dayKey);
                   const isToday = isSameDate(day, today);
                   const isSelected = selectedDate ? isSameDate(day, selectedDate) : false;
+                  const totalItems = dayEvents.length + dayOccs.length;
 
                   return (
                     <Link
                       key={di}
                       href={`/schedule?month=${currentMonthStr}&day=${dayKey}`}
-                      className={`min-h-[80px] p-2 border-r border-gray-50 last:border-r-0 hover:bg-gray-50 transition-colors ${
+                      className={`min-h-[52px] sm:min-h-[80px] p-1 sm:p-2 border-r border-gray-50 last:border-r-0 hover:bg-gray-50 transition-colors ${
                         isSelected ? 'bg-blue-50 ring-1 ring-inset ring-blue-300' : ''
                       }`}
                     >
-                      <div className="flex items-center gap-1 mb-1">
+                      <div className="flex items-center gap-0.5 sm:gap-1 mb-0.5 sm:mb-1">
                         <span
-                          className={`inline-flex items-center justify-center w-6 h-6 text-xs font-medium rounded-full ${
+                          className={`inline-flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 text-xs font-medium rounded-full ${
                             isToday
                               ? 'bg-[#1a3a5c] text-white'
                               : isSelected
@@ -243,35 +247,49 @@ export default async function SchedulePage({
                           {day.getUTCDate()}
                         </span>
                         {hasMySlot && (
-                          <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" title="My availability recorded" />
+                          <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-green-400 shrink-0" title="My availability recorded" />
                         )}
                       </div>
-                      <div className="space-y-0.5">
-                        {dayEvents.slice(0, 2).map((ev) => (
-                          <div
-                            key={ev.id}
-                            className={`text-xs px-1 py-0.5 rounded truncate border ${EVENT_TYPE_BG[ev.eventType]}`}
-                          >
-                            {mySignupIds.has(ev.id) && <span className="mr-0.5">✓</span>}
-                            {ev.title}
+                      {/* Event indicators: dots on mobile, labels on sm+ */}
+                      {totalItems > 0 && (
+                        <>
+                          <div className="sm:hidden flex flex-wrap gap-0.5 mt-0.5">
+                            {dayEvents.slice(0, 3).map((ev) => (
+                              <span key={ev.id} className={`w-1.5 h-1.5 rounded-full ${mySignupIds.has(ev.id) ? 'bg-green-500' : 'bg-blue-400'}`} />
+                            ))}
+                            {dayOccs.slice(0, Math.max(0, 3 - dayEvents.length)).map((occ) => (
+                              <span key={`${occ.job.id}__${occ.dateKey}`} className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                            ))}
+                            {totalItems > 3 && <span className="text-[8px] text-gray-400">+{totalItems - 3}</span>}
                           </div>
-                        ))}
-                        {dayOccs.slice(0, Math.max(0, 2 - dayEvents.length)).map((occ) => {
-                          const key = `${occ.job.id}__${occ.dateKey}`;
-                          return (
-                            <div
-                              key={key}
-                              className="text-xs px-1 py-0.5 rounded truncate border border-dashed bg-gray-50 text-gray-600 border-gray-300"
-                            >
-                              {mySignedJobDates.has(key) && <span className="mr-0.5">✓</span>}
-                              🔁 {occ.job.title}
-                            </div>
-                          );
-                        })}
-                        {dayEvents.length + dayOccs.length > 2 && (
-                          <div className="text-xs text-gray-400">+{dayEvents.length + dayOccs.length - 2} more</div>
-                        )}
-                      </div>
+                          <div className="hidden sm:block space-y-0.5">
+                            {dayEvents.slice(0, 2).map((ev) => (
+                              <div
+                                key={ev.id}
+                                className={`text-xs px-1 py-0.5 rounded truncate border ${EVENT_TYPE_BG[ev.eventType]}`}
+                              >
+                                {mySignupIds.has(ev.id) && <span className="mr-0.5">✓</span>}
+                                {ev.title}
+                              </div>
+                            ))}
+                            {dayOccs.slice(0, Math.max(0, 2 - dayEvents.length)).map((occ) => {
+                              const key = `${occ.job.id}__${occ.dateKey}`;
+                              return (
+                                <div
+                                  key={key}
+                                  className="text-xs px-1 py-0.5 rounded truncate border border-dashed bg-gray-50 text-gray-600 border-gray-300"
+                                >
+                                  {mySignedJobDates.has(key) && <span className="mr-0.5">✓</span>}
+                                  🔁 {occ.job.title}
+                                </div>
+                              );
+                            })}
+                            {totalItems > 2 && (
+                              <div className="text-xs text-gray-400">+{totalItems - 2} more</div>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </Link>
                   );
                 })}

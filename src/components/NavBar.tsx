@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { auth, signOut } from '@/auth';
+import MobileMenu, { type NavLink } from './MobileMenu';
 
 export default async function NavBar() {
   const session = await auth();
@@ -13,16 +14,41 @@ export default async function NavBar() {
     capabilities.includes('admin:calendar.write');
   const canUpload = capabilities.includes('admin:files.write');
 
+  // Build nav link lists to pass to the mobile menu client component
+  const mainLinks: NavLink[] = session
+    ? [
+        { href: '/dashboard', label: 'Dashboard' },
+        { href: '/schedule', label: 'Schedule & Availability' },
+        { href: '/announcements', label: 'Announcements' },
+      ]
+    : [];
+
+  const adminLinks: NavLink[] = [];
+  if (isAdmin) {
+    adminLinks.push({ href: '/admin', label: 'Overview' });
+    if (capabilities.includes('admin:users.read')) adminLinks.push({ href: '/admin/users', label: 'Users' });
+    if (capabilities.includes('admin:roles.read')) adminLinks.push({ href: '/admin/roles', label: 'Roles' });
+    if (capabilities.includes('admin:teams.read')) adminLinks.push({ href: '/admin/teams', label: 'Teams' });
+    if (capabilities.includes('admin:audit.read')) adminLinks.push({ href: '/admin/audit', label: 'Audit Log' });
+    if (capabilities.includes('admin:files.read')) adminLinks.push({ href: '/admin/files', label: 'Files' });
+    if (capabilities.includes('admin:announcements.write')) adminLinks.push({ href: '/admin/announcements', label: 'Announcements' });
+    if (capabilities.includes('admin:calendar.write')) adminLinks.push({ href: '/admin/schedule', label: 'Schedule' });
+    if (capabilities.includes('admin:calendar.write')) adminLinks.push({ href: '/admin/schedule/availability', label: 'Volunteer Availability' });
+  }
+
   return (
-    <nav className="bg-[#1a3a5c] text-white shadow-md">
+    <nav className="bg-[#1a3a5c] text-white shadow-md relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
+          {/* Logo */}
           <div className="flex items-center gap-6">
             <Link href="/" className="font-bold text-lg tracking-tight text-white hover:text-amber-300 transition-colors">
               CNAM VMS
             </Link>
+
+            {/* Desktop nav links (hidden on mobile) */}
             {session && (
-              <>
+              <div className="hidden md:flex items-center gap-6">
                 <Link href="/dashboard" className="text-gray-300 hover:text-white text-sm transition-colors">
                   Dashboard
                 </Link>
@@ -92,16 +118,37 @@ export default async function NavBar() {
                     Upload
                   </Link>
                 )}
-              </>
+              </div>
             )}
           </div>
-          <div className="flex items-center gap-4">
+
+          {/* Right side: desktop user controls + mobile hamburger */}
+          <div className="flex items-center gap-3">
             {session ? (
-              <div className="flex items-center gap-4">
-                <Link href="/profile" className="text-sm text-gray-300 hover:text-white transition-colors">
-                  {session.user?.name ?? session.user?.email}
-                </Link>
+              <>
+                {/* Desktop: profile link + sign out */}
+                <div className="hidden md:flex items-center gap-4">
+                  <Link href="/profile" className="text-sm text-gray-300 hover:text-white transition-colors">
+                    {session.user?.name ?? session.user?.email}
+                  </Link>
+                  <form
+                    action={async () => {
+                      'use server';
+                      await signOut({ redirectTo: '/' });
+                    }}
+                  >
+                    <button
+                      type="submit"
+                      className="text-sm bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded transition-colors"
+                    >
+                      Sign out
+                    </button>
+                  </form>
+                </div>
+
+                {/* Mobile sign-out button (always visible alongside hamburger) */}
                 <form
+                  className="md:hidden"
                   action={async () => {
                     'use server';
                     await signOut({ redirectTo: '/' });
@@ -109,12 +156,22 @@ export default async function NavBar() {
                 >
                   <button
                     type="submit"
-                    className="text-sm bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded transition-colors"
+                    className="text-xs bg-white/10 hover:bg-white/20 text-white px-2.5 py-1.5 rounded transition-colors"
                   >
                     Sign out
                   </button>
                 </form>
-              </div>
+
+                {/* Mobile hamburger menu */}
+                <MobileMenu
+                  links={mainLinks}
+                  adminLinks={adminLinks}
+                  isAdmin={isAdmin}
+                  canUpload={canUpload}
+                  userName={session.user?.name}
+                  userEmail={session.user?.email}
+                />
+              </>
             ) : (
               <Link
                 href="/auth/signin"
