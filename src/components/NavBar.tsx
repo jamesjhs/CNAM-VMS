@@ -11,6 +11,7 @@ export default async function NavBar() {
     capabilities.includes('admin:audit.read') ||
     capabilities.includes('admin:announcements.write') ||
     capabilities.includes('admin:calendar.write');
+  const canUpload = capabilities.includes('admin:files.write');
 
   return (
     <nav className="bg-[#1a3a5c] text-white shadow-md">
@@ -86,9 +87,11 @@ export default async function NavBar() {
                     </div>
                   </div>
                 )}
-                <Link href="/upload" className="text-gray-300 hover:text-white text-sm transition-colors">
-                  Upload
-                </Link>
+                {canUpload && (
+                  <Link href="/upload" className="text-gray-300 hover:text-white text-sm transition-colors">
+                    Upload
+                  </Link>
+                )}
               </>
             )}
           </div>

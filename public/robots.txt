@@ -1,0 +1,12 @@
+User-agent: *
+# Block all private/authenticated pages
+Disallow: /admin/
+Disallow: /dashboard
+Disallow: /schedule
+Disallow: /upload
+Disallow: /announcements
+Disallow: /profile
+Disallow: /volunteer/
+Disallow: /auth/
+Disallow: /api/
+Disallow: /unauthorized

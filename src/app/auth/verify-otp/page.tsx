@@ -11,6 +11,7 @@ export default async function VerifyOtpPage({
   const errorMessages: Record<string, string> = {
     OtpInvalid: 'That code is incorrect or has expired. Please check your email and try again.',
     MissingCode: 'Please enter the verification code from your email.',
+    TooManyAttempts: 'Too many incorrect attempts. For your security, please sign in again and request a new code.',
   };
   const errorMsg = error ? (errorMessages[error] ?? 'Something went wrong. Please try again.') : null;
 

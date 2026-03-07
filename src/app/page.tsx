@@ -4,6 +4,13 @@ import { auth } from '@/auth';
 
 export default async function Home() {
   const session = await auth();
+  const capabilities: string[] = (session?.user as { capabilities?: string[] })?.capabilities ?? [];
+  const isAdmin =
+    capabilities.includes('admin:users.read') ||
+    capabilities.includes('admin:roles.read') ||
+    capabilities.includes('admin:audit.read') ||
+    capabilities.includes('admin:announcements.write') ||
+    capabilities.includes('admin:calendar.write');
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -31,12 +38,14 @@ export default async function Home() {
                 >
                   Go to Dashboard
                 </Link>
-                <Link
-                  href="/admin"
-                  className="bg-white/10 hover:bg-white/20 text-white font-semibold px-8 py-3 rounded-lg transition-colors"
-                >
-                  Admin Panel
-                </Link>
+                {isAdmin && (
+                  <Link
+                    href="/admin"
+                    className="bg-white/10 hover:bg-white/20 text-white font-semibold px-8 py-3 rounded-lg transition-colors"
+                  >
+                    Admin Panel
+                  </Link>
+                )}
               </div>
             ) : (
               <Link
