@@ -70,7 +70,7 @@ export default async function AdminAvailabilityPage({
           <span className="text-gray-900 font-medium">Volunteer Availability</span>
         </nav>
 
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Volunteer Availability</h1>
             <p className="text-gray-500">
@@ -106,7 +106,10 @@ export default async function AdminAvailabilityPage({
 
           <div className="grid grid-cols-7 border-b border-gray-100">
             {DAY_NAMES_SHORT.map((d) => (
-              <div key={d} className="py-2 text-center text-xs font-medium text-gray-500">{d}</div>
+              <div key={d} className="py-2 text-center text-xs font-medium text-gray-500">
+                <span className="sm:hidden">{d[0]}</span>
+                <span className="hidden sm:inline">{d}</span>
+              </div>
             ))}
           </div>
 
@@ -115,7 +118,7 @@ export default async function AdminAvailabilityPage({
               <div key={wi} className="grid grid-cols-7 border-b border-gray-50 last:border-b-0">
                 {week.map((day, di) => {
                   if (!day) {
-                    return <div key={di} className="min-h-[70px] bg-gray-50/50 border-r border-gray-50 last:border-r-0" />;
+                    return <div key={di} className="min-h-[48px] sm:min-h-[70px] bg-gray-50/50 border-r border-gray-50 last:border-r-0" />;
                   }
                   const dayKey = dateToParam(day);
                   const daySlots = slotsByDate.get(dayKey) ?? [];
@@ -126,26 +129,26 @@ export default async function AdminAvailabilityPage({
                     <Link
                       key={di}
                       href={`/admin/schedule/availability?month=${currentMonthStr}&day=${dayKey}`}
-                      className={`min-h-[70px] p-2 border-r border-gray-50 last:border-r-0 hover:bg-gray-50 transition-colors ${
+                      className={`min-h-[48px] sm:min-h-[70px] p-1 sm:p-2 border-r border-gray-50 last:border-r-0 hover:bg-gray-50 transition-colors ${
                         isSelected ? 'bg-green-50 ring-1 ring-inset ring-green-300' : ''
                       }`}
                     >
-                      <div className="flex items-center gap-1 mb-1">
+                      <div className="flex items-center gap-0.5 sm:gap-1 mb-0.5 sm:mb-1">
                         <span
-                          className={`inline-flex items-center justify-center w-6 h-6 text-xs font-medium rounded-full ${
+                          className={`inline-flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 text-xs font-medium rounded-full ${
                             isToday ? 'bg-[#1a3a5c] text-white' : isSelected ? 'bg-green-200 text-green-900' : 'text-gray-700'
                           }`}
                         >
                           {day.getUTCDate()}
                         </span>
                         {daySlots.length > 0 && (
-                          <span className="text-xs font-medium text-green-700 bg-green-100 px-1 py-0.5 rounded-full">
+                          <span className="text-xs font-medium text-green-700 bg-green-100 px-1 py-0.5 rounded-full leading-none">
                             {daySlots.length}
                           </span>
                         )}
                       </div>
                       {daySlots.length > 0 && (
-                        <div className="space-y-0.5">
+                        <div className="hidden sm:block space-y-0.5">
                           {daySlots.slice(0, 2).map((s) => (
                             <div key={s.id} className="text-xs text-gray-600 truncate">
                               {s.user.name ?? s.user.email}

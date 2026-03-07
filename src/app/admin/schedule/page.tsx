@@ -111,12 +111,12 @@ export default async function AdminSchedulePage({
           <span className="text-gray-900 font-medium">Schedule</span>
         </nav>
 
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Schedule Management</h1>
             <p className="text-gray-500">Create and manage events, roster slots, and help requests. Recurring jobs appear automatically.</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Link
               href="/admin/schedule/availability"
               className="bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
@@ -168,7 +168,10 @@ export default async function AdminSchedulePage({
 
           <div className="grid grid-cols-7 border-b border-gray-100">
             {DAY_NAMES_SHORT.map((d) => (
-              <div key={d} className="py-2 text-center text-xs font-medium text-gray-500">{d}</div>
+              <div key={d} className="py-2 text-center text-xs font-medium text-gray-500">
+                <span className="sm:hidden">{d[0]}</span>
+                <span className="hidden sm:inline">{d}</span>
+              </div>
             ))}
           </div>
 
@@ -176,42 +179,57 @@ export default async function AdminSchedulePage({
             {weeks.map((week, wi) => (
               <div key={wi} className="grid grid-cols-7 border-b border-gray-50 last:border-b-0">
                 {week.map((day, di) => {
-                  if (!day) return <div key={di} className="min-h-[80px] bg-gray-50/50 border-r border-gray-50 last:border-r-0" />;
+                  if (!day) return <div key={di} className="min-h-[52px] sm:min-h-[80px] bg-gray-50/50 border-r border-gray-50 last:border-r-0" />;
                   const dayKey = dateToParam(day);
                   const dayEvents = eventsByDate.get(dayKey) ?? [];
                   const dayOccs = occurrencesByDate.get(dayKey) ?? [];
                   const isToday = isSameDate(day, today);
                   const isSelected = selectedDate ? isSameDate(day, selectedDate) : false;
+                  const totalItems = dayEvents.length + dayOccs.length;
 
                   return (
                     <Link
                       key={di}
                       href={`/admin/schedule?month=${currentMonthStr}&day=${dayKey}`}
-                      className={`min-h-[80px] p-2 border-r border-gray-50 last:border-r-0 hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50 ring-1 ring-inset ring-blue-300' : ''}`}
+                      className={`min-h-[52px] sm:min-h-[80px] p-1 sm:p-2 border-r border-gray-50 last:border-r-0 hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50 ring-1 ring-inset ring-blue-300' : ''}`}
                     >
                       <span
-                        className={`inline-flex items-center justify-center w-6 h-6 text-xs font-medium rounded-full mb-1 ${isToday ? 'bg-[#1a3a5c] text-white' : isSelected ? 'bg-blue-200 text-blue-900' : 'text-gray-700'}`}
+                        className={`inline-flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 text-xs font-medium rounded-full mb-0.5 sm:mb-1 ${isToday ? 'bg-[#1a3a5c] text-white' : isSelected ? 'bg-blue-200 text-blue-900' : 'text-gray-700'}`}
                       >
                         {day.getUTCDate()}
                       </span>
-                      <div className="space-y-0.5">
-                        {dayEvents.slice(0, 2).map((ev) => (
-                          <div key={ev.id} className={`text-xs px-1 py-0.5 rounded truncate border ${EVENT_TYPE_BG[ev.eventType]}`}>
-                            {ev.title}
+                      {/* Event indicators: dots on mobile, labels on sm+ */}
+                      {totalItems > 0 && (
+                        <>
+                          <div className="sm:hidden flex flex-wrap gap-0.5 mt-0.5">
+                            {dayEvents.slice(0, 3).map((ev) => (
+                              <span key={ev.id} className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                            ))}
+                            {dayOccs.slice(0, Math.max(0, 3 - dayEvents.length)).map((occ) => (
+                              <span key={`${occ.job.id}__${occ.dateKey}`} className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                            ))}
+                            {totalItems > 3 && <span className="text-[8px] text-gray-400">+{totalItems - 3}</span>}
                           </div>
-                        ))}
-                        {dayOccs.slice(0, Math.max(0, 2 - dayEvents.length)).map((occ) => (
-                          <div
-                            key={`${occ.job.id}__${occ.dateKey}`}
-                            className="text-xs px-1 py-0.5 rounded truncate border border-dashed bg-gray-50 text-gray-600 border-gray-300"
-                          >
-                            🔁 {occ.job.title}
+                          <div className="hidden sm:block space-y-0.5">
+                            {dayEvents.slice(0, 2).map((ev) => (
+                              <div key={ev.id} className={`text-xs px-1 py-0.5 rounded truncate border ${EVENT_TYPE_BG[ev.eventType]}`}>
+                                {ev.title}
+                              </div>
+                            ))}
+                            {dayOccs.slice(0, Math.max(0, 2 - dayEvents.length)).map((occ) => (
+                              <div
+                                key={`${occ.job.id}__${occ.dateKey}`}
+                                className="text-xs px-1 py-0.5 rounded truncate border border-dashed bg-gray-50 text-gray-600 border-gray-300"
+                              >
+                                🔁 {occ.job.title}
+                              </div>
+                            ))}
+                            {totalItems > 2 && (
+                              <div className="text-xs text-gray-400">+{totalItems - 2} more</div>
+                            )}
                           </div>
-                        ))}
-                        {dayEvents.length + dayOccs.length > 2 && (
-                          <div className="text-xs text-gray-400">+{dayEvents.length + dayOccs.length - 2} more</div>
-                        )}
-                      </div>
+                        </>
+                      )}
                     </Link>
                   );
                 })}
