@@ -16,6 +16,7 @@ export default async function SignInPage({
     MissingFields: 'Please enter your email address and password.',
     SessionExpired: 'Your sign-in session expired. Please try again.',
     OAuthAccountNotLinked: 'This email is already associated with another account.',
+    TooManyAttempts: 'Too many failed sign-in attempts. Please wait a few minutes before trying again.',
   };
   const errorMsg = error ? (errorMessages[error] ?? 'Something went wrong. Please try again.') : null;
 
