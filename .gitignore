@@ -435,3 +435,4 @@ prisma/migrations/dev.db
 .DS_Store
 Thumbs.db
 tsconfig.tsbuildinfo
+next-env.d.ts
