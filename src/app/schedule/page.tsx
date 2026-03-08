@@ -1,4 +1,4 @@
-import { requireAuth } from '@/lib/auth-helpers';
+import { requireAuth, hasCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
@@ -26,19 +26,52 @@ import {
   deleteVolunteerDateSlot,
   signupForJobOccurrence,
   withdrawFromJobOccurrence,
+  adminSignupForEventAs,
+  adminWithdrawFromEventAs,
+  adminSignupForJobOccurrenceAs,
+  adminWithdrawFromJobOccurrenceAs,
+  adminSaveVolunteerDateSlotAs,
+  adminDeleteVolunteerDateSlotAs,
 } from './actions';
 
 export default async function SchedulePage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; day?: string }>;
+  searchParams: Promise<{ month?: string; day?: string; userId?: string }>;
 }) {
   const user = await requireAuth();
 
-  const { month: monthParam, day: dayParam } = await searchParams;
+  const { month: monthParam, day: dayParam, userId: userIdParam } = await searchParams;
   const { year, month } = parseMonthParam(monthParam);
   const currentMonthStr = fmtMonth(year, month);
   const selectedDate = dayParam ? parseDate(dayParam) : null;
+
+  // Admin acting-as: allow admins to view/manage the schedule on behalf of another user
+  const isAdmin = hasCapability(user, 'admin:calendar.write');
+  const isActingAs = isAdmin && !!userIdParam && userIdParam !== user.id;
+
+  // Load all users for admin picker (only if admin)
+  const allUsers = isAdmin
+    ? await prisma.user.findMany({
+        where: { status: 'ACTIVE' },
+        select: { id: true, name: true, email: true },
+        orderBy: { name: 'asc' },
+      })
+    : [];
+
+  // Resolve the target user (the user whose schedule we are managing)
+  const targetUser = isActingAs
+    ? await prisma.user.findUnique({
+        where: { id: userIdParam },
+        select: { id: true, name: true, email: true },
+      })
+    : null;
+
+  // If the userId param was provided but the user wasn't found, fall back to the admin's own view
+  const resolvedIsActingAs = isActingAs && targetUser !== null;
+
+  // The effective user ID for all data queries
+  const targetId = targetUser ? targetUser.id : user.id;
 
   const [events, mySignups, mySlots, allJobs, myUpcomingSignups] = await Promise.all([
     prisma.calendarEvent.findMany({
@@ -52,14 +85,14 @@ export default async function SchedulePage({
     }),
     prisma.eventSignup.findMany({
       where: {
-        userId: user.id,
+        userId: targetId,
         event: { date: monthDateRange(year, month) },
       },
       select: { eventId: true, event: { select: { jobId: true, date: true } } },
     }),
     prisma.volunteerDateSlot.findMany({
       where: {
-        userId: user.id,
+        userId: targetId,
         date: monthDateRange(year, month),
       },
     }),
@@ -67,7 +100,7 @@ export default async function SchedulePage({
     // All future sign-ups (up to next 20, sorted by date)
     prisma.eventSignup.findMany({
       where: {
-        userId: user.id,
+        userId: targetId,
         event: { date: { gte: new Date() } },
       },
       orderBy: { event: { date: 'asc' } },
@@ -157,6 +190,63 @@ export default async function SchedulePage({
     <div className="min-h-screen flex flex-col">
       <NavBar />
       <main className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
+
+        {/* Admin: acting-as banner and user picker */}
+        {isAdmin && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm font-semibold text-amber-800">🛡️ Admin view:</span>
+              <form method="GET" action="/schedule" className="flex items-center gap-2 flex-1 min-w-0">
+                <input type="hidden" name="month" value={currentMonthStr} />
+                <label htmlFor="act-as-user" className="text-sm text-amber-700 shrink-0">
+                  Acting as:
+                </label>
+                <select
+                  id="act-as-user"
+                  name="userId"
+                  defaultValue={targetId}
+                  className="flex-1 min-w-0 border border-amber-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                >
+                  <option value={user.id}>Myself ({user.name ?? user.email})</option>
+                  {allUsers
+                    .filter((u) => u.id !== user.id)
+                    .map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name ?? u.email}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  type="submit"
+                  className="shrink-0 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm rounded-lg transition-colors"
+                >
+                  Switch
+                </button>
+              </form>
+              {resolvedIsActingAs && targetUser && (
+                <Link
+                  href={`/schedule?month=${currentMonthStr}`}
+                  className="text-xs text-amber-600 hover:text-amber-800 underline shrink-0"
+                >
+                  Back to my view
+                </Link>
+              )}
+            </div>
+            {isActingAs && !targetUser && (
+              <p className="mt-2 text-xs text-red-700">
+                ⚠️ The selected user could not be found. Showing your own schedule instead.
+              </p>
+            )}
+            {resolvedIsActingAs && targetUser && (
+              <p className="mt-2 text-xs text-amber-700">
+                ⚠️ You are managing the schedule on behalf of{' '}
+                <strong>{targetUser.name ?? targetUser.email}</strong>. All sign-ups and
+                availability changes will be applied to their account and logged against yours.
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Schedule &amp; Availability</h1>
           <p className="text-gray-500">
@@ -188,14 +278,14 @@ export default async function SchedulePage({
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <Link
-              href={`/schedule?month=${prevMonth(year, month)}`}
+              href={`/schedule?month=${prevMonth(year, month)}${resolvedIsActingAs && targetUser ? `&userId=${targetUser.id}` : ''}`}
               className="text-gray-500 hover:text-gray-900 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors text-sm"
             >
               ← Previous
             </Link>
             <h2 className="font-semibold text-gray-900">{MONTH_NAMES[month]} {year}</h2>
             <Link
-              href={`/schedule?month=${nextMonth(year, month)}`}
+              href={`/schedule?month=${nextMonth(year, month)}${resolvedIsActingAs && targetUser ? `&userId=${targetUser.id}` : ''}`}
               className="text-gray-500 hover:text-gray-900 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors text-sm"
             >
               Next →
@@ -229,7 +319,7 @@ export default async function SchedulePage({
                   return (
                     <Link
                       key={di}
-                      href={`/schedule?month=${currentMonthStr}&day=${dayKey}`}
+                      href={`/schedule?month=${currentMonthStr}&day=${dayKey}${resolvedIsActingAs && targetUser ? `&userId=${targetUser.id}` : ''}`}
                       className={`min-h-[52px] sm:min-h-[80px] p-1 sm:p-2 border-r border-gray-50 last:border-r-0 hover:bg-gray-50 transition-colors ${
                         isSelected ? 'bg-blue-50 ring-1 ring-inset ring-blue-300' : ''
                       }`}
@@ -303,7 +393,7 @@ export default async function SchedulePage({
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             {/* Backdrop */}
             <Link
-              href={`/schedule?month=${currentMonthStr}`}
+              href={`/schedule?month=${currentMonthStr}${resolvedIsActingAs && targetUser ? `&userId=${targetUser.id}` : ''}`}
               aria-label="Close"
               className="absolute inset-0 bg-black/50"
             />
@@ -318,9 +408,14 @@ export default async function SchedulePage({
                   year: 'numeric',
                   timeZone: 'UTC',
                 })}
+                {resolvedIsActingAs && targetUser && (
+                  <span className="ml-2 text-sm font-normal text-amber-600">
+                    — acting as {targetUser.name ?? targetUser.email}
+                  </span>
+                )}
               </h3>
               <Link
-                href={`/schedule?month=${currentMonthStr}`}
+                href={`/schedule?month=${currentMonthStr}${resolvedIsActingAs && targetUser ? `&userId=${targetUser.id}` : ''}`}
                 aria-label="Close"
                 className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100"
               >
@@ -392,7 +487,7 @@ export default async function SchedulePage({
                           </div>
                           <div className="shrink-0">
                             {isSignedUp ? (
-                              <form action={withdrawFromEvent.bind(null, ev.id)}>
+                              <form action={resolvedIsActingAs && targetUser ? adminWithdrawFromEventAs.bind(null, ev.id, targetUser.id) : withdrawFromEvent.bind(null, ev.id)}>
                                 <button
                                   type="submit"
                                   className="text-sm text-red-600 hover:text-red-800 font-medium px-3 py-2 rounded-lg border border-red-100 hover:bg-red-50 transition-colors whitespace-nowrap"
@@ -401,7 +496,7 @@ export default async function SchedulePage({
                                 </button>
                               </form>
                             ) : (
-                              <form action={signupForEvent.bind(null, ev.id)}>
+                              <form action={resolvedIsActingAs && targetUser ? adminSignupForEventAs.bind(null, ev.id, targetUser.id) : signupForEvent.bind(null, ev.id)}>
                                 <button
                                   type="submit"
                                   disabled={isFull}
@@ -464,7 +559,7 @@ export default async function SchedulePage({
                           </div>
                           <div className="shrink-0">
                             {isSignedUp ? (
-                              <form action={withdrawFromJobOccurrence.bind(null, occ.job.id, occ.dateKey)}>
+                              <form action={resolvedIsActingAs && targetUser ? adminWithdrawFromJobOccurrenceAs.bind(null, occ.job.id, occ.dateKey, targetUser.id) : withdrawFromJobOccurrence.bind(null, occ.job.id, occ.dateKey)}>
                                 <button
                                   type="submit"
                                   className="text-sm text-red-600 hover:text-red-800 font-medium px-3 py-2 rounded-lg border border-red-100 hover:bg-red-50 transition-colors whitespace-nowrap"
@@ -473,7 +568,7 @@ export default async function SchedulePage({
                                 </button>
                               </form>
                             ) : (
-                              <form action={signupForJobOccurrence.bind(null, occ.job.id, occ.dateKey)}>
+                              <form action={resolvedIsActingAs && targetUser ? adminSignupForJobOccurrenceAs.bind(null, occ.job.id, occ.dateKey, targetUser.id) : signupForJobOccurrence.bind(null, occ.job.id, occ.dateKey)}>
                                 <button
                                   type="submit"
                                   className="text-sm font-medium px-3 py-2 rounded-lg transition-colors whitespace-nowrap text-blue-600 hover:text-blue-800 border border-blue-200 hover:bg-blue-50"
@@ -491,14 +586,16 @@ export default async function SchedulePage({
               )}
             </div>
 
-            {/* ── Section 2: My availability for this day ───────────────────── */}
+            {/* ── Section 2: Availability for this day ───────────────────── */}
             <div className="px-6 py-5">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                  My Availability on This Day
+                  {resolvedIsActingAs && targetUser
+                    ? `${targetUser.name ?? targetUser.email}'s Availability on This Day`
+                    : 'My Availability on This Day'}
                 </h4>
                 {mySlotForDay && (
-                  <form action={deleteVolunteerDateSlot.bind(null, selectedDateKey!)}>
+                  <form action={resolvedIsActingAs && targetUser ? adminDeleteVolunteerDateSlotAs.bind(null, targetUser.id, selectedDateKey!) : deleteVolunteerDateSlot.bind(null, selectedDateKey!)}>
                     <button
                       type="submit"
                       className="text-xs text-red-500 hover:text-red-700 font-medium"
@@ -513,7 +610,7 @@ export default async function SchedulePage({
                 <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800 flex items-center gap-2">
                   <span className="text-green-500">✓</span>
                   <span>
-                    You have recorded availability for this day
+                    {resolvedIsActingAs && targetUser ? `${targetUser.name ?? targetUser.email} has` : 'You have'} recorded availability for this day
                     {mySlotForDay.startTime || mySlotForDay.endTime
                       ? `: ${mySlotForDay.startTime ?? ''}${mySlotForDay.endTime ? `–${mySlotForDay.endTime}` : ''}`
                       : ' (all day)'}.
@@ -532,7 +629,11 @@ export default async function SchedulePage({
                   const jobIds = allJobs
                     .map((j) => j.id)
                     .filter((id) => formData.get(`job_${id}`) === 'on');
-                  await saveVolunteerDateSlot(dateStr, startTime, endTime, jobIds, notes);
+                  if (resolvedIsActingAs && targetUser) {
+                    await adminSaveVolunteerDateSlotAs(targetUser.id, dateStr, startTime, endTime, jobIds, notes);
+                  } else {
+                    await saveVolunteerDateSlot(dateStr, startTime, endTime, jobIds, notes);
+                  }
                 }}
                 className="space-y-5"
               >
@@ -649,7 +750,9 @@ export default async function SchedulePage({
                   type="submit"
                   className="w-full bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
                 >
-                  {mySlotForDay ? '✓ Update My Availability' : 'Save My Availability for This Day'}
+                  {mySlotForDay
+                    ? (resolvedIsActingAs && targetUser ? `✓ Update ${targetUser.name ?? targetUser.email}'s Availability` : '✓ Update My Availability')
+                    : (resolvedIsActingAs && targetUser ? `Save ${targetUser.name ?? targetUser.email}'s Availability for This Day` : 'Save My Availability for This Day')}
                 </button>
               </form>
             </div>
@@ -691,20 +794,28 @@ export default async function SchedulePage({
           </div>
         )}
 
-        {/* My upcoming sign-ups */}
+        {/* Upcoming sign-ups */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="font-semibold text-gray-900 mb-1">My Upcoming Sign-ups</h3>
-          <p className="text-sm text-gray-500 mb-4">All events you are signed up for in the coming days.</p>
+          <h3 className="font-semibold text-gray-900 mb-1">
+            {resolvedIsActingAs && targetUser ? `${targetUser.name ?? targetUser.email}'s Upcoming Sign-ups` : 'My Upcoming Sign-ups'}
+          </h3>
+          <p className="text-sm text-gray-500 mb-4">
+            {resolvedIsActingAs && targetUser
+              ? `All events ${targetUser.name ?? targetUser.email} is signed up for in the coming days.`
+              : 'All events you are signed up for in the coming days.'}
+          </p>
           {myUpcomingSignups.length === 0 ? (
             <p className="text-gray-400 text-sm">
-              You haven&apos;t signed up for any upcoming events yet. Browse the calendar above to find events and sign up.
+              {resolvedIsActingAs && targetUser
+                ? `${targetUser.name ?? targetUser.email} hasn't signed up for any upcoming events yet.`
+                : "You haven't signed up for any upcoming events yet. Browse the calendar above to find events and sign up."}
             </p>
           ) : (
             <div className="space-y-2">
               {myUpcomingSignups.map((signup) => (
                 <Link
                   key={signup.id}
-                  href={`/schedule?month=${fmtMonth(signup.event.date.getUTCFullYear(), signup.event.date.getUTCMonth())}&day=${dateToParam(signup.event.date)}`}
+                  href={`/schedule?month=${fmtMonth(signup.event.date.getUTCFullYear(), signup.event.date.getUTCMonth())}&day=${dateToParam(signup.event.date)}${resolvedIsActingAs && targetUser ? `&userId=${targetUser.id}` : ''}`}
                   className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-colors"
                 >
                   <div className="text-center w-10 shrink-0">
