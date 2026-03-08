@@ -79,10 +79,10 @@ export default async function DashboardPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
           <DashCard title="Schedule &amp; Availability" icon="📅" href="/schedule" description="Browse events, sign up for shifts, record your availability, and choose what you can help with." />
-          <DashCard title="Announcements" icon="📣" href="/announcements" description="Latest news and updates from the museum." />
+          <DashCard title="Team Tasks" icon="✅" href="/teams" description="View active tasks across all teams, urgency levels, and requirements." />
           <DashCard title="Files &amp; Documents" icon="📁" href="/files" description="Browse and download files and documents shared by the museum team." />
           <DashCard title="My Profile" icon="👤" href="/profile" description="Update your name, contact details, and general activity preferences." />
-          <DashCard title="My Teams" icon="👥" href="/teams" description="View your team memberships, active tasks, and submit work logs or feedback." />
+          <DashCard title="My Teams" icon="👥" href="/teams" description="View your team memberships, submit work logs or feedback." />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -126,15 +126,17 @@ export default async function DashboardPage() {
             )}
           </div>
 
-          {/* Recent announcements */}
-          {announcements.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-semibold text-gray-900">Recent Announcements</h2>
-                <Link href="/announcements" className="text-sm text-blue-600 hover:text-blue-800 font-medium">
-                  View all →
-                </Link>
-              </div>
+          {/* Announcements */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-gray-900">Announcements</h2>
+              <Link href="/announcements" className="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                View all →
+              </Link>
+            </div>
+            {announcements.length === 0 ? (
+              <p className="text-gray-500 text-sm">No recent announcements.</p>
+            ) : (
               <div className="space-y-3">
                 {announcements.map((ann) => (
                   <div key={ann.id} className="flex items-start gap-2">
@@ -150,8 +152,8 @@ export default async function DashboardPage() {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* My teams */}
           <div className="bg-white rounded-xl border border-gray-200 p-6">
