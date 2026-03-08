@@ -17,6 +17,162 @@ Entries are listed in reverse chronological order (newest first). Each entry rec
 
 ---
 
+## 8 March 2026 — Manual Update
+
+**Agent session:** GitHub Copilot Coding Agent
+
+**What was done:**
+
+Updated `docs/user-manual.md` (Version 2.0) to reflect the current state of the application. The previous version (1.0) was written in March 2026 before most features were implemented and contained numerous "Coming soon" placeholders and inaccurate sign-in instructions (it described magic-link authentication, which was replaced by password + OTP).
+
+Changes made to the user manual:
+
+- **Sign-in section** completely rewritten to describe the current two-step flow: email + password, then a 6-digit email OTP. Documents the "Keep me signed in for 7 days" option, the 10-minute OTP expiry, and the brute-force lockout (5 failed attempts).
+- **Forgot password / reset password** documented as a new sub-section within the sign-in section.
+- **Home page and navigation bar** updated to reflect current nav links (Schedule, Announcements, Teams, Files).
+- **Dashboard** section updated: removed three "Coming soon" placeholders; replaced with descriptions of the real Upcoming Events, Recent Announcements, My Availability, and My Profile cards.
+- **New Section 8 — Announcements**: documents the announcements list, pinned announcements, and how announcements are ordered.
+- **New Section 9 — Schedule & Calendar**: documents the month calendar, event colour coding, sign-up/withdraw, day availability recording, and the rolling duties panel.
+- **New Section 10 — Teams**: documents the Teams page visible to all volunteers, including urgency badges, active tasks, work logs, and feedback.
+- **New Section 11 — Availability Preferences**: documents the general activity preferences page at `/volunteer/availability`.
+- **New Section 12 — Profile**: documents the profile page (name, telephone, roles, teams, capabilities).
+- **New Section 13 — File Library**: documents the `/files` page available to all signed-in users.
+- **New Section 14 — Managing Your Password**: documents first-time password setup, voluntary password change, and forgotten password reset flow.
+- **Section 15 — Uploading Files** (previously Section 8): updated to mention the admin file management page and the File Library.
+- **Section 16 — Admin Panel** (previously Section 9): massively expanded to cover all admin sections:
+  - Overview (updated stats: Events count added)
+  - User Management (add user, manage individual user, password reset, delete)
+  - Roles and Permissions (create role, assign capabilities, full capability table)
+  - Team Management (create team, set leader, task forms)
+  - Training Policies (add, edit, deactivate)
+  - Schedule Management (create event, delete event, admin availability view, job management)
+  - Announcements Management (create, pin/unpin, delete)
+  - File Management (download, delete)
+  - Audit Log (pagination, filters)
+  - Site Content (privacy policy editor)
+- **Section 17 — Email Notifications** (previously Section 10): updated to reflect actual notifications sent (verification code, password reset), removed speculative future notifications.
+- **Section 18 — Privacy and Security** (previously Section 11): corrected — passwords ARE stored (as scrypt hashes); updated to document two-step authentication.
+- **Section 19 — FAQ** (previously Section 12): updated questions to match current sign-in flow; added entries for password reset and profile editing; corrected session-expiry description.
+
+---
+
+## 8 March 2026 — Teams, Training Policies, Site Content, and Password Authentication
+
+**Agent session:** GitHub Copilot Coding Agent
+
+**What was done:**
+
+### 1. Password-based authentication (replacing magic links)
+
+The authentication system was rearchitected from passwordless magic links to a two-step email-and-password flow with one-time password (OTP) verification:
+
+**New database fields on `User`** (migration `20240108000000_add_password_fields`):
+- `passwordHash` — scrypt-hashed password, nullable (null = no password set)
+- `mustChangePassword` — boolean flag; when true the user is redirected to the change-password page immediately after OTP verification
+
+**New and updated auth pages:**
+
+| Path | What it does |
+|---|---|
+| `/auth/signin` | Email + password form with optional "keep me signed in" checkbox |
+| `/auth/verify-otp` | 6-digit OTP entry form; code sent to email after successful password check |
+| `/auth/change-password` | Set or change password; mandatory mode (first login) or voluntary |
+| `/auth/forgot-password` | Request a password reset email |
+| `/auth/reset-password` | Set a new password via a time-limited email token |
+
+**Security details:**
+- Passwords hashed with scrypt via `src/lib/password.ts`
+- OTP codes stored in `VerificationToken` with `identifier = "otp:{email}"`, expire in 10 minutes
+- Brute-force protection: 5 failed OTP attempts (identifier `"otp-fail:{email}"`) cancels the code
+- Password reset tokens: identifier `"pw-reset:{email}"`, expire in 24 hours
+- Password attempt rate-limiting: 10 attempts per 15 minutes (identifier `"pw-fail:{email}"`)
+- Session TTL: 2 hours (no "keep me signed in") or 7 days (with checkbox), stored in signed JWT
+- `mustChangePassword` users are intercepted by proxy middleware and redirected to `/auth/change-password`
+
+**Admin password reset:** Added `adminSendPasswordReset()` server action in `src/app/admin/users/actions.ts` allowing administrators to send a password reset email to any user from their manage page.
+
+### 2. Team management (`/admin/teams`, `/teams`, `/teams/[id]`)
+
+A full team management system was implemented covering both admin and volunteer-facing views.
+
+**New database models (migration `20260308020000_add_team_tasks_and_leader`):**
+
+| Model | Purpose |
+|---|---|
+| `Team` | A named group of volunteers with an optional team leader and description |
+| `TeamMember` | Join table linking users to teams |
+| `TeamTaskForm` | A template defining a piece of work (title, description, type, urgency, personnel, equipment, safety notes) |
+| `TeamTask` | An active instance of a task form assigned to a team, with status tracking |
+| `WorkLog` | A volunteer's record of work done on a task (duration, notes, observations) |
+| `TaskFeedback` | Free-text feedback on a task |
+
+**Capabilities added:** `admin:teams.read`, `admin:teams.write`, `admin:tasks.write`
+
+**New pages:**
+
+| Path | Access | Purpose |
+|---|---|---|
+| `/admin/teams` | `admin:teams.read` | Create, edit, delete teams; assign leader; link to task forms |
+| `/admin/teams/tasks` | `admin:tasks.write` | Create, edit, delete task forms with all fields |
+| `/teams` | Any signed-in user | Browse all teams and their active tasks |
+| `/teams/[id]` | Any signed-in user | View a single team's details; submit work logs and feedback |
+
+**Urgency levels:** `URGENT` (red), `MODERATE` (amber), `ROUTINE` (green)
+
+**Task types:** Seeded with common aviation museum categories (maintenance, inspection, restoration, etc.)
+
+### 3. Training policies (`/admin/training`)
+
+A training compliance matrix was added to help administrators track which training requirements apply to each category of volunteer.
+
+**New database model (migration `20260308010000_add_training_policies`):**
+
+| Model | Purpose |
+|---|---|
+| `TrainingPolicy` | A named training requirement with frequency, description, and active flag |
+| `TrainingPolicyRole` | Join table linking policies to account types (`VOLUNTEER`, `STAFF`, `MEMBER`) |
+
+**Capability added:** `admin:training.write`
+
+**Page:** `/admin/training` — create, edit, deactivate, and delete training policies; view compliance matrix table showing which account types each policy applies to.
+
+### 4. Site content management (`/admin/content`, `/privacy`)
+
+Administrators can now edit the privacy and cookie policy displayed publicly on the `/privacy` page.
+
+**New database model (migration `20260308000000_add_site_content`):**
+
+| Model | Purpose |
+|---|---|
+| `SiteContent` | Key-value store for site-wide text content; `key = 'privacy-policy'` for the privacy page |
+
+**Page:** `/admin/content` — large textarea for editing the policy, save button, last-updated timestamp, and a preview link to `/privacy`. A warning banner is shown because the default content was drafted with AI assistance and requires legal review.
+
+**Capability used:** `admin:theme.write` (already existed)
+
+**Decisions:**
+
+- Password authentication was chosen over magic links because volunteers expressed a preference for a conventional sign-in experience and because magic links require a functioning email server on every sign-in attempt.
+- OTP as a second factor provides a meaningful security improvement without requiring hardware tokens or authenticator apps.
+- Training policies are stored per account type (not per individual user) to keep the model simple for a small organisation. Individual compliance tracking (recording that a specific person has completed a specific training) is a potential future enhancement.
+- Site content uses a generic key-value model (`SiteContent`) so that additional content areas can be added in future without schema changes.
+
+**Known limitations at this stage:**
+
+- Individual training completion is not yet tracked — the matrix shows what is required but not who has completed it.
+- Teams do not have a discussion or messaging feature; communication happens outside the VMS.
+- No email notifications are sent when new team tasks are created or work logs are submitted.
+
+**Next steps identified:**
+
+- [ ] Individual training completion tracking (record that a specific user has completed a specific policy)
+- [ ] Email notification when a team task is created or updated
+- [ ] Admin sign-up list view (see exactly which volunteers have signed up for a calendar event)
+- [ ] Recurring availability patterns (e.g. "every Tuesday morning")
+- [ ] System Settings page (site name, contact details, theme options)
+
+---
+
 ## 6 March 2026 — Schedule & Calendar System
 
 **Agent session:** GitHub Copilot Coding Agent
