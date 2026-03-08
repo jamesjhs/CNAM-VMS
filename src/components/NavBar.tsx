@@ -13,7 +13,6 @@ export default async function NavBar() {
     capabilities.includes('admin:announcements.write') ||
     capabilities.includes('admin:calendar.write') ||
     capabilities.includes('admin:theme.write');
-  const canUpload = capabilities.includes('admin:files.write');
 
   // Build nav link lists to pass to the mobile menu client component
   const mainLinks: NavLink[] = session
@@ -21,6 +20,7 @@ export default async function NavBar() {
         { href: '/dashboard', label: 'Dashboard' },
         { href: '/schedule', label: 'Schedule & Availability' },
         { href: '/announcements', label: 'Announcements' },
+        { href: '/files', label: 'Files' },
       ]
     : [];
 
@@ -59,6 +59,9 @@ export default async function NavBar() {
                 </Link>
                 <Link href="/announcements" className="text-gray-300 hover:text-white text-sm transition-colors">
                   Announcements
+                </Link>
+                <Link href="/files" className="text-gray-300 hover:text-white text-sm transition-colors">
+                  Files
                 </Link>
                 {isAdmin && (
                   <div className="relative group">
@@ -120,11 +123,6 @@ export default async function NavBar() {
                     </div>
                   </div>
                 )}
-                {canUpload && (
-                  <Link href="/upload" className="text-gray-300 hover:text-white text-sm transition-colors">
-                    Upload
-                  </Link>
-                )}
               </div>
             )}
           </div>
@@ -174,7 +172,6 @@ export default async function NavBar() {
                   links={mainLinks}
                   adminLinks={adminLinks}
                   isAdmin={isAdmin}
-                  canUpload={canUpload}
                   userName={session.user?.name}
                   userEmail={session.user?.email}
                 />
