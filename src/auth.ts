@@ -63,7 +63,7 @@ function getRootEmail(): string | undefined {
 
 export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
   adapter: PrismaAdapter(prisma),
-  session: { strategy: 'jwt' },
+  session: { strategy: 'jwt', maxAge: 7 * 24 * 60 * 60 }, // max 7 days
   providers: [
     /**
      * Credentials provider — used for the two-step auth flow:
@@ -75,10 +75,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
       credentials: {
         userId: { type: 'text' },
         completionToken: { type: 'text' },
+        keepSignedIn: { type: 'text' },
       },
       async authorize(credentials) {
         const userId = credentials?.userId as string | undefined;
         const completionToken = credentials?.completionToken as string | undefined;
+        const keepSignedIn = credentials?.keepSignedIn === '1';
 
         if (!userId || !completionToken) return null;
 
@@ -104,6 +106,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
           email: user.email,
           name: user.name,
           image: user.image,
+          keepSignedIn,
         };
       },
     }),
@@ -132,6 +135,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
     async jwt({ token, user }) {
       if (user?.id) {
         token.id = user.id;
+        // Store keepSignedIn preference; cast to access the custom property
+        const u = user as { id: string; keepSignedIn?: boolean };
+        token.keepSignedIn = u.keepSignedIn ?? false;
+        // Set JWT expiry based on preference:
+        // - keepSignedIn: 7 days (matches session.maxAge)
+        // - otherwise: 2 hours (requires re-sign-in after browser session / short inactivity)
+        const maxAge = token.keepSignedIn ? 7 * 24 * 60 * 60 : 2 * 60 * 60;
+        token.exp = Math.floor(Date.now() / 1000) + maxAge;
       }
       return token;
     },

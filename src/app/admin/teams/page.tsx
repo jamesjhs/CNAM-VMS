@@ -3,14 +3,23 @@ import NavBar from '@/components/NavBar';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { createTeam, deleteTeam, updateTeam } from '../users/actions';
+import { setTeamLeader } from './actions';
 
-export default async function TeamsAdminPage() {
+export default async function TeamsAdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ success?: string; error?: string }>;
+}) {
   await requireCapability('admin:teams.read');
+
+  const { success, error } = await searchParams;
 
   const teams = await prisma.team.findMany({
     orderBy: { name: 'asc' },
     include: {
-      _count: { select: { userTeams: true } },
+      _count: { select: { userTeams: true, tasks: true } },
+      leader: { select: { id: true, name: true, email: true } },
+      userTeams: { include: { user: { select: { id: true, name: true, email: true } } } },
     },
   });
 
@@ -25,13 +34,33 @@ export default async function TeamsAdminPage() {
           <span className="text-gray-900 font-medium">Teams</span>
         </nav>
 
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Team Management</h1>
             <p className="text-gray-500">Create and manage volunteer teams.</p>
           </div>
-          <span className="text-sm text-gray-500">{teams.length} team{teams.length !== 1 ? 's' : ''}</span>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/admin/teams/tasks"
+              className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+            >
+              Task Forms
+            </Link>
+            <span className="text-sm text-gray-500">{teams.length} team{teams.length !== 1 ? 's' : ''}</span>
+          </div>
         </div>
+
+        {/* Success / error banners */}
+        {success === 'leader' && (
+          <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+            ✓ Team leader updated.
+          </div>
+        )}
+        {error === 'NotMember' && (
+          <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            The selected user is not a member of this team and cannot be set as leader.
+          </div>
+        )}
 
         {/* Create new team form */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
@@ -76,16 +105,24 @@ export default async function TeamsAdminPage() {
           <div className="space-y-4">
             {teams.map((team) => (
               <div key={team.id} className="bg-white rounded-xl border border-gray-200 p-6">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start justify-between gap-4 mb-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="font-semibold text-gray-900">{team.name}</h3>
                       <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
                         {team._count.userTeams} member{team._count.userTeams !== 1 ? 's' : ''}
                       </span>
+                      <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                        {team._count.tasks} task{team._count.tasks !== 1 ? 's' : ''}
+                      </span>
                     </div>
                     {team.description && (
                       <p className="text-gray-500 text-sm">{team.description}</p>
+                    )}
+                    {team.leader && (
+                      <p className="text-sm text-indigo-600 mt-1">
+                        👤 Leader: {team.leader.name ?? team.leader.email}
+                      </p>
                     )}
                     <p className="text-gray-400 text-xs mt-1">Created {team.createdAt.toLocaleDateString('en-GB')}</p>
                   </div>
@@ -121,6 +158,12 @@ export default async function TeamsAdminPage() {
                         Save
                       </button>
                     </form>
+                    <Link
+                      href={`/teams/${team.id}`}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium px-3 py-1.5 rounded-lg border border-blue-100 hover:bg-blue-50 transition-colors whitespace-nowrap"
+                    >
+                      View page
+                    </Link>
                     <form action={deleteTeam.bind(null, team.id)}>
                       <button
                         type="submit"
@@ -130,6 +173,38 @@ export default async function TeamsAdminPage() {
                       </button>
                     </form>
                   </div>
+                </div>
+
+                {/* Team leader assignment */}
+                <div className="border-t border-gray-100 pt-4">
+                  <p className="text-xs font-medium text-gray-500 mb-2">Team Leader</p>
+                  <form
+                    action={async (fd: FormData) => {
+                      'use server';
+                      const leaderId = (fd.get('leaderId') as string | null) || null;
+                      await setTeamLeader(team.id, leaderId);
+                    }}
+                    className="flex gap-2 flex-wrap"
+                  >
+                    <select
+                      name="leaderId"
+                      defaultValue={team.leader?.id ?? ''}
+                      className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="">No leader</option>
+                      {team.userTeams.map(({ user }) => (
+                        <option key={user.id} value={user.id}>
+                          {user.name ?? user.email}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="submit"
+                      className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors"
+                    >
+                      Set leader
+                    </button>
+                  </form>
                 </div>
               </div>
             ))}

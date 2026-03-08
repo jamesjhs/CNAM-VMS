@@ -51,8 +51,14 @@ export default async function AdminPage() {
             href="/admin/teams"
             icon="🏷️"
             title="Teams"
-            description="Manage volunteer teams and group assignments."
+            description="Manage volunteer teams, assign team leaders and group assignments."
             badge={`${teamCount} teams`}
+          />
+          <AdminCard
+            href="/admin/teams/tasks"
+            icon="📋"
+            title="Task Forms"
+            description="Create and manage structured task forms for teams, including equipment, consumables and safety information."
           />
           <AdminCard
             href="/admin/audit"

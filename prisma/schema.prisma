@@ -28,6 +28,18 @@ enum CalendarEventType {
   HELP_NEEDED
 }
 
+enum TaskType {
+  SITE
+  DISPLAY
+  AIRFRAME
+}
+
+enum TaskUrgency {
+  ROUTINE
+  MODERATE
+  URGENT
+}
+
 enum JobScheduleType {
   ONE_OFF
   WEEKLY
@@ -60,6 +72,9 @@ model User {
   eventSignups   EventSignup[]
   dateSlots      VolunteerDateSlot[]
   siteContentEdits SiteContent[]
+  ledTeams       Team[]          @relation("TeamLeader")
+  teamWorkLogs   TeamWorkLog[]
+  teamFeedbacks  TeamFeedback[]
 
   @@map("users")
 }
@@ -213,11 +228,15 @@ model Team {
   id          String   @id @default(cuid())
   name        String   @unique
   description String?
+  leaderId    String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  leader         User?          @relation("TeamLeader", fields: [leaderId], references: [id], onDelete: SetNull)
   userTeams      UserTeam[]
   calendarEvents CalendarEvent[]
+  tasks          TeamTask[]
+  feedbacks      TeamFeedback[]
 
   @@map("teams")
 }
@@ -376,4 +395,60 @@ model SiteContent {
   updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: SetNull)
 
   @@map("site_content")
+}
+
+// ---------------------------------------------------------------------------
+// Team tasks — structured work requests for teams
+// ---------------------------------------------------------------------------
+
+model TeamTask {
+  id                 String      @id @default(cuid())
+  teamId             String
+  title              String
+  taskType           TaskType
+  urgency            TaskUrgency
+  description        String?     @db.Text
+  personnelRequired  Int?
+  supervisorRequired Boolean     @default(false)
+  equipment          String[]
+  equipmentOther     String?
+  consumables        String[]
+  consumablesOther   String?
+  safetyIssues       String[]
+  safetyIssuesOther  String?
+  equipmentLocations String?     @db.Text
+  isActive           Boolean     @default(true)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  team     Team          @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  workLogs TeamWorkLog[]
+
+  @@map("team_tasks")
+}
+
+model TeamWorkLog {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  entry     String   @db.Text
+  createdAt DateTime @default(now())
+
+  task TeamTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("team_work_logs")
+}
+
+model TeamFeedback {
+  id        String   @id @default(cuid())
+  teamId    String
+  userId    String
+  feedback  String   @db.Text
+  createdAt DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("team_feedback")
 }
