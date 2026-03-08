@@ -12,6 +12,7 @@ export const CAPABILITIES = [
   { key: 'admin:announcements.write', description: 'Create and manage announcements' },
   { key: 'admin:calendar.write', description: 'Create and manage calendar events and jobs' },
   { key: 'admin:theme.write', description: 'Manage site theme and settings' },
+  { key: 'admin:training.write', description: 'Create and manage training policies' },
   { key: 'volunteer:tasks.read', description: 'View tasks' },
   { key: 'volunteer:tasks.write', description: 'Create and update tasks' },
 ] as const;

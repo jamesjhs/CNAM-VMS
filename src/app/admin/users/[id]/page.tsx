@@ -12,7 +12,8 @@ import {
   removeRole,
   assignTeam,
   removeTeam,
-  adminSetPassword,
+  adminSendPasswordReset,
+  resetUserLockout,
 } from '../actions';
 import DeleteUserButton from './DeleteUserButton';
 import type { UserStatus, UserAccountType } from '@prisma/client';
@@ -56,6 +57,15 @@ export default async function UserDetailPage({
   ]);
 
   if (!user) notFound();
+
+  // Check lockout status for this specific user
+  const userLockoutCount = await prisma.verificationToken.count({
+    where: {
+      identifier: `pw-fail:${user.email}`,
+      expires: { gt: new Date() },
+    },
+  });
+  const isLockedOut = userLockoutCount >= 10;
 
   const assignedRoleIds = new Set(user.userRoles.map((ur) => ur.roleId));
   const assignedTeamIds = new Set(user.userTeams.map((ut) => ut.teamId));
@@ -236,33 +246,54 @@ export default async function UserDetailPage({
           </div>
         </div>
 
-        {/* Set / reset password */}
+        {/* Password & Security */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-          <h2 className="font-semibold text-gray-900 mb-1">Set Password</h2>
+          <h2 className="font-semibold text-gray-900 mb-1">Password &amp; Security</h2>
+
+          {/* Lockout status */}
+          {isLockedOut ? (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-red-700">🔒 Account locked out</p>
+                <p className="text-xs text-red-500 mt-0.5">
+                  Too many failed sign-in attempts ({userLockoutCount}/10). Lockout clears automatically after 15 minutes.
+                </p>
+              </div>
+              <form action={resetUserLockout.bind(null, user.id)}>
+                <button
+                  type="submit"
+                  className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap"
+                >
+                  Clear lockout
+                </button>
+              </form>
+            </div>
+          ) : userLockoutCount > 0 ? (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between gap-4">
+              <p className="text-xs text-amber-700">
+                ⚠️ {userLockoutCount} recent failed sign-in attempt{userLockoutCount !== 1 ? 's' : ''} (max 10 before lockout).
+              </p>
+              <form action={resetUserLockout.bind(null, user.id)}>
+                <button
+                  type="submit"
+                  className="text-xs border border-amber-400 text-amber-700 hover:bg-amber-50 px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap"
+                >
+                  Clear attempts
+                </button>
+              </form>
+            </div>
+          ) : null}
+
+          {/* Send password reset email */}
           <p className="text-gray-500 text-sm mb-4">
-            Set a temporary password for this user. They will be required to change it on their next sign-in.
+            Send a password reset link to this user&apos;s email address. The link is valid for 24 hours.
           </p>
-          <form
-            action={async (formData: FormData) => {
-              'use server';
-              const newPassword = formData.get('newPassword') as string;
-              await adminSetPassword(user.id, newPassword);
-            }}
-            className="flex flex-col sm:flex-row gap-3"
-          >
-            <input
-              name="newPassword"
-              type="password"
-              required
-              minLength={8}
-              placeholder="Temporary password (min. 8 characters)"
-              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+          <form action={adminSendPasswordReset.bind(null, user.id)}>
             <button
               type="submit"
-              className="bg-amber-600 hover:bg-amber-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+              className="bg-amber-600 hover:bg-amber-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
             >
-              Set password
+              Send password reset email
             </button>
           </form>
         </div>

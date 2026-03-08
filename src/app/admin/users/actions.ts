@@ -360,28 +360,74 @@ export async function deleteTeam(teamId: string) {
 // Password management (admin)
 // ---------------------------------------------------------------------------
 
-export async function adminSetPassword(userId: string, newPassword: string) {
+/**
+ * Admin sends a password reset email to the user.
+ * The user follows the link to set their own password.
+ */
+export async function adminSendPasswordReset(userId: string) {
   const actor = await requireCapability('admin:users.write');
 
-  const trimmedPassword = newPassword.trim();
-  if (trimmedPassword.length < 8) return;
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+  if (!user?.email) return;
 
-  const { hashPassword } = await import('@/lib/password');
-  const hash = await hashPassword(trimmedPassword);
+  const { randomBytes } = await import('crypto');
+  const { sendPasswordResetEmail } = await import('@/lib/mail');
+  const { headers } = await import('next/headers');
 
-  await prisma.user.update({
-    where: { id: userId },
+  const headerStore = await headers();
+  const host = headerStore.get('host') ?? 'localhost';
+  const proto = headerStore.get('x-forwarded-proto') ?? 'http';
+  const baseUrl = `${proto}://${host}`;
+
+  const resetToken = randomBytes(32).toString('hex');
+  const resetIdentifier = `pw-reset:${user.email}`;
+
+  await prisma.verificationToken.deleteMany({ where: { identifier: resetIdentifier } });
+  await prisma.verificationToken.create({
     data: {
-      passwordHash: hash,
-      mustChangePassword: true, // Force change on next login
+      identifier: resetIdentifier,
+      token: resetToken,
+      expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
     },
+  });
+
+  const resetUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
+  try {
+    await sendPasswordResetEmail(user.email, resetUrl);
+  } catch {
+    // Email failure — token still created; admin can retry
+  }
+
+  await logAudit({
+    userId: actor.id,
+    action: 'ADMIN_PASSWORD_RESET_SENT',
+    resource: 'User',
+    resourceId: userId,
+    detail: { email: user.email },
+  });
+
+  revalidatePath(`/admin/users/${userId}`);
+}
+
+/**
+ * Admin clears the failed-login lockout for a user so they can try again immediately.
+ */
+export async function resetUserLockout(userId: string) {
+  const actor = await requireCapability('admin:users.write');
+
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+  if (!user?.email) return;
+
+  await prisma.verificationToken.deleteMany({
+    where: { identifier: `pw-fail:${user.email}` },
   });
 
   await logAudit({
     userId: actor.id,
-    action: 'ADMIN_PASSWORD_SET',
+    action: 'USER_LOCKOUT_CLEARED',
     resource: 'User',
     resourceId: userId,
+    detail: { email: user.email },
   });
 
   revalidatePath(`/admin/users/${userId}`);

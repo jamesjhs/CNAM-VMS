@@ -1,15 +1,16 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { randomBytes, randomInt } from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { signIn } from '@/auth';
 import { verifyPassword } from '@/lib/password';
-import { sendOtpEmail } from '@/lib/mail';
+import { sendOtpEmail, sendPasswordResetEmail } from '@/lib/mail';
 
 const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
 const COMPLETION_TOKEN_EXPIRY_MS = 2 * 60 * 1000; // 2 minutes
+const RESET_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // Brute-force protection
 const MAX_OTP_ATTEMPTS = 5; // Maximum failed OTP attempts before the code is invalidated
@@ -222,4 +223,104 @@ export async function submitOtp(formData: FormData) {
 
   // signIn throws a NEXT_REDIRECT internally; Next.js handles it as a redirect response
   await signIn('credentials', { userId, completionToken, redirectTo });
+}
+
+// ---------------------------------------------------------------------------
+// Self-service password reset — step 1: request a reset link
+// ---------------------------------------------------------------------------
+
+export async function requestPasswordReset(formData: FormData) {
+  const email = (formData.get('email') as string | null)?.toLowerCase().trim() ?? '';
+
+  if (!email) {
+    redirect('/auth/forgot-password?error=MissingEmail');
+  }
+
+  // Derive the base URL from the incoming request headers (host + protocol).
+  const headerStore = await headers();
+  const host = headerStore.get('host') ?? 'localhost';
+  const proto = headerStore.get('x-forwarded-proto') ?? 'http';
+  const baseUrl = `${proto}://${host}`;
+
+  // Always show a "success" response to prevent user enumeration
+  const user = await prisma.user.findUnique({ where: { email } });
+
+  if (user) {
+    const resetToken = randomBytes(32).toString('hex');
+    const resetIdentifier = `pw-reset:${email}`;
+
+    // Invalidate any existing reset token for this email
+    await prisma.verificationToken.deleteMany({ where: { identifier: resetIdentifier } });
+    await prisma.verificationToken.create({
+      data: {
+        identifier: resetIdentifier,
+        token: resetToken,
+        expires: new Date(Date.now() + RESET_TOKEN_EXPIRY_MS),
+      },
+    });
+
+    const resetUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
+    try {
+      await sendPasswordResetEmail(email, resetUrl);
+    } catch {
+      // Log but don't reveal to the user
+    }
+  }
+
+  redirect('/auth/forgot-password?sent=1');
+}
+
+// ---------------------------------------------------------------------------
+// Self-service password reset — step 2: set the new password via token
+// ---------------------------------------------------------------------------
+
+export async function completePasswordReset(formData: FormData) {
+  const token = (formData.get('token') as string | null)?.trim() ?? '';
+  const newPassword = (formData.get('newPassword') as string | null) ?? '';
+  const confirmPassword = (formData.get('confirmPassword') as string | null) ?? '';
+
+  if (!token || !newPassword || !confirmPassword) {
+    redirect(`/auth/reset-password?token=${encodeURIComponent(token)}&error=MissingFields`);
+  }
+
+  if (newPassword !== confirmPassword) {
+    redirect(`/auth/reset-password?token=${encodeURIComponent(token)}&error=PasswordMismatch`);
+  }
+
+  if (newPassword.length < 8) {
+    redirect(`/auth/reset-password?token=${encodeURIComponent(token)}&error=TooShort`);
+  }
+
+  // Look up the token — it must be unexpired and be a pw-reset token
+  const tokenRecord = await prisma.verificationToken.findUnique({ where: { token } });
+  if (!tokenRecord || !tokenRecord.identifier.startsWith('pw-reset:') || tokenRecord.expires < new Date()) {
+    redirect('/auth/reset-password?error=InvalidToken');
+  }
+
+  const email = tokenRecord.identifier.slice('pw-reset:'.length);
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    redirect('/auth/reset-password?error=InvalidToken');
+  }
+
+  const { hashPassword } = await import('@/lib/password');
+  const hash = await hashPassword(newPassword);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: hash, mustChangePassword: false },
+  });
+
+  // Invalidate the used token
+  await prisma.verificationToken.deleteMany({ where: { identifier: tokenRecord.identifier } });
+
+  const { logAudit } = await import('@/lib/audit');
+  await logAudit({
+    userId: user.id,
+    action: 'PASSWORD_RESET',
+    resource: 'User',
+    resourceId: user.id,
+  });
+
+  redirect('/auth/signin?reset=1');
 }

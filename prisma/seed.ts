@@ -80,6 +80,7 @@ async function main() {
     'admin:teams.read',
     'admin:teams.write',
     'admin:audit.read',
+    'admin:training.write',
   ];
   for (const key of adminCapKeys) {
     const cap = allCapabilities.find((c) => c.key === key);
