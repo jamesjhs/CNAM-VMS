@@ -6,10 +6,16 @@ A web-based volunteer and task management application built with Next.js, TypeSc
 
 ## Features
 
-- 🔒 **Passwordless authentication** via email magic links (Auth.js)
+- 🔐 **Two-step authentication** — email + password with email OTP verification; password reset flow; mandatory first-login password change
 - 👥 **Capability-based access control** with multiple roles per user
-- 📊 **Audit logging** for all key actions
-- 📁 **Local file uploads** with metadata storage
+- 📅 **Scheduling & calendar** — month-view calendar, event sign-ups, volunteer availability recording, rolling and rostered job management
+- 📢 **Announcements** — post, pin, and manage news for all volunteers
+- 🏗️ **Team management** — organise volunteers into teams, manage task forms with urgency levels, record work logs and feedback
+- 🎓 **Training policies** — compliance matrix showing training requirements per account type
+- 👤 **User management** — add users, manage status and roles, send password resets
+- 📁 **File library** — upload and share documents and images; secure download via API
+- 📊 **Audit logging** for all key actions with paginated viewer and filters
+- ✏️ **Site content editor** — manage the privacy policy and other site-wide text
 - 📧 **Notification service** (email with stub fallback)
 - 🗄️ **PostgreSQL + Prisma ORM**
 - 🔄 **Backup & restore** scripts
@@ -45,13 +51,19 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ```
 src/
   app/                 # Next.js App Router pages
-    api/               # API routes (auth, upload)
-    admin/             # Protected admin panel
-    auth/              # Auth pages (signin, verify, error)
+    api/               # API routes (auth, upload, file download)
+    admin/             # Protected admin panel (users, roles, teams, schedule, training, content…)
+    auth/              # Auth pages (signin, verify-otp, change-password, forgot/reset password)
+    announcements/     # Announcements list
     dashboard/         # User dashboard
+    files/             # File library (all signed-in users)
+    profile/           # User profile self-service
+    schedule/          # Scheduling calendar
+    teams/             # Teams and task overview
     upload/            # File upload page
+    volunteer/         # Volunteer availability preferences
   components/          # Shared React components
-  lib/                 # Utilities (prisma, auth helpers, uploads, notifications)
+  lib/                 # Utilities (prisma, auth helpers, uploads, notifications, calendar)
   types/               # TypeScript type declarations
   auth.ts              # Auth.js configuration
 prisma/
