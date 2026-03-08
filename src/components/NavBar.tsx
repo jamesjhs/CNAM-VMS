@@ -11,7 +11,8 @@ export default async function NavBar() {
     capabilities.includes('admin:roles.read') ||
     capabilities.includes('admin:audit.read') ||
     capabilities.includes('admin:announcements.write') ||
-    capabilities.includes('admin:calendar.write');
+    capabilities.includes('admin:calendar.write') ||
+    capabilities.includes('admin:theme.write');
   const canUpload = capabilities.includes('admin:files.write');
 
   // Build nav link lists to pass to the mobile menu client component
@@ -34,6 +35,7 @@ export default async function NavBar() {
     if (capabilities.includes('admin:announcements.write')) adminLinks.push({ href: '/admin/announcements', label: 'Announcements' });
     if (capabilities.includes('admin:calendar.write')) adminLinks.push({ href: '/admin/schedule', label: 'Schedule' });
     if (capabilities.includes('admin:calendar.write')) adminLinks.push({ href: '/admin/schedule/availability', label: 'Volunteer Availability' });
+    if (capabilities.includes('admin:theme.write')) adminLinks.push({ href: '/admin/content', label: 'Site Content' });
   }
 
   return (
@@ -108,6 +110,11 @@ export default async function NavBar() {
                       {capabilities.includes('admin:calendar.write') && (
                         <Link href="/admin/schedule/availability" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                           Volunteer Availability
+                        </Link>
+                      )}
+                      {capabilities.includes('admin:theme.write') && (
+                        <Link href="/admin/content" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          Site Content
                         </Link>
                       )}
                     </div>

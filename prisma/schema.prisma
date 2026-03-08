@@ -59,6 +59,7 @@ model User {
   calendarEvents CalendarEvent[] @relation("CalendarEventCreator")
   eventSignups   EventSignup[]
   dateSlots      VolunteerDateSlot[]
+  siteContentEdits SiteContent[]
 
   @@map("users")
 }
@@ -332,4 +333,19 @@ model VolunteerDateSlot {
 
   @@unique([userId, date])
   @@map("volunteer_date_slots")
+}
+
+// ---------------------------------------------------------------------------
+// Site content — editable pages such as the privacy & cookie policy
+// ---------------------------------------------------------------------------
+
+model SiteContent {
+  key         String   @id
+  content     String   @db.Text
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+
+  updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("site_content")
 }
