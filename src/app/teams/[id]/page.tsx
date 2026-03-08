@@ -32,10 +32,13 @@ function combineWithOther(items: string[], other: string | null): string | null 
 
 export default async function TeamPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ success?: string; error?: string }>;
 }) {
   const { id } = await params;
+  const { success, error } = await searchParams;
   const currentUser = await requireAuth();
 
   const team = await prisma.team.findUnique({
@@ -81,6 +84,23 @@ export default async function TeamPage({
           <span>/</span>
           <span className="text-gray-900 font-medium">{team.name}</span>
         </nav>
+
+        {/* Success / error banners */}
+        {success === 'log' && (
+          <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+            ✓ Work log entry added. It will be reviewed by your team leader.
+          </div>
+        )}
+        {success === 'feedback' && (
+          <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+            ✓ Feedback submitted. Thank you.
+          </div>
+        )}
+        {error === 'NotMember' && (
+          <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            You must be a member of this team to submit entries or feedback.
+          </div>
+        )}
 
         {/* Team header */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">

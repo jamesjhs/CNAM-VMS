@@ -5,8 +5,14 @@ import Link from 'next/link';
 import { createTeam, deleteTeam, updateTeam } from '../users/actions';
 import { setTeamLeader } from './actions';
 
-export default async function TeamsAdminPage() {
+export default async function TeamsAdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ success?: string; error?: string }>;
+}) {
   await requireCapability('admin:teams.read');
+
+  const { success, error } = await searchParams;
 
   const teams = await prisma.team.findMany({
     orderBy: { name: 'asc' },
@@ -28,7 +34,7 @@ export default async function TeamsAdminPage() {
           <span className="text-gray-900 font-medium">Teams</span>
         </nav>
 
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Team Management</h1>
             <p className="text-gray-500">Create and manage volunteer teams.</p>
@@ -43,6 +49,18 @@ export default async function TeamsAdminPage() {
             <span className="text-sm text-gray-500">{teams.length} team{teams.length !== 1 ? 's' : ''}</span>
           </div>
         </div>
+
+        {/* Success / error banners */}
+        {success === 'leader' && (
+          <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+            ✓ Team leader updated.
+          </div>
+        )}
+        {error === 'NotMember' && (
+          <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            The selected user is not a member of this team and cannot be set as leader.
+          </div>
+        )}
 
         {/* Create new team form */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
