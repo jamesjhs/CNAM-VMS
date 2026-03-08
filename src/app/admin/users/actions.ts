@@ -327,7 +327,10 @@ export async function updateTeam(teamId: string, name: string, description: stri
 
   await prisma.team.update({
     where: { id: teamId },
-    data: { name: trimmedName, description: description.trim() || null },
+    data: {
+      name: trimmedName,
+      description: description.trim() || null,
+    },
   });
 
   await logAudit({

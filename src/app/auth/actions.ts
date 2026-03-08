@@ -19,6 +19,7 @@ const PASSWORD_LOCKOUT_MS = 15 * 60 * 1000; // 15-minute sliding window for pass
 
 const PENDING_UID_COOKIE = '_cnam_pending_uid';
 const CALLBACK_URL_COOKIE = '_cnam_cb';
+const KEEP_SIGNED_IN_COOKIE = '_cnam_keep';
 
 /**
  * Validate that a callbackUrl is a safe same-origin relative path (prevents open redirect).
@@ -47,6 +48,7 @@ export async function submitPassword(formData: FormData) {
   const email = (formData.get('email') as string | null)?.toLowerCase().trim() ?? '';
   const password = (formData.get('password') as string | null) ?? '';
   const callbackUrl = safeCallbackUrl(formData.get('callbackUrl') as string | null);
+  const keepSignedIn = formData.get('keepSignedIn') === '1';
 
   if (!email || !password) {
     redirect('/auth/signin?error=MissingFields');
@@ -135,6 +137,13 @@ export async function submitPassword(formData: FormData) {
     maxAge: 600,
     path: '/',
   });
+  cookieStore.set(KEEP_SIGNED_IN_COOKIE, keepSignedIn ? '1' : '0', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 600,
+    path: '/',
+  });
 
   redirect('/auth/verify-otp');
 }
@@ -153,6 +162,7 @@ export async function submitOtp(formData: FormData) {
   const cookieStore = await cookies();
   const userId = cookieStore.get(PENDING_UID_COOKIE)?.value;
   const callbackUrl = safeCallbackUrl(cookieStore.get(CALLBACK_URL_COOKIE)?.value);
+  const keepSignedIn = cookieStore.get(KEEP_SIGNED_IN_COOKIE)?.value === '1';
 
   if (!userId) {
     // Session expired or cookie missing — restart sign-in
@@ -215,6 +225,7 @@ export async function submitOtp(formData: FormData) {
   // Clear pending cookies
   cookieStore.delete(PENDING_UID_COOKIE);
   cookieStore.delete(CALLBACK_URL_COOKIE);
+  cookieStore.delete(KEEP_SIGNED_IN_COOKIE);
 
   // Determine redirect target — force change-password if flagged
   const redirectTo = user.mustChangePassword
@@ -222,7 +233,7 @@ export async function submitOtp(formData: FormData) {
     : callbackUrl;
 
   // signIn throws a NEXT_REDIRECT internally; Next.js handles it as a redirect response
-  await signIn('credentials', { userId, completionToken, redirectTo });
+  await signIn('credentials', { userId, completionToken, keepSignedIn: keepSignedIn ? '1' : '0', redirectTo });
 }
 
 // ---------------------------------------------------------------------------

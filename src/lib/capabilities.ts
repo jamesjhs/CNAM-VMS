@@ -6,6 +6,7 @@ export const CAPABILITIES = [
   { key: 'admin:roles.write', description: 'Create, update, delete roles' },
   { key: 'admin:teams.read', description: 'View teams' },
   { key: 'admin:teams.write', description: 'Create, update, delete teams' },
+  { key: 'admin:tasks.write', description: 'Create and manage team tasks' },
   { key: 'admin:audit.read', description: 'View audit logs' },
   { key: 'admin:files.read', description: 'View all uploaded files' },
   { key: 'admin:files.write', description: 'Upload and manage files' },

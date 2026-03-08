@@ -87,6 +87,19 @@ export default async function SignInPage({
               />
             </div>
 
+            <div className="flex items-center gap-2">
+              <input
+                id="keepSignedIn"
+                name="keepSignedIn"
+                type="checkbox"
+                value="1"
+                className="h-4 w-4 rounded border-gray-300 text-[#1a3a5c] focus:ring-[#1a3a5c]"
+              />
+              <label htmlFor="keepSignedIn" className="text-sm text-gray-600">
+                Keep me signed in for 7 days
+              </label>
+            </div>
+
             <button
               type="submit"
               className="w-full bg-[#1a3a5c] hover:bg-[#2d5986] text-white font-semibold py-2.5 px-4 rounded-lg transition-colors"
