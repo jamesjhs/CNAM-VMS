@@ -91,7 +91,7 @@ export default function MobileMenu({
                         key={link.href}
                         href={link.href}
                         onClick={() => setOpen(false)}
-                        className="block px-3 py-2 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 text-sm transition-colors"
+                        className="block px-3 py-2.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 text-sm transition-colors"
                       >
                         {link.label}
                       </Link>

@@ -395,7 +395,7 @@ export default async function SchedulePage({
                               <form action={withdrawFromEvent.bind(null, ev.id)}>
                                 <button
                                   type="submit"
-                                  className="text-xs text-red-600 hover:text-red-800 font-medium px-3 py-1.5 rounded-lg border border-red-100 hover:bg-red-50 transition-colors whitespace-nowrap"
+                                  className="text-sm text-red-600 hover:text-red-800 font-medium px-3 py-2 rounded-lg border border-red-100 hover:bg-red-50 transition-colors whitespace-nowrap"
                                 >
                                   Withdraw
                                 </button>
@@ -405,7 +405,7 @@ export default async function SchedulePage({
                                 <button
                                   type="submit"
                                   disabled={isFull}
-                                  className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${
+                                  className={`text-sm font-medium px-3 py-2 rounded-lg transition-colors whitespace-nowrap ${
                                     isFull
                                       ? 'text-gray-400 bg-gray-100 cursor-not-allowed'
                                       : 'text-blue-600 hover:text-blue-800 border border-blue-200 hover:bg-blue-50'
@@ -467,7 +467,7 @@ export default async function SchedulePage({
                               <form action={withdrawFromJobOccurrence.bind(null, occ.job.id, occ.dateKey)}>
                                 <button
                                   type="submit"
-                                  className="text-xs text-red-600 hover:text-red-800 font-medium px-3 py-1.5 rounded-lg border border-red-100 hover:bg-red-50 transition-colors whitespace-nowrap"
+                                  className="text-sm text-red-600 hover:text-red-800 font-medium px-3 py-2 rounded-lg border border-red-100 hover:bg-red-50 transition-colors whitespace-nowrap"
                                 >
                                   Withdraw
                                 </button>
@@ -476,7 +476,7 @@ export default async function SchedulePage({
                               <form action={signupForJobOccurrence.bind(null, occ.job.id, occ.dateKey)}>
                                 <button
                                   type="submit"
-                                  className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap text-blue-600 hover:text-blue-800 border border-blue-200 hover:bg-blue-50"
+                                  className="text-sm font-medium px-3 py-2 rounded-lg transition-colors whitespace-nowrap text-blue-600 hover:text-blue-800 border border-blue-200 hover:bg-blue-50"
                                 >
                                   Sign up
                                 </button>

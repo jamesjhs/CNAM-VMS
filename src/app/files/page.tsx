@@ -66,10 +66,10 @@ export default async function FilesPage() {
                 <tbody className="divide-y divide-gray-100">
                   {files.map((file) => (
                     <tr key={file.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4 min-w-0 max-w-0 sm:max-w-none">
                         <div className="flex items-center gap-2">
-                          <span className="text-lg">{MIME_ICONS[file.mimeType] ?? '📎'}</span>
-                          <span className="font-medium text-gray-900 text-sm">{file.originalName}</span>
+                          <span className="text-lg shrink-0">{MIME_ICONS[file.mimeType] ?? '📎'}</span>
+                          <span className="font-medium text-gray-900 text-sm truncate">{file.originalName}</span>
                         </div>
                       </td>
                       <td className="py-3 px-4 text-gray-500 text-xs hidden sm:table-cell">{file.mimeType}</td>

@@ -191,7 +191,7 @@ export default async function DashboardPage() {
                       </div>
                       <Link
                         href={`/teams/${team.id}`}
-                        className="shrink-0 text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors"
+                        className="shrink-0 text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-medium transition-colors"
                       >
                         Open →
                       </Link>

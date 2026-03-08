@@ -82,7 +82,7 @@ export default async function TeamsPage() {
                       </span>
                       <Link
                         href={`/teams/${team.id}`}
-                        className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors"
+                        className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-medium transition-colors"
                       >
                         Team page →
                       </Link>
@@ -100,7 +100,7 @@ export default async function TeamsPage() {
                             {URGENCY_LABELS[task.urgency]}
                           </span>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-gray-900 text-sm">{task.title}</p>
+                            <p className="font-medium text-gray-900 text-sm truncate">{task.title}</p>
                             {task.description && (
                               <p className="text-gray-500 text-xs mt-0.5 line-clamp-2">{task.description}</p>
                             )}
