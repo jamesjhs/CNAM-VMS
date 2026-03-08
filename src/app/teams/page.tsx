@@ -22,7 +22,10 @@ export default async function TeamsPage() {
   const teams = await prisma.team.findMany({
     orderBy: { name: 'asc' },
     include: {
-      leader: { select: { name: true, email: true } },
+      userTeams: {
+        where: { isLeader: true },
+        include: { user: { select: { name: true, email: true } } },
+      },
       tasks: {
         where: { isActive: true },
         orderBy: [{ urgency: 'asc' }, { createdAt: 'desc' }],
@@ -70,9 +73,9 @@ export default async function TeamsPage() {
                       {team.description && (
                         <p className="text-sm text-gray-500">{team.description}</p>
                       )}
-                      {team.leader && (
+                      {team.userTeams.length > 0 && (
                         <p className="text-sm text-indigo-600 mt-0.5">
-                          👤 {team.leader.name ?? team.leader.email}
+                          👤 {team.userTeams.map((m) => m.user.name ?? m.user.email).join(', ')}
                         </p>
                       )}
                     </div>

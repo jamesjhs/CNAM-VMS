@@ -231,31 +231,31 @@ export async function addTeamFeedback(teamId: string, feedback: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Admin: set team leader
+// Admin: toggle team leader status for a member
 // ---------------------------------------------------------------------------
 
-export async function setTeamLeader(teamId: string, leaderId: string | null) {
+export async function toggleTeamLeader(teamId: string, userId: string) {
   const actor = await requireCapability('admin:teams.write');
 
-  // Validate the proposed leader is a member of the team (or explicitly clearing)
-  if (leaderId) {
-    const membership = await prisma.userTeam.findUnique({
-      where: { userId_teamId: { userId: leaderId, teamId } },
-    });
-    if (!membership) redirect('/admin/teams?error=NotMember');
-  }
+  // The user must already be a member of the team
+  const membership = await prisma.userTeam.findUnique({
+    where: { userId_teamId: { userId, teamId } },
+  });
+  if (!membership) redirect('/admin/teams?error=NotMember');
 
-  await prisma.team.update({
-    where: { id: teamId },
-    data: { leaderId: leaderId || null },
+  const newIsLeader = !membership.isLeader;
+
+  await prisma.userTeam.update({
+    where: { userId_teamId: { userId, teamId } },
+    data: { isLeader: newIsLeader },
   });
 
   await logAudit({
     userId: actor.id,
-    action: 'TEAM_LEADER_SET',
+    action: newIsLeader ? 'TEAM_LEADER_ADDED' : 'TEAM_LEADER_REMOVED',
     resource: 'Team',
     resourceId: teamId,
-    detail: { leaderId },
+    detail: { userId },
   });
 
   revalidatePath('/admin/teams');

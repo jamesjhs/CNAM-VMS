@@ -48,7 +48,10 @@ export default async function DashboardPage() {
       include: {
         team: {
           include: {
-            leader: { select: { id: true, name: true, email: true } },
+            userTeams: {
+              where: { isLeader: true },
+              include: { user: { select: { id: true, name: true, email: true } } },
+            },
             tasks: {
               where: { isActive: true },
               select: { id: true, urgency: true },
@@ -186,8 +189,8 @@ export default async function DashboardPage() {
                           {activeCount === 0 && (
                             <span className="text-xs text-gray-400">No active tasks</span>
                           )}
-                          {team.leader && (
-                            <span className="text-xs text-gray-400">· Leader: {team.leader.name ?? team.leader.email}</span>
+                          {team.userTeams.length > 0 && (
+                            <span className="text-xs text-gray-400">· Admin: {team.userTeams.map((m) => m.user.name ?? m.user.email).join(', ')}</span>
                           )}
                         </div>
                       </div>

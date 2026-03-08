@@ -44,7 +44,6 @@ export default async function TeamPage({
   const team = await prisma.team.findUnique({
     where: { id },
     include: {
-      leader: { select: { id: true, name: true, email: true } },
       userTeams: { include: { user: { select: { id: true, name: true, email: true } } } },
       tasks: {
         where: { isActive: true },
@@ -65,7 +64,8 @@ export default async function TeamPage({
 
   if (!team) notFound();
 
-  const isLeader = team.leader?.id === currentUser.id;
+  const leaders = team.userTeams.filter((m) => m.isLeader);
+  const isLeader = team.userTeams.some((m) => m.userId === currentUser.id && m.isLeader);
   const isAdmin = hasCapability(currentUser, 'admin:teams.read');
   const canViewLogs = isLeader || isAdmin;
 
@@ -88,7 +88,7 @@ export default async function TeamPage({
         {/* Success / error banners */}
         {success === 'log' && (
           <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-            ✓ Work log entry added. It will be reviewed by your team leader.
+            ✓ Work log entry added. It will be reviewed by your team admin.
           </div>
         )}
         {success === 'feedback' && (
@@ -108,9 +108,12 @@ export default async function TeamPage({
             <div>
               <h1 className="text-2xl font-bold text-gray-900 mb-1">{team.name}</h1>
               {team.description && <p className="text-gray-500 mb-2">{team.description}</p>}
-              {team.leader && (
+              {leaders.length > 0 && (
                 <p className="text-sm text-indigo-600">
-                  👤 Team Leader: <span className="font-medium">{team.leader.name ?? team.leader.email}</span>
+                  👤 Team Admin{leaders.length !== 1 ? 's' : ''}:{' '}
+                  <span className="font-medium">
+                    {leaders.map((m) => m.user.name ?? m.user.email).join(', ')}
+                  </span>
                 </p>
               )}
               <p className="text-xs text-gray-400 mt-1">
@@ -260,7 +263,7 @@ export default async function TeamPage({
                         </ul>
                       )
                     ) : (
-                      <p className="text-xs text-gray-400">Work log entries are visible to team leaders and administrators.</p>
+                      <p className="text-xs text-gray-400">Work log entries are visible to team admins and administrators.</p>
                     )}
                   </div>
                 </div>
@@ -315,7 +318,7 @@ export default async function TeamPage({
                 </ul>
               )
             ) : (
-              <p className="text-sm text-gray-400">Feedback is visible to team leaders and administrators once submitted.</p>
+              <p className="text-sm text-gray-400">Feedback is visible to team admins and administrators once submitted.</p>
             )}
           </div>
         </section>

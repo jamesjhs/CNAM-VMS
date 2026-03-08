@@ -72,7 +72,6 @@ model User {
   eventSignups   EventSignup[]
   dateSlots      VolunteerDateSlot[]
   siteContentEdits SiteContent[]
-  ledTeams       Team[]          @relation("TeamLeader")
   teamWorkLogs   TeamWorkLog[]
   teamFeedbacks  TeamFeedback[]
 
@@ -228,11 +227,9 @@ model Team {
   id          String   @id @default(cuid())
   name        String   @unique
   description String?
-  leaderId    String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  leader         User?          @relation("TeamLeader", fields: [leaderId], references: [id], onDelete: SetNull)
   userTeams      UserTeam[]
   calendarEvents CalendarEvent[]
   tasks          TeamTask[]
@@ -258,6 +255,7 @@ model Announcement {
 model UserTeam {
   userId   String
   teamId   String
+  isLeader Boolean  @default(false)
   joinedAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
