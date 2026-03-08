@@ -10,8 +10,8 @@ export default async function DashboardPage() {
   const now = new Date();
   const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
-  // Fetch upcoming events (next 30 days) and user's signups
-  const [announcements, upcomingEvents, mySignupIds] = await Promise.all([
+  // Fetch upcoming events (next 30 days), user's signups, and team memberships
+  const [announcements, upcomingEvents, mySignupIds, myTeams] = await Promise.all([
     prisma.announcement.findMany({
       orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
       take: 3,
@@ -43,6 +43,21 @@ export default async function DashboardPage() {
       },
       select: { eventId: true },
     }),
+    prisma.userTeam.findMany({
+      where: { userId: user.id },
+      include: {
+        team: {
+          include: {
+            leader: { select: { id: true, name: true, email: true } },
+            tasks: {
+              where: { isActive: true },
+              select: { id: true, urgency: true },
+            },
+          },
+        },
+      },
+      orderBy: { joinedAt: 'asc' },
+    }),
   ]);
 
   const mySignupSet = new Set(mySignupIds.map((s) => s.eventId));
@@ -67,6 +82,7 @@ export default async function DashboardPage() {
           <DashCard title="Announcements" icon="📣" href="/announcements" description="Latest news and updates from the museum." />
           <DashCard title="Files &amp; Documents" icon="📁" href="/files" description="Browse and download files and documents shared by the museum team." />
           <DashCard title="My Profile" icon="👤" href="/profile" description="Update your name, contact details, and general activity preferences." />
+          <DashCard title="My Teams" icon="👥" href="/teams" description="View your team memberships, active tasks, and submit work logs or feedback." />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -136,6 +152,55 @@ export default async function DashboardPage() {
               </div>
             </div>
           )}
+
+          {/* My teams */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-gray-900">My Teams</h2>
+              <Link href="/teams" className="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                View all →
+              </Link>
+            </div>
+            {myTeams.length === 0 ? (
+              <p className="text-gray-500 text-sm">You are not currently a member of any team.</p>
+            ) : (
+              <div className="space-y-3">
+                {myTeams.map(({ team }) => {
+                  const urgentCount = team.tasks.filter((t) => t.urgency === 'URGENT').length;
+                  const activeCount = team.tasks.length;
+                  return (
+                    <div key={team.id} className="flex items-center justify-between gap-3 p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{team.name}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {urgentCount > 0 && (
+                            <span className="text-xs font-medium text-red-700">
+                              ⚠️ {urgentCount} urgent task{urgentCount !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                          {activeCount > 0 && urgentCount === 0 && (
+                            <span className="text-xs text-gray-400">{activeCount} active task{activeCount !== 1 ? 's' : ''}</span>
+                          )}
+                          {activeCount === 0 && (
+                            <span className="text-xs text-gray-400">No active tasks</span>
+                          )}
+                          {team.leader && (
+                            <span className="text-xs text-gray-400">· Leader: {team.leader.name ?? team.leader.email}</span>
+                          )}
+                        </div>
+                      </div>
+                      <Link
+                        href={`/teams/${team.id}`}
+                        className="shrink-0 text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors"
+                      >
+                        Open →
+                      </Link>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>
