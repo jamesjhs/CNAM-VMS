@@ -1,13 +1,14 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { submitPassword } from '../actions';
+import Link from 'next/link';
 
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ callbackUrl?: string; error?: string }>;
+  searchParams: Promise<{ callbackUrl?: string; error?: string; reset?: string }>;
 }) {
-  const { callbackUrl, error } = await searchParams;
+  const { callbackUrl, error, reset } = await searchParams;
   const session = await auth();
   if (session) redirect(callbackUrl ?? '/dashboard');
 
@@ -36,6 +37,12 @@ export default async function SignInPage({
             Enter your email and password. A one-time verification code will be sent to your inbox.
           </p>
 
+          {reset && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+              ✓ Your password has been reset. You can now sign in with your new password.
+            </div>
+          )}
+
           {errorMsg && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
               {errorMsg}
@@ -61,9 +68,14 @@ export default async function SignInPage({
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  Password
+                </label>
+                <Link href="/auth/forgot-password" className="text-xs text-[#1a3a5c] hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
               <input
                 id="password"
                 name="password"

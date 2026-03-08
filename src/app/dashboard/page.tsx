@@ -65,6 +65,7 @@ export default async function DashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
           <DashCard title="Schedule &amp; Availability" icon="📅" href="/schedule" description="Browse events, sign up for shifts, record your availability, and choose what you can help with." />
           <DashCard title="Announcements" icon="📣" href="/announcements" description="Latest news and updates from the museum." />
+          <DashCard title="Files &amp; Documents" icon="📁" href="/files" description="Browse and download files and documents shared by the museum team." />
           <DashCard title="My Profile" icon="👤" href="/profile" description="Update your name, contact details, and general activity preferences." />
         </div>
 

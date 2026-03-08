@@ -16,8 +16,8 @@ export async function GET(
   }
 
   const user = session.user as SessionUser;
-  if (!user.capabilities?.includes('admin:files.read') && !user.capabilities?.includes('admin:files.write')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const { id } = await params;

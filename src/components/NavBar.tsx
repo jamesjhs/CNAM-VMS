@@ -12,8 +12,8 @@ export default async function NavBar() {
     capabilities.includes('admin:audit.read') ||
     capabilities.includes('admin:announcements.write') ||
     capabilities.includes('admin:calendar.write') ||
-    capabilities.includes('admin:theme.write');
-  const canUpload = capabilities.includes('admin:files.write');
+    capabilities.includes('admin:theme.write') ||
+    capabilities.includes('admin:training.write');
 
   // Build nav link lists to pass to the mobile menu client component
   const mainLinks: NavLink[] = session
@@ -21,6 +21,7 @@ export default async function NavBar() {
         { href: '/dashboard', label: 'Dashboard' },
         { href: '/schedule', label: 'Schedule & Availability' },
         { href: '/announcements', label: 'Announcements' },
+        { href: '/files', label: 'Files' },
       ]
     : [];
 
@@ -36,6 +37,7 @@ export default async function NavBar() {
     if (capabilities.includes('admin:calendar.write')) adminLinks.push({ href: '/admin/schedule', label: 'Schedule' });
     if (capabilities.includes('admin:calendar.write')) adminLinks.push({ href: '/admin/schedule/availability', label: 'Volunteer Availability' });
     if (capabilities.includes('admin:theme.write')) adminLinks.push({ href: '/admin/content', label: 'Site Content' });
+    if (capabilities.includes('admin:training.write')) adminLinks.push({ href: '/admin/training', label: 'Training Policies' });
   }
 
   return (
@@ -59,6 +61,9 @@ export default async function NavBar() {
                 </Link>
                 <Link href="/announcements" className="text-gray-300 hover:text-white text-sm transition-colors">
                   Announcements
+                </Link>
+                <Link href="/files" className="text-gray-300 hover:text-white text-sm transition-colors">
+                  Files
                 </Link>
                 {isAdmin && (
                   <div className="relative group">
@@ -117,13 +122,13 @@ export default async function NavBar() {
                           Site Content
                         </Link>
                       )}
+                      {capabilities.includes('admin:training.write') && (
+                        <Link href="/admin/training" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          Training Policies
+                        </Link>
+                      )}
                     </div>
                   </div>
-                )}
-                {canUpload && (
-                  <Link href="/upload" className="text-gray-300 hover:text-white text-sm transition-colors">
-                    Upload
-                  </Link>
                 )}
               </div>
             )}
@@ -174,7 +179,6 @@ export default async function NavBar() {
                   links={mainLinks}
                   adminLinks={adminLinks}
                   isAdmin={isAdmin}
-                  canUpload={canUpload}
                   userName={session.user?.name}
                   userEmail={session.user?.email}
                 />

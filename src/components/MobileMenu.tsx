@@ -12,7 +12,6 @@ interface MobileMenuProps {
   links: NavLink[];
   adminLinks: NavLink[];
   isAdmin: boolean;
-  canUpload: boolean;
   userName: string | null | undefined;
   userEmail: string | null | undefined;
 }
@@ -21,7 +20,6 @@ export default function MobileMenu({
   links,
   adminLinks,
   isAdmin,
-  canUpload,
   userName,
   userEmail,
 }: MobileMenuProps) {
@@ -66,17 +64,6 @@ export default function MobileMenu({
                 {link.label}
               </Link>
             ))}
-
-            {/* Upload link */}
-            {canUpload && (
-              <Link
-                href="/upload"
-                onClick={() => setOpen(false)}
-                className="block px-3 py-2.5 rounded-lg text-gray-200 hover:text-white hover:bg-white/10 text-sm font-medium transition-colors"
-              >
-                Upload
-              </Link>
-            )}
 
             {/* Admin section */}
             {isAdmin && adminLinks.length > 0 && (

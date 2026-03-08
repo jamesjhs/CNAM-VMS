@@ -49,3 +49,27 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
     `,
   });
 }
+
+/** Send a password reset link to the given email address. */
+export async function sendPasswordResetEmail(to: string, resetUrl: string): Promise<void> {
+  await sendMail({
+    to,
+    subject: 'Reset your CNAM VMS password',
+    text: `You have been sent a password reset link.\n\nClick the link below to set a new password (valid for 24 hours):\n${resetUrl}\n\nIf you did not request this, please ignore this email.`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:auto">
+        <h2 style="color:#1a3a5c">CNAM Volunteer Management</h2>
+        <p>A password reset has been requested for your account.</p>
+        <p>Click the button below to set a new password. This link is valid for <strong>24 hours</strong>.</p>
+        <p style="text-align:center;margin:24px 0">
+          <a href="${resetUrl}" style="display:inline-block;background:#1a3a5c;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600">
+            Reset Password
+          </a>
+        </p>
+        <p style="color:#666;font-size:13px">Or copy this link into your browser:</p>
+        <p style="color:#666;font-size:12px;word-break:break-all">${resetUrl}</p>
+        <p style="color:#666;font-size:13px">If you did not request a password reset, please ignore this email. Your password will not change.</p>
+      </div>
+    `,
+  });
+}

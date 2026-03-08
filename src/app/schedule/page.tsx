@@ -298,10 +298,18 @@ export default async function SchedulePage({
           </div>
         </div>
 
-        {/* ── Unified day detail panel ───────────────────────────────────────── */}
+        {/* ── Day detail modal overlay ──────────────────────────────────────── */}
         {selectedDate && (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
-            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <Link
+              href={`/schedule?month=${currentMonthStr}`}
+              aria-label="Close"
+              className="absolute inset-0 bg-black/50"
+            />
+            {/* Modal panel */}
+            <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50 sticky top-0 rounded-t-xl">
               <h3 className="font-semibold text-gray-900">
                 {selectedDate.toLocaleDateString('en-GB', {
                   weekday: 'long',
@@ -311,6 +319,15 @@ export default async function SchedulePage({
                   timeZone: 'UTC',
                 })}
               </h3>
+              <Link
+                href={`/schedule?month=${currentMonthStr}`}
+                aria-label="Close"
+                className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </Link>
             </div>
 
             {/* ── Section 1: Scheduled events ──────────────────────────────── */}
@@ -613,15 +630,18 @@ export default async function SchedulePage({
                   </div>
                 )}
 
-                {/* Notes */}
+                {/* Plans / notes for the day */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Notes <span className="text-gray-400 font-normal">(optional)</span></label>
-                  <input
+                  <label htmlFor="availability-notes" className="block text-xs font-medium text-gray-500 mb-1">
+                    What are you planning to do? <span className="text-gray-400 font-normal">(optional — visible to admins)</span>
+                  </label>
+                  <textarea
+                    id="availability-notes"
                     name="notes"
-                    type="text"
+                    rows={3}
                     defaultValue={mySlotForDay?.notes ?? ''}
-                    placeholder="e.g. I can only make the morning, or any relevant details"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. helping with the tearoom in the morning, or anything else you'd like the team to know"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                   />
                 </div>
 
@@ -632,6 +652,7 @@ export default async function SchedulePage({
                   {mySlotForDay ? '✓ Update My Availability' : 'Save My Availability for This Day'}
                 </button>
               </form>
+            </div>
             </div>
           </div>
         )}

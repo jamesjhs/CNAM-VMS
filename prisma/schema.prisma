@@ -336,6 +336,34 @@ model VolunteerDateSlot {
 }
 
 // ---------------------------------------------------------------------------
+// Training policies — compliance matrix assigned per account type
+// ---------------------------------------------------------------------------
+
+model TrainingPolicy {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  frequency   String?  // e.g. "Annual", "One-off", "Every 2 years"
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  roleAssignments TrainingPolicyRole[]
+
+  @@map("training_policies")
+}
+
+model TrainingPolicyRole {
+  policyId    String
+  accountType UserAccountType
+
+  policy TrainingPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@id([policyId, accountType])
+  @@map("training_policy_roles")
+}
+
+// ---------------------------------------------------------------------------
 // Site content — editable pages such as the privacy & cookie policy
 // ---------------------------------------------------------------------------
 
