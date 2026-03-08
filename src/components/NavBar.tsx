@@ -179,7 +179,7 @@ export default async function NavBar() {
                 >
                   <button
                     type="submit"
-                    className="text-xs bg-white/10 hover:bg-white/20 text-white px-2.5 py-1.5 rounded transition-colors"
+                    className="text-sm bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded transition-colors"
                   >
                     Sign out
                   </button>
