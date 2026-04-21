@@ -15,5 +15,13 @@ declare module 'next-auth' {
 declare module 'next-auth/jwt' {
   interface JWT {
     id?: string;
+    /** User account status cached in the token (refreshed every 5 minutes). */
+    status?: string;
+    /** Whether the user must change their password (cached in token). */
+    mustChangePassword?: boolean;
+    /** Granted capability keys cached in the token (refreshed every 5 minutes). */
+    capabilities?: string[];
+    /** Unix timestamp (seconds) when capabilities/status were last refreshed. */
+    capabilitiesAt?: number;
   }
 }

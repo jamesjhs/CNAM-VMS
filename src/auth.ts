@@ -6,6 +6,57 @@ import { prisma } from '@/lib/prisma';
 import { CAPABILITIES } from '@/lib/capabilities';
 import type { UserStatus } from '@prisma/client';
 
+// How long (in seconds) capability/status data cached in the JWT remains
+// fresh before being re-read from the database.  A short TTL (5 minutes)
+// means capability changes propagate quickly without a DB hit on every
+// request.
+const CAPABILITIES_CACHE_TTL = 5 * 60; // 5 minutes
+
+/**
+ * Fetch the current user's status, mustChangePassword flag, and capability
+ * keys from the database.  The result is stored in the JWT so subsequent
+ * requests can read it without hitting the DB again until the TTL expires.
+ */
+async function fetchUserClaims(userId: string): Promise<{
+  status: string;
+  mustChangePassword: boolean;
+  capabilities: string[];
+} | null> {
+  const dbUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      status: true,
+      mustChangePassword: true,
+      userRoles: {
+        select: {
+          role: {
+            select: {
+              roleCapabilities: {
+                select: { capability: { select: { key: true } } },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!dbUser) return null;
+
+  const caps = new Set<string>();
+  for (const ur of dbUser.userRoles) {
+    for (const rc of ur.role.roleCapabilities) {
+      caps.add(rc.capability.key);
+    }
+  }
+
+  return {
+    status: dbUser.status,
+    mustChangePassword: dbUser.mustChangePassword,
+    capabilities: Array.from(caps),
+  };
+}
+
 /**
  * Promote a user to ACTIVE status and assign them the Root role.
  * The Root role is created if it does not already exist, and all capabilities
@@ -142,6 +193,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
     },
     async jwt({ token, user }) {
       if (user?.id) {
+        // Initial sign-in — populate the token with the user's id and
+        // eagerly load claims so the first request has them immediately.
         token.id = user.id;
         // Store keepSignedIn preference; cast to access the custom property
         const u = user as { id: string; keepSignedIn?: boolean };
@@ -151,44 +204,40 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
         // - otherwise: 2 hours (requires re-sign-in after browser session / short inactivity)
         const maxAge = token.keepSignedIn ? 7 * 24 * 60 * 60 : 2 * 60 * 60;
         token.exp = Math.floor(Date.now() / 1000) + maxAge;
+
+        // Eagerly populate claims so the very first session() call is free.
+        const claims = await fetchUserClaims(user.id);
+        if (claims) {
+          token.status = claims.status;
+          token.mustChangePassword = claims.mustChangePassword;
+          token.capabilities = claims.capabilities;
+          token.capabilitiesAt = Math.floor(Date.now() / 1000);
+        }
+        return token;
       }
+
+      // Subsequent calls — refresh claims from DB if the cache has expired.
+      const now = Math.floor(Date.now() / 1000);
+      const lastRefresh = token.capabilitiesAt ?? 0;
+      if (token.id && now - lastRefresh > CAPABILITIES_CACHE_TTL) {
+        const claims = await fetchUserClaims(token.id);
+        if (claims) {
+          token.status = claims.status;
+          token.mustChangePassword = claims.mustChangePassword;
+          token.capabilities = claims.capabilities;
+          token.capabilitiesAt = now;
+        }
+      }
+
       return token;
     },
     async session({ session, token }) {
       if (session.user && token.id) {
         session.user.id = token.id;
-
-        // Attach status, mustChangePassword, and capabilities to session
-        const dbUser = await prisma.user.findUnique({
-          where: { id: token.id },
-          select: {
-            status: true,
-            mustChangePassword: true,
-            userRoles: {
-              include: {
-                role: {
-                  include: {
-                    roleCapabilities: {
-                      include: { capability: true },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        });
-
-        if (dbUser) {
-          session.user.status = dbUser.status;
-          session.user.mustChangePassword = dbUser.mustChangePassword;
-          const caps = new Set<string>();
-          for (const ur of dbUser.userRoles) {
-            for (const rc of ur.role.roleCapabilities) {
-              caps.add(rc.capability.key);
-            }
-          }
-          session.user.capabilities = Array.from(caps);
-        }
+        // Read cached claims from the JWT — no DB round-trip required.
+        session.user.status = (token.status as string) ?? 'PENDING';
+        session.user.mustChangePassword = token.mustChangePassword ?? false;
+        session.user.capabilities = token.capabilities ?? [];
       }
       return session;
     },

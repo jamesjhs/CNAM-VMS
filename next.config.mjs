@@ -1,5 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Produce a self-contained deployment folder — dramatically reduces what
+  // needs to be copied to the VPS and eliminates unused node_modules.
+  output: 'standalone',
+
+  // Drop source maps from the production build; they nearly double build
+  // memory usage and are rarely needed in production.
+  productionBrowserSourceMaps: false,
+
+  // Tell Next.js to tree-shake these large packages at the module level so
+  // only the code paths actually used end up in bundles.
+  experimental: {
+    optimizePackageImports: ['next-auth', '@auth/prisma-adapter'],
+  },
+
   async headers() {
     return [
       {

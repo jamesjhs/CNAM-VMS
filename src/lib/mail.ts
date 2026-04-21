@@ -5,16 +5,19 @@
 
 import nodemailer from 'nodemailer';
 
-function createTransport() {
-  return nodemailer.createTransport({
-    host: process.env.EMAIL_SERVER_HOST,
-    port: Number(process.env.EMAIL_SERVER_PORT ?? 587),
-    auth: {
-      user: process.env.EMAIL_SERVER_USER,
-      pass: process.env.EMAIL_SERVER_PASSWORD,
-    },
-  });
-}
+// Module-level singleton: nodemailer manages connection pooling internally.
+// Creating a new transport per call (the previous approach) re-established the
+// TCP/TLS connection on every email and left idle connections open.
+const transport = nodemailer.createTransport({
+  host: process.env.EMAIL_SERVER_HOST,
+  port: Number(process.env.EMAIL_SERVER_PORT ?? 587),
+  auth: {
+    user: process.env.EMAIL_SERVER_USER,
+    pass: process.env.EMAIL_SERVER_PASSWORD,
+  },
+  pool: true,      // keep connections alive between sends
+  maxConnections: 2,
+});
 
 export async function sendMail(opts: {
   to: string;
@@ -22,8 +25,7 @@ export async function sendMail(opts: {
   text: string;
   html: string;
 }): Promise<void> {
-  const transporter = createTransport();
-  await transporter.sendMail({
+  await transport.sendMail({
     from: process.env.EMAIL_FROM ?? 'noreply@example.com',
     to: opts.to,
     subject: opts.subject,
