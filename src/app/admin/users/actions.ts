@@ -373,14 +373,11 @@ export async function adminSendPasswordReset(userId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
   if (!user?.email) return;
 
-  const { randomBytes } = await import('crypto');
+  const { randomBytes, createHash } = await import('crypto');
   const { sendPasswordResetEmail } = await import('@/lib/mail');
-  const { headers } = await import('next/headers');
 
-  const headerStore = await headers();
-  const host = headerStore.get('host') ?? 'localhost';
-  const proto = headerStore.get('x-forwarded-proto') ?? 'http';
-  const baseUrl = `${proto}://${host}`;
+  // Use the configured public URL — never trust Host/X-Forwarded-Proto headers
+  const baseUrl = (process.env.AUTH_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 
   const resetToken = randomBytes(32).toString('hex');
   const resetIdentifier = `pw-reset:${user.email}`;
@@ -389,7 +386,8 @@ export async function adminSendPasswordReset(userId: string) {
   await prisma.verificationToken.create({
     data: {
       identifier: resetIdentifier,
-      token: resetToken,
+      // Hash the token before storage — raw token travels only in the email link
+      token: createHash('sha256').update(resetToken).digest('hex'),
       expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
     },
   });

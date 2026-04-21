@@ -1,6 +1,7 @@
 import NextAuth from 'next-auth';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import Credentials from 'next-auth/providers/credentials';
+import { createHash, timingSafeEqual } from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { CAPABILITIES } from '@/lib/capabilities';
 import type { UserStatus } from '@prisma/client';
@@ -91,7 +92,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
           where: { identifier, expires: { gt: new Date() } },
         });
 
-        if (!tokenRecord || tokenRecord.token !== completionToken) return null;
+        // Hash the incoming token and compare timing-safely against the stored hash
+        const incomingHash = createHash('sha256').update(completionToken).digest('hex');
+        const storedHash = tokenRecord?.token ?? '';
+        const tokenValid =
+          storedHash.length > 0 &&
+          timingSafeEqual(Buffer.from(incomingHash, 'hex'), Buffer.from(storedHash, 'hex'));
+
+        if (!tokenRecord || !tokenValid) return null;
 
         // Delete immediately — single-use token
         await prisma.verificationToken.deleteMany({ where: { identifier } });

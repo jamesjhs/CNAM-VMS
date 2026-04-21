@@ -3,7 +3,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { safeUploadPath } from '@/lib/uploads';
 import type { SessionUser } from '@/lib/auth-helpers';
-import fs from 'fs';
+import fs from 'fs/promises';
 
 export async function GET(
   _request: NextRequest,
@@ -34,14 +34,16 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid file path' }, { status: 400 });
   }
 
-  if (!fs.existsSync(filePath)) {
+  let fileBuffer: Buffer;
+  try {
+    fileBuffer = await fs.readFile(filePath);
+  } catch {
     return NextResponse.json({ error: 'File not found on disk' }, { status: 404 });
   }
 
-  const fileBuffer = fs.readFileSync(filePath);
   const safeOriginalName = file.originalName.replace(/[^a-zA-Z0-9._\- ]/g, '_');
 
-  return new NextResponse(fileBuffer, {
+  return new NextResponse(fileBuffer as unknown as BodyInit, {
     headers: {
       'Content-Type': file.mimeType,
       'Content-Disposition': `attachment; filename="${safeOriginalName}"; filename*=UTF-8''${encodeURIComponent(safeOriginalName)}`,
