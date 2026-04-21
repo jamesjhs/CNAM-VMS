@@ -43,7 +43,7 @@ export async function GET(
 
   const safeOriginalName = file.originalName.replace(/[^a-zA-Z0-9._\- ]/g, '_');
 
-  return new NextResponse(fileBuffer as unknown as BodyInit, {
+  return new NextResponse(new Uint8Array(fileBuffer), {
     headers: {
       'Content-Type': file.mimeType,
       'Content-Disposition': `attachment; filename="${safeOriginalName}"; filename*=UTF-8''${encodeURIComponent(safeOriginalName)}`,

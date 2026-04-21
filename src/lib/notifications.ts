@@ -20,7 +20,7 @@ class EmailNotificationService implements NotificationService {
       to: payload.to,
       subject: payload.subject,
       html: payload.html,
-      text: payload.text ?? payload.subject,
+      text: payload.text ?? '',
     });
   }
 }
