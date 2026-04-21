@@ -2,7 +2,11 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // Only generate the binary for the current platform.  Without this, Prisma
+  // can silently bundle several platform-specific query-engine binaries which
+  // adds ~100 MB to node_modules and slows `npm ci` on a low-RAM VPS.
+  binaryTargets = ["native"]
 }
 
 datasource db {
@@ -140,6 +144,9 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+  // Auth flow queries by identifier + expires frequently (OTP / rate-limit
+  // checks). Without this index those queries scan the whole table.
+  @@index([identifier, expires])
   @@map("verification_tokens")
 }
 

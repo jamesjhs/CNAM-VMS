@@ -3,16 +3,16 @@
   "version": "0.2.0",
   "private": true,
   "scripts": {
-    "dev": "npx prisma generate && next dev",
-    "build": "npx prisma generate && next build",
+    "dev": "prisma generate && next dev",
+    "build": "prisma generate && NODE_OPTIONS=--max-old-space-size=512 next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "db:generate": "npx prisma generate",
-    "db:migrate": "npx prisma migrate dev",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
     "db:seed": "ts-node --project tsconfig.seed.json prisma/seed.ts",
     "db:set-initial-password": "ts-node --project tsconfig.seed.json scripts/set-initial-password.ts",
-    "db:studio": "npx prisma studio"
+    "db:studio": "prisma studio"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.2",
