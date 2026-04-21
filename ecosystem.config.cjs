@@ -6,7 +6,9 @@ module.exports = {
       // Standalone output places the production server at this path.
       args: '.next/standalone/server.js',
       env: {
-        PORT: '3001',
+        // Read from the environment so the port can be changed in .env.
+        // Falls back to 3001 if PORT is not exported in the shell.
+        PORT: process.env.PORT || '3001',
         AUTH_URL: 'https://cnam.jahosi.co.uk',
         // Cap Node's heap so the process does not silently eat all available
         // RAM.  Adjust upward if you add heavier workloads.
