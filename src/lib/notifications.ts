@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import { sendMail } from '@/lib/mail';
 
 export interface NotificationPayload {
   to: string;
@@ -12,29 +12,15 @@ export interface NotificationService {
 }
 
 /**
- * Email notification service using Nodemailer.
+ * Email notification service — delegates to the shared sendMail helper.
  */
 class EmailNotificationService implements NotificationService {
-  private transporter: nodemailer.Transporter;
-
-  constructor() {
-    this.transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_SERVER_HOST,
-      port: Number(process.env.EMAIL_SERVER_PORT ?? 587),
-      auth: {
-        user: process.env.EMAIL_SERVER_USER,
-        pass: process.env.EMAIL_SERVER_PASSWORD,
-      },
-    });
-  }
-
   async send(payload: NotificationPayload): Promise<void> {
-    await this.transporter.sendMail({
-      from: process.env.EMAIL_FROM ?? 'noreply@example.com',
+    await sendMail({
       to: payload.to,
       subject: payload.subject,
       html: payload.html,
-      text: payload.text,
+      text: payload.text ?? '',
     });
   }
 }

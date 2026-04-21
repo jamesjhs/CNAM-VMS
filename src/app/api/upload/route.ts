@@ -5,6 +5,30 @@ import { saveFile, validateFile } from '@/lib/uploads';
 import { logAudit } from '@/lib/audit';
 import type { SessionUser } from '@/lib/auth-helpers';
 
+// ---------------------------------------------------------------------------
+// Simple in-memory rate limiter — max 10 uploads per user per minute
+// ---------------------------------------------------------------------------
+const uploadAttempts = new Map<string, { count: number; windowStart: number }>();
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+
+function isRateLimited(userId: string): boolean {
+  const now = Date.now();
+  const entry = uploadAttempts.get(userId);
+
+  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+    uploadAttempts.set(userId, { count: 1, windowStart: now });
+    return false;
+  }
+
+  if (entry.count >= RATE_LIMIT_MAX) {
+    return true;
+  }
+
+  entry.count += 1;
+  return false;
+}
+
 export async function POST(request: NextRequest) {
   const session = await auth();
 
@@ -15,6 +39,13 @@ export async function POST(request: NextRequest) {
   const user = session.user as SessionUser;
   if (!user.capabilities?.includes('admin:files.write')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  if (isRateLimited(user.id)) {
+    return NextResponse.json(
+      { error: 'Too many uploads. Please wait before trying again.' },
+      { status: 429 },
+    );
   }
 
   let formData: FormData;

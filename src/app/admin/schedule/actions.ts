@@ -7,6 +7,14 @@ import { logAudit } from '@/lib/audit';
 import type { CalendarEventType } from '@prisma/client';
 import { parseDate } from '@/lib/calendar';
 
+/** Accept only 3- or 6-digit hex colour codes (e.g. #fff or #6366f1). */
+const HEX_COLOUR_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+const DEFAULT_COLOUR = '#6366f1';
+
+function safeColour(raw: string): string {
+  return HEX_COLOUR_RE.test(raw) ? raw : DEFAULT_COLOUR;
+}
+
 // ---------------------------------------------------------------------------
 // Calendar event actions
 // ---------------------------------------------------------------------------
@@ -99,7 +107,7 @@ export async function createJob(
       title: trimmedTitle,
       description: description.trim() || null,
       isRolling,
-      colour: colour || '#6366f1',
+      colour: safeColour(colour),
       scheduleType: (scheduleType as 'ONE_OFF' | 'WEEKLY' | 'MONTHLY') || 'ONE_OFF',
       weekDays,
       monthDays,
@@ -146,7 +154,7 @@ export async function updateJob(
       title: trimmedTitle,
       description: description.trim() || null,
       isRolling,
-      colour: colour || '#6366f1',
+      colour: safeColour(colour),
       scheduleType: (scheduleType as 'ONE_OFF' | 'WEEKLY' | 'MONTHLY') || 'ONE_OFF',
       weekDays,
       monthDays,

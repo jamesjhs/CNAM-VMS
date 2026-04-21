@@ -17,6 +17,53 @@ Entries are listed in reverse chronological order (newest first). Each entry rec
 
 ---
 
+## 21 April 2026 — Security Audit (v0.2.0)
+
+**Agent session:** GitHub Copilot Coding Agent
+
+**What was done:**
+
+Full security audit of the codebase. Version bumped from 0.1.0 to 0.2.0.
+
+### Critical / High Fixes
+
+- **Broken middleware (CRITICAL):** `src/proxy.ts` was never executed by Next.js because middleware must be named `middleware.ts`. Renamed to `src/middleware.ts` so the mandatory password-change redirect now correctly fires. Removed the dead root-level `proxy.ts` file.
+
+- **Host Header Injection in password reset (HIGH):** Both `src/app/auth/actions.ts` and `src/app/admin/users/actions.ts` built password reset URLs from the user-supplied `Host` and `X-Forwarded-Proto` HTTP headers. An attacker could send crafted headers to poison reset emails (classic "password reset poisoning"). Replaced with `process.env.AUTH_URL`, which is already a required deployment variable.
+
+- **Plaintext verification tokens (HIGH):** OTP codes, completion tokens, and password-reset tokens were stored as plaintext in the `verification_tokens` table. An attacker with DB read access could extract them directly. All three are now hashed with SHA-256 before being stored; verification re-hashes the submitted value and compares with `crypto.timingSafeEqual`.
+
+- **Timing-unsafe token comparison (HIGH):** The completion token in `src/auth.ts` was compared with `!==` — a non-constant-time string comparison that leaks information via timing. Replaced with `timingSafeEqual` using SHA-256 hashes (equal-length 64-char hex buffers).
+
+### Medium Fixes
+
+- **Missing Content-Security-Policy and HSTS headers (MEDIUM):** `next.config.mjs` set several security headers but was missing `Content-Security-Policy` and `Strict-Transport-Security`. Both have been added. The CSP defaults to `self` with `unsafe-inline` and `unsafe-eval` required for Next.js's runtime; can be tightened further if a nonce-based approach is adopted.
+
+- **Synchronous blocking I/O (MEDIUM):** `src/app/api/files/[id]/route.ts` used `fs.readFileSync`; `src/app/admin/files/actions.ts` used `fs.existsSync`/`fs.unlinkSync`; `src/lib/uploads.ts` used `fs.existsSync`/`fs.mkdirSync`. All replaced with async equivalents (`fs/promises`) so the Node event loop is not blocked during file operations.
+
+- **No upload rate limiting (MEDIUM):** `/api/upload` had no per-user rate limit beyond authentication. Added an in-memory sliding-window rate limiter (10 uploads per user per 60 seconds) with a `429 Too Many Requests` response.
+
+### Low Fixes
+
+- **Unvalidated hex colour values (LOW):** Job/schedule `colour` fields accepted arbitrary strings, which could produce unexpected output if rendered in a `style` attribute. Added a strict `#rrggbb` / `#rgb` validation regex; invalid values fall back to the default indigo colour.
+
+- **Duplicate SMTP transport code (CODE QUALITY):** `src/lib/notifications.ts` duplicated the nodemailer transporter setup that already existed in `src/lib/mail.ts`. Refactored to delegate to `sendMail()` from `mail.ts`, removing the duplicate.
+
+### Dependency Updates
+
+- `next` upgraded from `16.1.6` → `16.2.4` — fixes CVEs: HTTP request smuggling (GHSA-ggv3-7p47-pfv8), CSRF bypass via null origin (GHSA-mq59-m269-xvcx, GHSA-jcc7-9wpm-mj36), DoS via Server Components (GHSA-q4gf-8mx6-v5v3), unbounded disk cache growth (GHSA-3x4c-7xq6-9pq8), postponed resume buffering DoS (GHSA-h27x-g6w4-24gq).
+- `nodemailer` upgraded from `7.0.13` → `8.0.5` — fixes SMTP command injection via CRLF (GHSA-c7w3-x93f-qmm8, GHSA-vvjj-xcjg-gr5g).
+- `eslint-config-next` upgraded from `16.1.6` → `16.2.4` to match Next.js.
+- `brace-expansion`, `flatted`, `picomatch` updated via `npm audit fix` to resolve remaining moderate/high transitive CVEs.
+- **Result: 0 known vulnerabilities** (`npm audit` clean).
+
+**Next steps:**
+- Consider tightening the CSP with a nonce-based approach (requires Next.js middleware integration) to remove `unsafe-inline`/`unsafe-eval`.
+- Evaluate migrating OTP storage to bcrypt if database read speed improves enough to make SHA-256 rainbow tables a practical concern (currently mitigated by rate limiting + short expiry).
+- Add integration tests for the auth flow.
+
+---
+
 ## 8 March 2026 — Manual Update
 
 **Agent session:** GitHub Copilot Coding Agent

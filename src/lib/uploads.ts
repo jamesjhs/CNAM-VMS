@@ -1,5 +1,5 @@
 import path from 'path';
-import fs from 'fs';
+import fs from 'fs/promises';
 import crypto from 'crypto';
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR ?? path.join(process.cwd(), 'uploads');
@@ -38,10 +38,8 @@ export interface UploadError {
 /**
  * Ensure the upload directory exists.
  */
-export function ensureUploadDir(): void {
-  if (!fs.existsSync(UPLOAD_DIR)) {
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-  }
+export async function ensureUploadDir(): Promise<void> {
+  await fs.mkdir(UPLOAD_DIR, { recursive: true });
 }
 
 /**
@@ -97,12 +95,12 @@ export async function saveFile(
   originalName: string,
   mimeType: string,
 ): Promise<UploadResult> {
-  ensureUploadDir();
+  await ensureUploadDir();
 
   const filename = generateFilename(originalName);
   const filePath = safeUploadPath(filename);
 
-  await fs.promises.writeFile(filePath, buffer);
+  await fs.writeFile(filePath, buffer);
 
   return {
     filename,

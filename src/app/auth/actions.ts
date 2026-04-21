@@ -1,8 +1,8 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { cookies, headers } from 'next/headers';
-import { randomBytes, randomInt } from 'crypto';
+import { cookies } from 'next/headers';
+import { randomBytes, randomInt, createHash, timingSafeEqual } from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { signIn } from '@/auth';
 import { verifyPassword } from '@/lib/password';
@@ -108,7 +108,8 @@ export async function submitPassword(formData: FormData) {
   await prisma.verificationToken.create({
     data: {
       identifier,
-      token: otp, // stored plaintext; short-lived (10 min) + timing-safe compare on verify
+      // Hash the OTP before storage — protects against DB-level read; verify by hashing the submission
+      token: createHash('sha256').update(otp).digest('hex'),
       expires: new Date(Date.now() + OTP_EXPIRY_MS),
     },
   });
@@ -194,7 +195,13 @@ export async function submitOtp(formData: FormData) {
     where: { identifier, expires: { gt: new Date() } },
   });
 
-  if (!tokenRecord || tokenRecord.token !== code) {
+  const codeHash = createHash('sha256').update(code).digest('hex');
+  const storedHash = tokenRecord?.token ?? '';
+  const codeMatches =
+    storedHash.length > 0 &&
+    timingSafeEqual(Buffer.from(codeHash, 'hex'), Buffer.from(storedHash, 'hex'));
+
+  if (!tokenRecord || !codeMatches) {
     // Record this failed attempt
     await prisma.verificationToken.create({
       data: {
@@ -210,14 +217,14 @@ export async function submitOtp(formData: FormData) {
   await prisma.verificationToken.deleteMany({ where: { identifier } });
   await prisma.verificationToken.deleteMany({ where: { identifier: failIdentifier } });
 
-  // Create a one-time completion token (2-minute TTL)
+  // Create a one-time completion token (2-minute TTL) — hash before storage
   const completionToken = randomBytes(32).toString('hex');
   const completionIdentifier = `auth:complete:${userId}`;
   await prisma.verificationToken.deleteMany({ where: { identifier: completionIdentifier } });
   await prisma.verificationToken.create({
     data: {
       identifier: completionIdentifier,
-      token: completionToken,
+      token: createHash('sha256').update(completionToken).digest('hex'),
       expires: new Date(Date.now() + COMPLETION_TOKEN_EXPIRY_MS),
     },
   });
@@ -247,11 +254,9 @@ export async function requestPasswordReset(formData: FormData) {
     redirect('/auth/forgot-password?error=MissingEmail');
   }
 
-  // Derive the base URL from the incoming request headers (host + protocol).
-  const headerStore = await headers();
-  const host = headerStore.get('host') ?? 'localhost';
-  const proto = headerStore.get('x-forwarded-proto') ?? 'http';
-  const baseUrl = `${proto}://${host}`;
+  // Use the configured public URL — never trust Host/X-Forwarded-Proto headers
+  // (prevents password-reset poisoning via Host header injection).
+  const baseUrl = (process.env.AUTH_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 
   // Always show a "success" response to prevent user enumeration
   const user = await prisma.user.findUnique({ where: { email } });
@@ -265,7 +270,8 @@ export async function requestPasswordReset(formData: FormData) {
     await prisma.verificationToken.create({
       data: {
         identifier: resetIdentifier,
-        token: resetToken,
+        // Hash the token before storage — raw token travels only in the email link
+        token: createHash('sha256').update(resetToken).digest('hex'),
         expires: new Date(Date.now() + RESET_TOKEN_EXPIRY_MS),
       },
     });
@@ -302,9 +308,19 @@ export async function completePasswordReset(formData: FormData) {
     redirect(`/auth/reset-password?token=${encodeURIComponent(token)}&error=TooShort`);
   }
 
-  // Look up the token — it must be unexpired and be a pw-reset token
-  const tokenRecord = await prisma.verificationToken.findUnique({ where: { token } });
-  if (!tokenRecord || !tokenRecord.identifier.startsWith('pw-reset:') || tokenRecord.expires < new Date()) {
+  // Look up the token — hash the raw token and find by identifier prefix
+  // (tokens are stored hashed; we can't look up by raw value any more)
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const cutoff = new Date();
+  const tokenRecord = await prisma.verificationToken.findFirst({
+    where: {
+      token: tokenHash,
+      identifier: { startsWith: 'pw-reset:' },
+      expires: { gt: cutoff },
+    },
+  });
+
+  if (!tokenRecord) {
     redirect('/auth/reset-password?error=InvalidToken');
   }
 
