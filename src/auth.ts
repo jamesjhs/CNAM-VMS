@@ -235,7 +235,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
       if (session.user && token.id) {
         session.user.id = token.id;
         // Read cached claims from the JWT — no DB round-trip required.
-        session.user.status = (token.status as string) ?? 'PENDING';
+        const pendingStatus: UserStatus = 'PENDING';
+        session.user.status = (token.status as string) ?? pendingStatus;
         session.user.mustChangePassword = token.mustChangePassword ?? false;
         session.user.capabilities = token.capabilities ?? [];
       }
