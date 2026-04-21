@@ -26,8 +26,8 @@ See [docs/deployment.md](docs/deployment.md) for full setup instructions.
 
 ```bash
 # Install dependencies
-# Note: --legacy-peer-deps is required due to peer dependency constraints in Auth.js beta
-npm ci --legacy-peer-deps
+# (legacy-peer-deps is configured in .npmrc — no extra flag needed)
+npm ci
 
 # Configure environment
 cp .env.example .env

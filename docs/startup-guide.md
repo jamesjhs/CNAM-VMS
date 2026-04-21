@@ -56,10 +56,8 @@ If you received the code as a zip file, unzip it and open a terminal window in t
 The application relies on a number of open-source packages. Install them with this single command (this may take a minute or two):
 
 ```bash
-npm ci --legacy-peer-deps
+npm ci
 ```
-
-> **Note:** The `--legacy-peer-deps` flag is needed because one of the packages (the authentication library) is still in a pre-release state. This is safe to use and does not affect how the application runs.
 
 ---
 
