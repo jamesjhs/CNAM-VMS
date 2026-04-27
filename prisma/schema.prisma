@@ -10,7 +10,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -98,7 +98,7 @@ model UserPhone {
 model VolunteerAvailability {
   id             String   @id @default(cuid())
   userId         String   @unique
-  activities     Json     @default("[]")
+  activities     String[]
   notes          String?
   updatedAt      DateTime @updatedAt
 
@@ -113,12 +113,12 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String?
-  access_token      String?
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String?
+  id_token          String? @db.Text
   session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -284,8 +284,8 @@ model Job {
   colour      String          @default("#6366f1")
   // Recurrence
   scheduleType      JobScheduleType @default(ONE_OFF)
-  weekDays          Json            @default("[]") // 0=Mon … 6=Sun; used when scheduleType=WEEKLY
-  monthDays         Json            @default("[]") // 1..31; used when scheduleType=MONTHLY
+  weekDays          Int[]           // 0=Mon … 6=Sun; used when scheduleType=WEEKLY
+  monthDays         Int[]           // 1..31; used when scheduleType=MONTHLY
   defaultStartTime  String?
   defaultEndTime    String?
   defaultMaxSignups Int?
@@ -306,7 +306,7 @@ model CalendarEvent {
   title       String
   description String?
   eventType   CalendarEventType @default(EVENT)
-  date        DateTime
+  date        DateTime          @db.Date
   startTime   String?
   endTime     String?
   jobId       String?
@@ -345,10 +345,10 @@ model EventSignup {
 model VolunteerDateSlot {
   id        String   @id @default(cuid())
   userId    String
-  date      DateTime
+  date      DateTime @db.Date
   startTime String?
   endTime   String?
-  jobIds    Json     @default("[]")
+  jobIds    String[]
   notes     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -393,7 +393,7 @@ model TrainingPolicyRole {
 
 model SiteContent {
   key         String   @id
-  content     String
+  content     String   @db.Text
   updatedAt   DateTime @updatedAt
   updatedById String?
 
@@ -412,16 +412,16 @@ model TeamTask {
   title              String
   taskType           TaskType
   urgency            TaskUrgency
-  description        String?
+  description        String?     @db.Text
   personnelRequired  Int?
   supervisorRequired Boolean     @default(false)
-  equipment          Json        @default("[]")
+  equipment          String[]
   equipmentOther     String?
-  consumables        Json        @default("[]")
+  consumables        String[]
   consumablesOther   String?
-  safetyIssues       Json        @default("[]")
+  safetyIssues       String[]
   safetyIssuesOther  String?
-  equipmentLocations String?
+  equipmentLocations String?     @db.Text
   isActive           Boolean     @default(true)
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
@@ -436,7 +436,7 @@ model TeamWorkLog {
   id        String   @id @default(cuid())
   taskId    String
   userId    String
-  entry     String
+  entry     String   @db.Text
   createdAt DateTime @default(now())
 
   task TeamTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -449,7 +449,7 @@ model TeamFeedback {
   id        String   @id @default(cuid())
   teamId    String
   userId    String
-  feedback  String
+  feedback  String   @db.Text
   createdAt DateTime @default(now())
 
   team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)

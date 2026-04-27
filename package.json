@@ -1,6 +1,6 @@
 {
   "name": "cnam-vms",
-  "version": "0.5.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "prisma generate && next dev",
@@ -9,7 +9,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma db push",
+    "db:migrate": "prisma migrate dev",
     "db:seed": "ts-node --project tsconfig.seed.json prisma/seed.ts",
     "db:set-initial-password": "ts-node --project tsconfig.seed.json scripts/set-initial-password.ts",
     "db:studio": "prisma studio"
