@@ -1,6 +1,6 @@
 import { requireAuth, hasCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
-import { prisma } from '@/lib/prisma';
+import { getDb, unpackDate, unpackBool, unpackArr } from '@/lib/db';
 import Link from 'next/link';
 import {
   getCalendarWeeks,
@@ -15,7 +15,6 @@ import {
   DAY_NAMES_SHORT,
   EVENT_TYPE_BG,
   EVENT_TYPE_LABELS,
-  monthDateRange,
   getJobOccurrenceDates,
   WEEK_DAY_LABELS,
 } from '@/lib/calendar';
@@ -51,20 +50,19 @@ export default async function SchedulePage({
   const isActingAs = isAdmin && !!userIdParam && userIdParam !== user.id;
 
   // Load all users for admin picker (only if admin)
+  const db = getDb();
+
   const allUsers = isAdmin
-    ? await prisma.user.findMany({
-        where: { status: 'ACTIVE' },
-        select: { id: true, name: true, email: true },
-        orderBy: { name: 'asc' },
-      })
+    ? (db.prepare(`SELECT id, name, email FROM users WHERE status = 'ACTIVE' ORDER BY name ASC`).all() as {
+        id: string; name: string | null; email: string;
+      }[])
     : [];
 
   // Resolve the target user (the user whose schedule we are managing)
   const targetUser = isActingAs
-    ? await prisma.user.findUnique({
-        where: { id: userIdParam },
-        select: { id: true, name: true, email: true },
-      })
+    ? (db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(userIdParam) as {
+        id: string; name: string | null; email: string;
+      } | null)
     : null;
 
   // If the userId param was provided but the user wasn't found, fall back to the admin's own view
@@ -73,48 +71,120 @@ export default async function SchedulePage({
   // The effective user ID for all data queries
   const targetId = targetUser ? targetUser.id : user.id;
 
-  const [events, mySignups, mySlots, allJobs, myUpcomingSignups] = await Promise.all([
-    prisma.calendarEvent.findMany({
-      where: { date: monthDateRange(year, month) },
-      orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
-      include: {
-        job: { select: { id: true, title: true, colour: true } },
-        team: { select: { id: true, name: true } },
-        _count: { select: { signups: true } },
-      },
-    }),
-    prisma.eventSignup.findMany({
-      where: {
-        userId: targetId,
-        event: { date: monthDateRange(year, month) },
-      },
-      select: { eventId: true, event: { select: { jobId: true, date: true } } },
-    }),
-    prisma.volunteerDateSlot.findMany({
-      where: {
-        userId: targetId,
-        date: monthDateRange(year, month),
-      },
-    }),
-    prisma.job.findMany({ orderBy: [{ isRolling: 'desc' }, { title: 'asc' }] }),
-    // All future sign-ups (up to next 20, sorted by date)
-    prisma.eventSignup.findMany({
-      where: {
-        userId: targetId,
-        event: { date: { gte: new Date() } },
-      },
-      orderBy: { event: { date: 'asc' } },
-      take: 20,
-      include: {
-        event: {
-          include: {
-            job: { select: { title: true, colour: true } },
-            team: { select: { name: true } },
-          },
-        },
-      },
-    }),
-  ]);
+  const startDateStr = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
+  const endDateStr = new Date(Date.UTC(year, month + 1, 1)).toISOString().slice(0, 10);
+  const nowStr = new Date().toISOString().slice(0, 10);
+
+  const rawEvents = db.prepare(`
+    SELECT ce.id, ce.title, ce.description, ce.date, ce.startTime, ce.endTime,
+           ce.eventType, ce.maxSignups,
+           j.id as job_id, j.title as job_title, j.colour as job_colour,
+           t.id as team_id, t.name as team_name,
+           COUNT(es.id) as signupCount
+    FROM calendar_events ce
+    LEFT JOIN jobs j ON ce.jobId = j.id
+    LEFT JOIN teams t ON ce.teamId = t.id
+    LEFT JOIN event_signups es ON es.eventId = ce.id
+    WHERE ce.date >= ? AND ce.date < ?
+    GROUP BY ce.id
+    ORDER BY ce.date ASC, ce.startTime ASC
+  `).all(startDateStr, endDateStr) as {
+    id: string; title: string; description: string | null;
+    date: string; startTime: string | null; endTime: string | null;
+    eventType: string; maxSignups: number | null;
+    job_id: string | null; job_title: string | null; job_colour: string | null;
+    team_id: string | null; team_name: string | null;
+    signupCount: number;
+  }[];
+
+  const events = rawEvents.map((ev) => ({
+    ...ev,
+    date: unpackDate(ev.date)!,
+    job: ev.job_id ? { id: ev.job_id, title: ev.job_title!, colour: ev.job_colour! } : null,
+    team: ev.team_id ? { id: ev.team_id, name: ev.team_name! } : null,
+    _count: { signups: ev.signupCount },
+  }));
+
+  const rawMySignups = db.prepare(`
+    SELECT es.eventId, ce.jobId, ce.date
+    FROM event_signups es
+    JOIN calendar_events ce ON es.eventId = ce.id
+    WHERE es.userId = ? AND ce.date >= ? AND ce.date < ?
+  `).all(targetId, startDateStr, endDateStr) as {
+    eventId: string; jobId: string | null; date: string;
+  }[];
+
+  const mySignups = rawMySignups.map((s) => ({
+    eventId: s.eventId,
+    event: { jobId: s.jobId, date: unpackDate(s.date)! },
+  }));
+
+  const rawMySlots = db.prepare(`
+    SELECT id, userId, date, startTime, endTime, notes, jobIds
+    FROM volunteer_date_slots
+    WHERE userId = ? AND date >= ? AND date < ?
+  `).all(targetId, startDateStr, endDateStr) as {
+    id: string; userId: string; date: string; startTime: string | null;
+    endTime: string | null; notes: string | null; jobIds: string;
+  }[];
+
+  const mySlots = rawMySlots.map((s) => ({
+    ...s,
+    date: unpackDate(s.date)!,
+    jobIds: unpackArr<string>(s.jobIds, []),
+  }));
+
+  const rawAllJobs = db.prepare(`
+    SELECT id, title, description, colour, isRolling, scheduleType,
+           weekDays, monthDays, defaultStartTime, defaultEndTime, defaultMaxSignups
+    FROM jobs
+    ORDER BY isRolling DESC, title ASC
+  `).all() as {
+    id: string; title: string; description: string | null; colour: string;
+    isRolling: number; scheduleType: string; weekDays: string; monthDays: string;
+    defaultStartTime: string | null; defaultEndTime: string | null; defaultMaxSignups: number | null;
+  }[];
+
+  const allJobs = rawAllJobs.map((j) => ({
+    ...j,
+    isRolling: unpackBool(j.isRolling),
+    weekDays: unpackArr<number>(j.weekDays, []),
+    monthDays: unpackArr<number>(j.monthDays, []),
+  }));
+
+  const rawUpcomingSignups = db.prepare(`
+    SELECT es.id, ce.id as eventId, ce.title, ce.date, ce.startTime, ce.endTime,
+           ce.eventType, ce.maxSignups,
+           j.title as job_title, j.colour as job_colour,
+           t.name as team_name
+    FROM event_signups es
+    JOIN calendar_events ce ON es.eventId = ce.id
+    LEFT JOIN jobs j ON ce.jobId = j.id
+    LEFT JOIN teams t ON ce.teamId = t.id
+    WHERE es.userId = ? AND ce.date >= ?
+    ORDER BY ce.date ASC
+    LIMIT 20
+  `).all(targetId, nowStr) as {
+    id: string; eventId: string; title: string; date: string;
+    startTime: string | null; endTime: string | null;
+    eventType: string; maxSignups: number | null;
+    job_title: string | null; job_colour: string | null;
+    team_name: string | null;
+  }[];
+
+  const myUpcomingSignups = rawUpcomingSignups.map((s) => ({
+    id: s.id,
+    event: {
+      title: s.title,
+      date: unpackDate(s.date)!,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      eventType: s.eventType,
+      maxSignups: s.maxSignups,
+      job: s.job_title ? { title: s.job_title, colour: s.job_colour! } : null,
+      team: s.team_name ? { name: s.team_name } : null,
+    },
+  }));
 
   const mySignupIds = new Set(mySignups.map((s) => s.eventId));
 

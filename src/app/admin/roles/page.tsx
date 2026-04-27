@@ -1,22 +1,45 @@
 import { requireCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
-import { prisma } from '@/lib/prisma';
+import { getDb, unpackBool } from '@/lib/db';
 import Link from 'next/link';
 import { createRole, assignCapabilityToRole, removeCapabilityFromRole } from '../users/actions';
 
 export default async function RolesAdminPage() {
   await requireCapability('admin:roles.read');
 
-  const [roles, allCapabilities] = await Promise.all([
-    prisma.role.findMany({
-      orderBy: { name: 'asc' },
-      include: {
-        roleCapabilities: { include: { capability: true } },
-        _count: { select: { userRoles: true } },
-      },
-    }),
-    prisma.capability.findMany({ orderBy: { key: 'asc' } }),
-  ]);
+  const db = getDb();
+
+  const rawRoles = db.prepare(
+    'SELECT id, name, description, isSystem FROM roles ORDER BY name ASC',
+  ).all() as { id: string; name: string; description: string | null; isSystem: number }[];
+
+  const rawRoleCaps = db.prepare(`
+    SELECT rc.roleId, rc.capabilityId, c.key, c.description
+    FROM role_capabilities rc
+    JOIN capabilities c ON rc.capabilityId = c.id
+  `).all() as { roleId: string; capabilityId: string; key: string; description: string | null }[];
+
+  const userRoleCounts = db.prepare(
+    'SELECT roleId, COUNT(*) as cnt FROM user_roles GROUP BY roleId',
+  ).all() as { roleId: string; cnt: number }[];
+  const userRoleCountMap = new Map(userRoleCounts.map((r) => [r.roleId, r.cnt]));
+
+  const allCapabilities = db.prepare(
+    'SELECT id, key, description FROM capabilities ORDER BY key ASC',
+  ).all() as { id: string; key: string; description: string | null }[];
+
+  const capsByRole = new Map<string, typeof rawRoleCaps>();
+  for (const rc of rawRoleCaps) {
+    if (!capsByRole.has(rc.roleId)) capsByRole.set(rc.roleId, []);
+    capsByRole.get(rc.roleId)!.push(rc);
+  }
+
+  const roles = rawRoles.map((r) => ({
+    ...r,
+    isSystem: unpackBool(r.isSystem),
+    roleCapabilities: capsByRole.get(r.id) ?? [],
+    _count: { userRoles: userRoleCountMap.get(r.id) ?? 0 },
+  }));
 
   return (
     <div className="min-h-screen flex flex-col">

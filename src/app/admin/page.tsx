@@ -1,26 +1,38 @@
 import { requireCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
-import { prisma } from '@/lib/prisma';
+import { getDb, unpackTs } from '@/lib/db';
 import Link from 'next/link';
 
 export default async function AdminPage() {
   const user = await requireCapability('admin:users.read');
 
-  const [userCount, roleCount, teamCount, auditCount, fileCount, announcementCount, eventCount] = await Promise.all([
-    prisma.user.count(),
-    prisma.role.count(),
-    prisma.team.count(),
-    prisma.auditLog.count(),
-    prisma.fileAsset.count(),
-    prisma.announcement.count(),
-    prisma.calendarEvent.count(),
-  ]);
+  const db = getDb();
 
-  const recentAuditLogs = await prisma.auditLog.findMany({
-    orderBy: { createdAt: 'desc' },
-    take: 10,
-    include: { user: { select: { email: true, name: true } } },
-  });
+  const { n: userCount } = db.prepare('SELECT COUNT(*) as n FROM users').get() as { n: number };
+  const { n: roleCount } = db.prepare('SELECT COUNT(*) as n FROM roles').get() as { n: number };
+  const { n: teamCount } = db.prepare('SELECT COUNT(*) as n FROM teams').get() as { n: number };
+  const { n: auditCount } = db.prepare('SELECT COUNT(*) as n FROM audit_logs').get() as { n: number };
+  const { n: fileCount } = db.prepare('SELECT COUNT(*) as n FROM file_assets').get() as { n: number };
+  const { n: announcementCount } = db.prepare('SELECT COUNT(*) as n FROM announcements').get() as { n: number };
+  const { n: eventCount } = db.prepare('SELECT COUNT(*) as n FROM calendar_events').get() as { n: number };
+
+  const rawRecentLogs = db.prepare(`
+    SELECT al.id, al.action, al.resource, al.resourceId, al.createdAt,
+           u.email as user_email
+    FROM audit_logs al
+    LEFT JOIN users u ON al.userId = u.id
+    ORDER BY al.createdAt DESC
+    LIMIT 10
+  `).all() as {
+    id: string; action: string; resource: string | null; resourceId: string | null;
+    createdAt: string; user_email: string | null;
+  }[];
+
+  const recentAuditLogs = rawRecentLogs.map((l) => ({
+    ...l,
+    createdAt: unpackTs(l.createdAt),
+    user: l.user_email ? { email: l.user_email } : null,
+  }));
 
   return (
     <div className="min-h-screen flex flex-col">

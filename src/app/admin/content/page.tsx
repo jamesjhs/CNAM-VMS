@@ -1,6 +1,6 @@
 import { requireCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
-import { prisma } from '@/lib/prisma';
+import { getDb, unpackTs } from '@/lib/db';
 import { DEFAULT_PRIVACY_POLICY } from '@/lib/default-privacy-policy';
 import Link from 'next/link';
 import { savePrivacyPolicy } from './actions';
@@ -12,8 +12,13 @@ export const metadata = {
 export default async function AdminContentPage() {
   await requireCapability('admin:theme.write');
 
-  const record = await prisma.siteContent.findUnique({ where: { key: 'privacy-policy' } });
+  const db = getDb();
+  const record = db.prepare('SELECT * FROM site_content WHERE key = ?').get('privacy-policy') as
+    | { key: string; content: string; updatedAt: string; updatedById: string | null }
+    | undefined;
+
   const currentContent = record?.content ?? DEFAULT_PRIVACY_POLICY;
+  const updatedAt = record ? unpackTs(record.updatedAt) : null;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -54,10 +59,10 @@ export default async function AdminContentPage() {
             <Link href="/privacy" className="underline hover:text-gray-700">
               /privacy
             </Link>
-            {record?.updatedAt && (
+            {updatedAt && (
               <>
                 {' '}· Last saved{' '}
-                {record.updatedAt.toLocaleString('en-GB', {
+                {updatedAt.toLocaleString('en-GB', {
                   day: 'numeric',
                   month: 'long',
                   year: 'numeric',

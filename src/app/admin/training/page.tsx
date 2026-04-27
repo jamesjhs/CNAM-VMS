@@ -1,9 +1,9 @@
 import { requireCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
-import { prisma } from '@/lib/prisma';
+import { getDb, unpackBool } from '@/lib/db';
 import Link from 'next/link';
 import { createTrainingPolicy, updateTrainingPolicy, deleteTrainingPolicy } from './actions';
-import type { UserAccountType } from '@prisma/client';
+import type { UserAccountType } from '@/lib/db-types';
 
 const ACCOUNT_TYPE_LABELS: Record<UserAccountType, string> = {
   VOLUNTEER: 'Volunteer',
@@ -22,10 +22,32 @@ export default async function TrainingAdminPage({
 
   const { edit: editId } = await searchParams;
 
-  const policies = await prisma.trainingPolicy.findMany({
-    orderBy: [{ isActive: 'desc' }, { title: 'asc' }],
-    include: { roleAssignments: true },
-  });
+  const db = getDb();
+  const rawPolicies = db.prepare(`
+    SELECT id, title, description, frequency, isActive
+    FROM training_policies
+    ORDER BY isActive DESC, title ASC
+  `).all() as {
+    id: string; title: string; description: string | null; frequency: string | null; isActive: number;
+  }[];
+
+  const rawAssignments = db.prepare(
+    'SELECT trainingPolicyId, accountType FROM training_policy_roles',
+  ).all() as { trainingPolicyId: string; accountType: string }[];
+
+  const assignmentsByPolicy = new Map<string, Set<string>>();
+  for (const a of rawAssignments) {
+    if (!assignmentsByPolicy.has(a.trainingPolicyId)) {
+      assignmentsByPolicy.set(a.trainingPolicyId, new Set());
+    }
+    assignmentsByPolicy.get(a.trainingPolicyId)!.add(a.accountType);
+  }
+
+  const policies = rawPolicies.map((p) => ({
+    ...p,
+    isActive: unpackBool(p.isActive),
+    roleAssignments: Array.from(assignmentsByPolicy.get(p.id) ?? []).map((accountType) => ({ accountType })),
+  }));
 
   const editPolicy = editId ? policies.find((p) => p.id === editId) ?? null : null;
 

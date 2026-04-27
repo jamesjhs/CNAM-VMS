@@ -1,9 +1,9 @@
 import { requireCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
-import { prisma } from '@/lib/prisma';
+import { getDb, unpackBool, unpackArr } from '@/lib/db';
 import Link from 'next/link';
 import { deleteTeamTask } from '../actions';
-import type { TaskType, TaskUrgency } from '@prisma/client';
+import type { TaskType, TaskUrgency } from '@/lib/db-types';
 import TaskFormClient from './TaskFormClient';
 
 const TASK_TYPE_LABELS: Record<TaskType, string> = {
@@ -33,13 +33,43 @@ export default async function AdminTasksPage({
 
   const { success, error } = await searchParams;
 
-  const [teams, tasks] = await Promise.all([
-    prisma.team.findMany({ orderBy: { name: 'asc' } }),
-    prisma.teamTask.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: { team: { select: { name: true } } },
-    }),
-  ]);
+  const db = getDb();
+
+  const teams = db.prepare('SELECT id, name FROM teams ORDER BY name ASC').all() as {
+    id: string; name: string;
+  }[];
+
+  const rawTasks = db.prepare(`
+    SELECT tt.id, tt.title, tt.description, tt.taskType, tt.urgency, tt.isActive,
+           tt.supervisorRequired, tt.equipment, tt.consumables, tt.safetyIssues,
+           tt.personnelRequired, tt.equipmentOther, tt.consumablesOther,
+           tt.safetyIssuesOther, tt.equipmentLocations,
+           tt.createdAt, tt.teamId,
+           t.name as teamName
+    FROM team_tasks tt
+    JOIN teams t ON tt.teamId = t.id
+    ORDER BY tt.createdAt DESC
+  `).all() as {
+    id: string; title: string; description: string | null; taskType: string; urgency: string;
+    isActive: number; supervisorRequired: number;
+    equipment: string; consumables: string; safetyIssues: string;
+    personnelRequired: number | null; equipmentOther: string | null;
+    consumablesOther: string | null; safetyIssuesOther: string | null;
+    equipmentLocations: string | null;
+    createdAt: string; teamId: string; teamName: string;
+  }[];
+
+  const tasks = rawTasks.map((t) => ({
+    ...t,
+    taskType: t.taskType as TaskType,
+    urgency: t.urgency as TaskUrgency,
+    isActive: unpackBool(t.isActive),
+    supervisorRequired: unpackBool(t.supervisorRequired),
+    equipment: unpackArr<string>(t.equipment, []),
+    consumables: unpackArr<string>(t.consumables, []),
+    safetyIssues: unpackArr<string>(t.safetyIssues, []),
+    team: { name: t.teamName },
+  }));
 
   const successMessages: Record<string, string> = {
     created: '\u2713 Task created successfully.',
@@ -137,7 +167,7 @@ export default async function AdminTasksPage({
                 </summary>
                 <div className="px-6 pb-6 border-t border-gray-100 pt-4">
                   <p className="text-xs text-gray-400 mb-4">
-                    Expand to edit \u2014 changes are saved immediately on submit.
+                    Expand to edit — changes are saved immediately on submit.
                   </p>
                   <TaskFormClient
                     teams={teams}

@@ -1,6 +1,6 @@
 import { requireCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
-import { prisma } from '@/lib/prisma';
+import { getDb, unpackBool, unpackArr } from '@/lib/db';
 import Link from 'next/link';
 import { createJob, updateJob, deleteJob } from '../actions';
 import { WEEK_DAY_LABELS } from '@/lib/calendar';
@@ -19,10 +19,30 @@ function parseArrayField(formData: FormData, name: string): number[] {
 export default async function JobsAdminPage() {
   await requireCapability('admin:calendar.write');
 
-  const jobs = await prisma.job.findMany({
-    orderBy: [{ scheduleType: 'asc' }, { isRolling: 'desc' }, { title: 'asc' }],
-    include: { _count: { select: { calendarEvents: true } } },
-  });
+  const db = getDb();
+
+  const rawJobs = db.prepare(`
+    SELECT j.id, j.title, j.description, j.isRolling, j.colour, j.scheduleType,
+           j.weekDays, j.monthDays, j.defaultStartTime, j.defaultEndTime, j.defaultMaxSignups,
+           COUNT(ce.id) as eventCount
+    FROM jobs j
+    LEFT JOIN calendar_events ce ON ce.jobId = j.id
+    GROUP BY j.id
+    ORDER BY j.scheduleType ASC, j.isRolling DESC, j.title ASC
+  `).all() as {
+    id: string; title: string; description: string | null; isRolling: number; colour: string;
+    scheduleType: string; weekDays: string; monthDays: string;
+    defaultStartTime: string | null; defaultEndTime: string | null;
+    defaultMaxSignups: number | null; eventCount: number;
+  }[];
+
+  const jobs = rawJobs.map((j) => ({
+    ...j,
+    isRolling: unpackBool(j.isRolling),
+    weekDays: unpackArr<number>(j.weekDays, []),
+    monthDays: unpackArr<number>(j.monthDays, []),
+    _count: { calendarEvents: j.eventCount },
+  }));
 
   const rollingJobs = jobs.filter((j) => j.isRolling);
   const rosteredJobs = jobs.filter((j) => !j.isRolling);

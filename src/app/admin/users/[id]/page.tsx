@@ -1,6 +1,6 @@
 import { requireCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
-import { prisma } from '@/lib/prisma';
+import { getDb, unpackTs } from '@/lib/db';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
@@ -16,7 +16,7 @@ import {
   resetUserLockout,
 } from '../actions';
 import DeleteUserButton from './DeleteUserButton';
-import type { UserStatus, UserAccountType } from '@prisma/client';
+import type { UserStatus, UserAccountType } from '@/lib/db-types';
 
 const STATUS_STYLES: Record<UserStatus, string> = {
   ACTIVE: 'bg-green-100 text-green-800',
@@ -38,37 +38,62 @@ export default async function UserDetailPage({
   await requireCapability('admin:users.read');
 
   const { id } = await params;
+  const db = getDb();
 
-  const [user, allRoles, allTeams] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id },
-      include: {
-        userRoles: { include: { role: true } },
-        userTeams: { include: { team: true } },
-        phones: { orderBy: { createdAt: 'asc' } },
-        auditLogs: {
-          orderBy: { createdAt: 'desc' },
-          take: 10,
-        },
-      },
-    }),
-    prisma.role.findMany({ orderBy: { name: 'asc' } }),
-    prisma.team.findMany({ orderBy: { name: 'asc' } }),
-  ]);
+  const rawUser = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as {
+    id: string; email: string; name: string | null; status: string; accountType: string;
+    createdAt: string; updatedAt: string; mustChangePassword: number;
+  } | undefined;
 
-  if (!user) notFound();
+  if (!rawUser) notFound();
 
-  // Check lockout status for this specific user
-  const userLockoutCount = await prisma.verificationToken.count({
-    where: {
-      identifier: `pw-fail:${user.email}`,
-      expires: { gt: new Date() },
-    },
-  });
+  const user = {
+    ...rawUser,
+    status: rawUser.status as UserStatus,
+    accountType: rawUser.accountType as UserAccountType,
+    createdAt: unpackTs(rawUser.createdAt),
+  };
+
+  const rawUserRoles = db.prepare(`
+    SELECT ur.roleId, r.name as roleName, r.description as roleDescription
+    FROM user_roles ur
+    JOIN roles r ON ur.roleId = r.id
+    WHERE ur.userId = ?
+  `).all(id) as { roleId: string; roleName: string; roleDescription: string | null }[];
+
+  const rawUserTeams = db.prepare(`
+    SELECT ut.teamId, t.name as teamName, t.description as teamDescription
+    FROM user_teams ut
+    JOIN teams t ON ut.teamId = t.id
+    WHERE ut.userId = ?
+  `).all(id) as { teamId: string; teamName: string; teamDescription: string | null }[];
+
+  const phones = db.prepare(
+    'SELECT id, number, label FROM user_phones WHERE userId = ? ORDER BY createdAt ASC',
+  ).all(id) as { id: string; number: string; label: string | null }[];
+
+  const rawAuditLogs = db.prepare(
+    'SELECT id, action, resource, createdAt FROM audit_logs WHERE userId = ? ORDER BY createdAt DESC LIMIT 10',
+  ).all(id) as { id: string; action: string; resource: string | null; createdAt: string }[];
+
+  const auditLogs = rawAuditLogs.map((l) => ({ ...l, createdAt: unpackTs(l.createdAt) }));
+
+  const { n: userLockoutCount } = db.prepare(
+    'SELECT COUNT(*) as n FROM verification_tokens WHERE identifier = ? AND expires > ?',
+  ).get(`pw-fail:${user.email}`, new Date().toISOString()) as { n: number };
+
   const isLockedOut = userLockoutCount >= 10;
 
-  const assignedRoleIds = new Set(user.userRoles.map((ur) => ur.roleId));
-  const assignedTeamIds = new Set(user.userTeams.map((ut) => ut.teamId));
+  const allRoles = db.prepare('SELECT id, name, description FROM roles ORDER BY name ASC').all() as {
+    id: string; name: string; description: string | null;
+  }[];
+
+  const allTeams = db.prepare('SELECT id, name, description FROM teams ORDER BY name ASC').all() as {
+    id: string; name: string; description: string | null;
+  }[];
+
+  const assignedRoleIds = new Set(rawUserRoles.map((ur) => ur.roleId));
+  const assignedTeamIds = new Set(rawUserTeams.map((ut) => ut.teamId));
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -161,9 +186,9 @@ export default async function UserDetailPage({
         {/* Phone Numbers */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <h2 className="font-semibold text-gray-900 mb-4">Telephone Numbers</h2>
-          {user.phones.length > 0 && (
+          {phones.length > 0 && (
             <ul className="mb-4 space-y-2">
-              {user.phones.map((phone) => (
+              {phones.map((phone) => (
                 <li key={phone.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 bg-gray-50">
                   <div>
                     <span className="font-medium text-sm text-gray-900">{phone.number}</span>
@@ -369,7 +394,7 @@ export default async function UserDetailPage({
         </div>
 
         {/* Audit log for this user */}
-        {user.auditLogs.length > 0 && (
+        {auditLogs.length > 0 && (
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h2 className="font-semibold text-gray-900 mb-4">Recent Activity</h2>
             <div className="overflow-x-auto">
@@ -382,7 +407,7 @@ export default async function UserDetailPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {user.auditLogs.map((log) => (
+                  {auditLogs.map((log) => (
                     <tr key={log.id} className="border-b border-gray-50 hover:bg-gray-50">
                       <td className="py-2 px-3 text-gray-400 whitespace-nowrap">
                         {log.createdAt.toLocaleString('en-GB')}
@@ -400,4 +425,3 @@ export default async function UserDetailPage({
     </div>
   );
 }
-

@@ -1,6 +1,6 @@
 import { requireCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
-import { prisma } from '@/lib/prisma';
+import { getDb, unpackTs } from '@/lib/db';
 import Link from 'next/link';
 import { deleteFileAsset } from './actions';
 
@@ -25,10 +25,23 @@ const MIME_ICONS: Record<string, string> = {
 export default async function FilesAdminPage() {
   await requireCapability('admin:files.read');
 
-  const files = await prisma.fileAsset.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: { uploader: { select: { email: true, name: true } } },
-  });
+  const db = getDb();
+  const rawFiles = db.prepare(`
+    SELECT fa.id, fa.filename, fa.originalName, fa.mimeType, fa.size, fa.createdAt,
+           u.email as uploader_email, u.name as uploader_name
+    FROM file_assets fa
+    LEFT JOIN users u ON fa.uploadedBy = u.id
+    ORDER BY fa.createdAt DESC
+  `).all() as {
+    id: string; filename: string; originalName: string; mimeType: string; size: number;
+    createdAt: string; uploader_email: string | null; uploader_name: string | null;
+  }[];
+
+  const files = rawFiles.map((f) => ({
+    ...f,
+    createdAt: unpackTs(f.createdAt),
+    uploader: f.uploader_email ? { email: f.uploader_email, name: f.uploader_name } : null,
+  }));
 
   const totalSize = files.reduce((sum, f) => sum + f.size, 0);
 

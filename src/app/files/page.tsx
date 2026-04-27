@@ -1,6 +1,6 @@
 import { requireAuth } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
-import { prisma } from '@/lib/prisma';
+import { getDb, unpackTs } from '@/lib/db';
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -23,16 +23,12 @@ const MIME_ICONS: Record<string, string> = {
 export default async function FilesPage() {
   await requireAuth();
 
-  const files = await prisma.fileAsset.findMany({
-    orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      originalName: true,
-      mimeType: true,
-      size: true,
-      createdAt: true,
-    },
-  });
+  const db = getDb();
+  const rawFiles = db.prepare(
+    'SELECT id, originalName, mimeType, size, createdAt FROM file_assets ORDER BY createdAt DESC',
+  ).all() as { id: string; originalName: string; mimeType: string; size: number; createdAt: string }[];
+
+  const files = rawFiles.map((f) => ({ ...f, createdAt: unpackTs(f.createdAt) }));
 
   return (
     <div className="min-h-screen flex flex-col">

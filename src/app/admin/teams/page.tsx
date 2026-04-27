@@ -1,6 +1,6 @@
 import { requireCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
-import { prisma } from '@/lib/prisma';
+import { getDb, unpackTs, unpackBool } from '@/lib/db';
 import Link from 'next/link';
 import { createTeam, deleteTeam, updateTeam } from '../users/actions';
 import { toggleTeamLeader } from './actions';
@@ -15,16 +15,49 @@ export default async function TeamsAdminPage({
 
   const { success, error } = await searchParams;
 
-  const teams = await prisma.team.findMany({
-    orderBy: { name: 'asc' },
-    include: {
-      _count: { select: { userTeams: true, tasks: true } },
-      userTeams: {
-        include: { user: { select: { id: true, name: true, email: true } } },
-        orderBy: { joinedAt: 'asc' },
-      },
+  const db = getDb();
+
+  const rawTeams = db.prepare(
+    'SELECT id, name, description, createdAt FROM teams ORDER BY name ASC',
+  ).all() as { id: string; name: string; description: string | null; createdAt: string }[];
+
+  const rawUserTeams = db.prepare(`
+    SELECT ut.teamId, ut.userId, ut.isLeader,
+           u.id as uid, u.name as uname, u.email as uemail
+    FROM user_teams ut
+    JOIN users u ON ut.userId = u.id
+    ORDER BY ut.joinedAt ASC
+  `).all() as {
+    teamId: string; userId: string; isLeader: number;
+    uid: string; uname: string | null; uemail: string;
+  }[];
+
+  const memberCountByTeam = new Map<string, number>();
+  const membersByTeam = new Map<string, { userId: string; isLeader: boolean; user: { id: string; name: string | null; email: string } }[]>();
+  for (const m of rawUserTeams) {
+    if (!membersByTeam.has(m.teamId)) membersByTeam.set(m.teamId, []);
+    membersByTeam.get(m.teamId)!.push({
+      userId: m.userId,
+      isLeader: unpackBool(m.isLeader),
+      user: { id: m.uid, name: m.uname, email: m.uemail },
+    });
+    memberCountByTeam.set(m.teamId, (memberCountByTeam.get(m.teamId) ?? 0) + 1);
+  }
+
+  const taskCounts = db.prepare(
+    'SELECT teamId, COUNT(*) as cnt FROM team_tasks GROUP BY teamId',
+  ).all() as { teamId: string; cnt: number }[];
+  const taskCountMap = new Map(taskCounts.map((t) => [t.teamId, t.cnt]));
+
+  const teams = rawTeams.map((t) => ({
+    ...t,
+    createdAt: unpackTs(t.createdAt),
+    userTeams: membersByTeam.get(t.id) ?? [],
+    _count: {
+      userTeams: memberCountByTeam.get(t.id) ?? 0,
+      tasks: taskCountMap.get(t.id) ?? 0,
     },
-  });
+  }));
 
   return (
     <div className="min-h-screen flex flex-col">

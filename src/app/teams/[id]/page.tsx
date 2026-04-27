@@ -1,10 +1,10 @@
 import { requireAuth, hasCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
-import { prisma } from '@/lib/prisma';
+import { getDb, unpackBool, unpackArr, unpackTs } from '@/lib/db';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { addWorkLogEntry, addTeamFeedback } from '../../admin/teams/actions';
-import type { TaskType, TaskUrgency } from '@prisma/client';
+import type { TaskType, TaskUrgency } from '@/lib/db-types';
 
 const TASK_TYPE_LABELS: Record<TaskType, string> = {
   SITE: 'Site',
@@ -24,7 +24,6 @@ const URGENCY_COLOURS: Record<TaskUrgency, string> = {
   URGENT: 'bg-red-100 text-red-800',
 };
 
-/** Combine a multi-select array with an optional free-text "other" entry. */
 function combineWithOther(items: string[], other: string | null): string | null {
   const all = [...items, ...(other ? [other] : [])];
   return all.length > 0 ? all.join(', ') : null;
@@ -41,38 +40,100 @@ export default async function TeamPage({
   const { success, error } = await searchParams;
   const currentUser = await requireAuth();
 
-  const team = await prisma.team.findUnique({
-    where: { id },
-    include: {
-      userTeams: { include: { user: { select: { id: true, name: true, email: true } } } },
-      tasks: {
-        where: { isActive: true },
-        orderBy: [{ urgency: 'asc' }, { createdAt: 'desc' }],
-        include: {
-          workLogs: {
-            orderBy: { createdAt: 'desc' },
-            include: { user: { select: { name: true, email: true } } },
-          },
-        },
-      },
-      feedbacks: {
-        orderBy: { createdAt: 'desc' },
-        include: { user: { select: { name: true, email: true } } },
-      },
-    },
-  });
+  const db = getDb();
+
+  const team = db.prepare('SELECT id, name, description FROM teams WHERE id = ?').get(id) as {
+    id: string; name: string; description: string | null;
+  } | undefined;
 
   if (!team) notFound();
 
-  const leaders = team.userTeams.filter((m) => m.isLeader);
-  const isLeader = team.userTeams.some((m) => m.userId === currentUser.id && m.isLeader);
+  const rawMembers = db.prepare(`
+    SELECT ut.userId, ut.isLeader, u.id as uid, u.name as uname, u.email as uemail
+    FROM user_teams ut
+    JOIN users u ON ut.userId = u.id
+    WHERE ut.teamId = ?
+  `).all(id) as {
+    userId: string; isLeader: number; uid: string; uname: string | null; uemail: string;
+  }[];
+
+  const members = rawMembers.map((m) => ({
+    userId: m.userId,
+    isLeader: unpackBool(m.isLeader),
+    user: { id: m.uid, name: m.uname, email: m.uemail },
+  }));
+
+  const rawTasks = db.prepare(`
+    SELECT id, teamId, title, taskType, urgency, description, personnelRequired,
+           supervisorRequired, equipment, consumables, safetyIssues,
+           equipmentOther, consumablesOther, safetyIssuesOther, equipmentLocations
+    FROM team_tasks
+    WHERE teamId = ? AND isActive = 1
+    ORDER BY CASE urgency WHEN 'URGENT' THEN 0 WHEN 'MODERATE' THEN 1 ELSE 2 END ASC, createdAt DESC
+  `).all(id) as {
+    id: string; teamId: string; title: string; taskType: string; urgency: string;
+    description: string | null; personnelRequired: number | null; supervisorRequired: number;
+    equipment: string; consumables: string; safetyIssues: string;
+    equipmentOther: string | null; consumablesOther: string | null; safetyIssuesOther: string | null;
+    equipmentLocations: string | null;
+  }[];
+
+  const taskIds = rawTasks.map((t) => t.id);
+
+  const rawWorkLogs = taskIds.length > 0
+    ? db.prepare(`
+        SELECT wl.id, wl.taskId, wl.entry, wl.createdAt, u.name as uname, u.email as uemail
+        FROM team_work_logs wl
+        JOIN users u ON wl.userId = u.id
+        WHERE wl.taskId IN (${taskIds.map(() => '?').join(',')})
+        ORDER BY wl.createdAt DESC
+      `).all(...taskIds) as {
+        id: string; taskId: string; entry: string; createdAt: string;
+        uname: string | null; uemail: string;
+      }[]
+    : [];
+
+  const workLogsByTask = new Map<string, typeof rawWorkLogs>();
+  for (const wl of rawWorkLogs) {
+    if (!workLogsByTask.has(wl.taskId)) workLogsByTask.set(wl.taskId, []);
+    workLogsByTask.get(wl.taskId)!.push(wl);
+  }
+
+  const tasks = rawTasks.map((t) => ({
+    ...t,
+    taskType: t.taskType as TaskType,
+    urgency: t.urgency as TaskUrgency,
+    supervisorRequired: unpackBool(t.supervisorRequired),
+    equipment: unpackArr<string>(t.equipment, []),
+    consumables: unpackArr<string>(t.consumables, []),
+    safetyIssues: unpackArr<string>(t.safetyIssues, []),
+    workLogs: (workLogsByTask.get(t.id) ?? []).map((wl) => ({
+      ...wl,
+      createdAt: unpackTs(wl.createdAt),
+      user: { name: wl.uname, email: wl.uemail },
+    })),
+  }));
+
+  const rawFeedbacks = db.prepare(`
+    SELECT tf.id, tf.feedback, tf.createdAt, u.name as uname, u.email as uemail
+    FROM team_feedback tf
+    JOIN users u ON tf.userId = u.id
+    WHERE tf.teamId = ?
+    ORDER BY tf.createdAt DESC
+  `).all(id) as {
+    id: string; feedback: string; createdAt: string; uname: string | null; uemail: string;
+  }[];
+
+  const feedbacks = rawFeedbacks.map((f) => ({
+    ...f,
+    createdAt: unpackTs(f.createdAt),
+    user: { name: f.uname, email: f.uemail },
+  }));
+
+  const leaders = members.filter((m) => m.isLeader);
+  const isLeader = members.some((m) => m.userId === currentUser.id && m.isLeader);
   const isAdmin = hasCapability(currentUser, 'admin:teams.read');
   const canViewLogs = isLeader || isAdmin;
-
-  const urgencyOrder: Record<TaskUrgency, number> = { URGENT: 0, MODERATE: 1, ROUTINE: 2 };
-  const sortedTasks = [...team.tasks].sort(
-    (a, b) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency],
-  );
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -117,7 +178,7 @@ export default async function TeamPage({
                 </p>
               )}
               <p className="text-xs text-gray-400 mt-1">
-                {team.userTeams.length} member{team.userTeams.length !== 1 ? 's' : ''}
+                {members.length} member{members.length !== 1 ? 's' : ''}
               </p>
             </div>
             {isAdmin && (
@@ -145,13 +206,13 @@ export default async function TeamPage({
             )}
           </div>
 
-          {sortedTasks.length === 0 ? (
+          {tasks.length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
               <p className="text-gray-500">No active tasks for this team.</p>
             </div>
           ) : (
             <div className="space-y-6">
-              {sortedTasks.map((task) => (
+              {tasks.map((task) => (
                 <div key={task.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                   {/* Task header */}
                   <div className="px-6 py-4 border-b border-gray-100">
@@ -221,7 +282,6 @@ export default async function TeamPage({
                   <div className="px-6 py-4">
                     <h4 className="text-sm font-medium text-gray-700 mb-3">Work Log</h4>
 
-                    {/* Add work log entry (all members) */}
                     <form
                       action={async (fd: FormData) => {
                         'use server';
@@ -245,7 +305,6 @@ export default async function TeamPage({
                       </button>
                     </form>
 
-                    {/* Work log entries (visible to leader and admin) */}
                     {canViewLogs ? (
                       task.workLogs.length === 0 ? (
                         <p className="text-xs text-gray-400">No work log entries yet.</p>
@@ -276,7 +335,6 @@ export default async function TeamPage({
         <section>
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Team Feedback</h2>
           <div className="bg-white rounded-xl border border-gray-200 p-6">
-            {/* Add feedback (all members) */}
             <form
               action={async (fd: FormData) => {
                 'use server';
@@ -300,13 +358,12 @@ export default async function TeamPage({
               </button>
             </form>
 
-            {/* Feedback entries (visible to leader and admin) */}
             {canViewLogs ? (
-              team.feedbacks.length === 0 ? (
+              feedbacks.length === 0 ? (
                 <p className="text-sm text-gray-400">No feedback submitted yet.</p>
               ) : (
                 <ul className="space-y-3">
-                  {team.feedbacks.map((fb) => (
+                  {feedbacks.map((fb) => (
                     <li key={fb.id} className="text-sm border-l-2 border-indigo-200 pl-3">
                       <span className="text-gray-700">{fb.feedback}</span>
                       <span className="ml-2 text-xs text-gray-400">
