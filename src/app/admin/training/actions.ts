@@ -1,10 +1,11 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { prisma } from '@/lib/prisma';
+import { createId } from '@paralleldrive/cuid2';
+import { getDb, now } from '@/lib/db';
 import { requireCapability } from '@/lib/auth-helpers';
 import { logAudit } from '@/lib/audit';
-import type { UserAccountType } from '@prisma/client';
+import type { UserAccountType } from '@/lib/db-types';
 
 export async function createTrainingPolicy(
   title: string,
@@ -17,22 +18,21 @@ export async function createTrainingPolicy(
   const trimmedTitle = title.trim();
   if (!trimmedTitle) return;
 
-  const policy = await prisma.trainingPolicy.create({
-    data: {
-      title: trimmedTitle,
-      description: description.trim() || null,
-      frequency: frequency.trim() || null,
-      roleAssignments: {
-        create: accountTypes.map((accountType) => ({ accountType })),
-      },
-    },
-  });
+  const db = getDb();
+  const id = createId();
+  const ts = now();
+  db.prepare('INSERT INTO training_policies (id, title, description, frequency, createdAt, updatedAt) VALUES (?,?,?,?,?,?)').run(
+    id, trimmedTitle, description.trim() || null, frequency.trim() || null, ts, ts,
+  );
+  for (const accountType of accountTypes) {
+    db.prepare('INSERT OR IGNORE INTO training_policy_roles (policyId, accountType) VALUES (?,?)').run(id, accountType);
+  }
 
   await logAudit({
     userId: actor.id,
     action: 'TRAINING_POLICY_CREATED',
     resource: 'TrainingPolicy',
-    resourceId: policy.id,
+    resourceId: id,
     detail: { title: trimmedTitle, accountTypes },
   });
 
@@ -52,22 +52,16 @@ export async function updateTrainingPolicy(
   const trimmedTitle = title.trim();
   if (!trimmedTitle) return;
 
-  await prisma.$transaction([
-    prisma.trainingPolicy.update({
-      where: { id: policyId },
-      data: {
-        title: trimmedTitle,
-        description: description.trim() || null,
-        frequency: frequency.trim() || null,
-        isActive,
-      },
-    }),
-    // Replace role assignments
-    prisma.trainingPolicyRole.deleteMany({ where: { policyId } }),
-    ...accountTypes.map((accountType) =>
-      prisma.trainingPolicyRole.create({ data: { policyId, accountType } }),
-    ),
-  ]);
+  const db = getDb();
+  db.transaction(() => {
+    db.prepare('UPDATE training_policies SET title=?, description=?, frequency=?, isActive=?, updatedAt=? WHERE id=?').run(
+      trimmedTitle, description.trim() || null, frequency.trim() || null, isActive ? 1 : 0, now(), policyId,
+    );
+    db.prepare('DELETE FROM training_policy_roles WHERE policyId = ?').run(policyId);
+    for (const accountType of accountTypes) {
+      db.prepare('INSERT INTO training_policy_roles (policyId, accountType) VALUES (?,?)').run(policyId, accountType);
+    }
+  })();
 
   await logAudit({
     userId: actor.id,
@@ -83,7 +77,8 @@ export async function updateTrainingPolicy(
 export async function deleteTrainingPolicy(policyId: string) {
   const actor = await requireCapability('admin:training.write');
 
-  await prisma.trainingPolicy.delete({ where: { id: policyId } });
+  const db = getDb();
+  db.prepare('DELETE FROM training_policies WHERE id = ?').run(policyId);
 
   await logAudit({
     userId: actor.id,

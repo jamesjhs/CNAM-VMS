@@ -2,10 +2,11 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
+import { createId } from '@paralleldrive/cuid2';
+import { getDb, now } from '@/lib/db';
 import { requireCapability } from '@/lib/auth-helpers';
 import { logAudit } from '@/lib/audit';
-import type { UserStatus, UserAccountType } from '@prisma/client';
+import type { UserStatus, UserAccountType } from '@/lib/db-types';
 
 // ---------------------------------------------------------------------------
 // User creation
@@ -18,20 +19,18 @@ export async function createUser(email: string, name: string, accountType: UserA
   const trimmedName = name.trim();
   if (!trimmedEmail) return;
 
-  const user = await prisma.user.create({
-    data: {
-      email: trimmedEmail,
-      name: trimmedName || null,
-      accountType,
-      status: 'PENDING',
-    },
-  });
+  const db = getDb();
+  const id = createId();
+  const ts = now();
+  db.prepare(
+    'INSERT INTO users (id, email, name, accountType, status, createdAt, updatedAt) VALUES (?,?,?,?,?,?,?)',
+  ).run(id, trimmedEmail, trimmedName || null, accountType, 'PENDING', ts, ts);
 
   await logAudit({
     userId: actor.id,
     action: 'USER_CREATED',
     resource: 'User',
-    resourceId: user.id,
+    resourceId: id,
     detail: { email: trimmedEmail, accountType },
   });
 
@@ -48,10 +47,8 @@ export async function updateUserProfile(userId: string, name: string, email: str
   const trimmedName = name.trim() || null;
   const trimmedEmail = email.trim().toLowerCase();
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: { name: trimmedName, email: trimmedEmail, accountType },
-  });
+  const db = getDb();
+  db.prepare('UPDATE users SET name=?, email=?, accountType=?, updatedAt=? WHERE id=?').run(trimmedName, trimmedEmail, accountType, now(), userId);
 
   await logAudit({
     userId: actor.id,
@@ -75,13 +72,10 @@ export async function addUserPhone(userId: string, number: string, label: string
   const trimmedNumber = number.trim();
   if (!trimmedNumber) return;
 
-  await prisma.userPhone.create({
-    data: {
-      userId,
-      number: trimmedNumber,
-      label: label.trim() || null,
-    },
-  });
+  const db = getDb();
+  db.prepare('INSERT INTO user_phones (id, userId, number, label, createdAt) VALUES (?,?,?,?,?)').run(
+    createId(), userId, trimmedNumber, label.trim() || null, now(),
+  );
 
   await logAudit({
     userId: actor.id,
@@ -97,7 +91,8 @@ export async function addUserPhone(userId: string, number: string, label: string
 export async function removeUserPhone(userId: string, phoneId: string) {
   const actor = await requireCapability('admin:users.write');
 
-  await prisma.userPhone.delete({ where: { id: phoneId } });
+  const db = getDb();
+  db.prepare('DELETE FROM user_phones WHERE id = ?').run(phoneId);
 
   await logAudit({
     userId: actor.id,
@@ -111,16 +106,14 @@ export async function removeUserPhone(userId: string, phoneId: string) {
 }
 
 // ---------------------------------------------------------------------------
-// User actions
+// User status actions
 // ---------------------------------------------------------------------------
 
 export async function updateUserStatus(userId: string, status: UserStatus) {
   const actor = await requireCapability('admin:users.write');
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: { status },
-  });
+  const db = getDb();
+  db.prepare('UPDATE users SET status=?, updatedAt=? WHERE id=?').run(status, now(), userId);
 
   await logAudit({
     userId: actor.id,
@@ -137,9 +130,10 @@ export async function updateUserStatus(userId: string, status: UserStatus) {
 export async function deleteUser(userId: string) {
   const actor = await requireCapability('admin:users.write');
 
-  const target = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+  const db = getDb();
+  const target = db.prepare('SELECT email FROM users WHERE id = ?').get(userId) as { email: string } | undefined;
 
-  await prisma.user.delete({ where: { id: userId } });
+  db.prepare('DELETE FROM users WHERE id = ?').run(userId);
 
   await logAudit({
     userId: actor.id,
@@ -160,11 +154,8 @@ export async function deleteUser(userId: string) {
 export async function assignRole(userId: string, roleId: string) {
   const actor = await requireCapability('admin:users.write');
 
-  await prisma.userRole.upsert({
-    where: { userId_roleId: { userId, roleId } },
-    update: {},
-    create: { userId, roleId, grantedBy: actor.id },
-  });
+  const db = getDb();
+  db.prepare('INSERT OR IGNORE INTO user_roles (userId, roleId, grantedAt, grantedBy) VALUES (?,?,?,?)').run(userId, roleId, now(), actor.id);
 
   await logAudit({
     userId: actor.id,
@@ -180,7 +171,8 @@ export async function assignRole(userId: string, roleId: string) {
 export async function removeRole(userId: string, roleId: string) {
   const actor = await requireCapability('admin:users.write');
 
-  await prisma.userRole.deleteMany({ where: { userId, roleId } });
+  const db = getDb();
+  db.prepare('DELETE FROM user_roles WHERE userId = ? AND roleId = ?').run(userId, roleId);
 
   await logAudit({
     userId: actor.id,
@@ -200,11 +192,8 @@ export async function removeRole(userId: string, roleId: string) {
 export async function assignTeam(userId: string, teamId: string) {
   const actor = await requireCapability('admin:users.write');
 
-  await prisma.userTeam.upsert({
-    where: { userId_teamId: { userId, teamId } },
-    update: {},
-    create: { userId, teamId },
-  });
+  const db = getDb();
+  db.prepare('INSERT OR IGNORE INTO user_teams (userId, teamId, joinedAt) VALUES (?,?,?)').run(userId, teamId, now());
 
   await logAudit({
     userId: actor.id,
@@ -220,7 +209,8 @@ export async function assignTeam(userId: string, teamId: string) {
 export async function removeTeam(userId: string, teamId: string) {
   const actor = await requireCapability('admin:users.write');
 
-  await prisma.userTeam.deleteMany({ where: { userId, teamId } });
+  const db = getDb();
+  db.prepare('DELETE FROM user_teams WHERE userId = ? AND teamId = ?').run(userId, teamId);
 
   await logAudit({
     userId: actor.id,
@@ -243,15 +233,16 @@ export async function createRole(name: string, description: string) {
   const trimmedName = name.trim();
   if (!trimmedName) return;
 
-  const role = await prisma.role.create({
-    data: { name: trimmedName, description: description.trim() || null },
-  });
+  const db = getDb();
+  const id = createId();
+  const ts = now();
+  db.prepare('INSERT INTO roles (id, name, description, createdAt, updatedAt) VALUES (?,?,?,?,?)').run(id, trimmedName, description.trim() || null, ts, ts);
 
   await logAudit({
     userId: actor.id,
     action: 'ROLE_CREATED',
     resource: 'Role',
-    resourceId: role.id,
+    resourceId: id,
     detail: { name: trimmedName },
   });
 
@@ -261,11 +252,8 @@ export async function createRole(name: string, description: string) {
 export async function assignCapabilityToRole(roleId: string, capabilityId: string) {
   const actor = await requireCapability('admin:roles.write');
 
-  await prisma.roleCapability.upsert({
-    where: { roleId_capabilityId: { roleId, capabilityId } },
-    update: {},
-    create: { roleId, capabilityId },
-  });
+  const db = getDb();
+  db.prepare('INSERT OR IGNORE INTO role_capabilities (roleId, capabilityId) VALUES (?,?)').run(roleId, capabilityId);
 
   await logAudit({
     userId: actor.id,
@@ -281,7 +269,8 @@ export async function assignCapabilityToRole(roleId: string, capabilityId: strin
 export async function removeCapabilityFromRole(roleId: string, capabilityId: string) {
   const actor = await requireCapability('admin:roles.write');
 
-  await prisma.roleCapability.deleteMany({ where: { roleId, capabilityId } });
+  const db = getDb();
+  db.prepare('DELETE FROM role_capabilities WHERE roleId = ? AND capabilityId = ?').run(roleId, capabilityId);
 
   await logAudit({
     userId: actor.id,
@@ -304,15 +293,16 @@ export async function createTeam(name: string, description: string) {
   const trimmedName = name.trim();
   if (!trimmedName) return;
 
-  const team = await prisma.team.create({
-    data: { name: trimmedName, description: description.trim() || null },
-  });
+  const db = getDb();
+  const id = createId();
+  const ts = now();
+  db.prepare('INSERT INTO teams (id, name, description, createdAt, updatedAt) VALUES (?,?,?,?,?)').run(id, trimmedName, description.trim() || null, ts, ts);
 
   await logAudit({
     userId: actor.id,
     action: 'TEAM_CREATED',
     resource: 'Team',
-    resourceId: team.id,
+    resourceId: id,
     detail: { name: trimmedName },
   });
 
@@ -325,13 +315,8 @@ export async function updateTeam(teamId: string, name: string, description: stri
   const trimmedName = name.trim();
   if (!trimmedName) return;
 
-  await prisma.team.update({
-    where: { id: teamId },
-    data: {
-      name: trimmedName,
-      description: description.trim() || null,
-    },
-  });
+  const db = getDb();
+  db.prepare('UPDATE teams SET name=?, description=?, updatedAt=? WHERE id=?').run(trimmedName, description.trim() || null, now(), teamId);
 
   await logAudit({
     userId: actor.id,
@@ -347,7 +332,8 @@ export async function updateTeam(teamId: string, name: string, description: stri
 export async function deleteTeam(teamId: string) {
   const actor = await requireCapability('admin:teams.write');
 
-  await prisma.team.delete({ where: { id: teamId } });
+  const db = getDb();
+  db.prepare('DELETE FROM teams WHERE id = ?').run(teamId);
 
   await logAudit({
     userId: actor.id,
@@ -370,7 +356,8 @@ export async function deleteTeam(teamId: string) {
 export async function adminSendPasswordReset(userId: string) {
   const actor = await requireCapability('admin:users.write');
 
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+  const db = getDb();
+  const user = db.prepare('SELECT email FROM users WHERE id = ?').get(userId) as { email: string } | undefined;
   if (!user?.email) return;
 
   const { randomBytes, createHash } = await import('crypto');
@@ -381,16 +368,15 @@ export async function adminSendPasswordReset(userId: string) {
 
   const resetToken = randomBytes(32).toString('hex');
   const resetIdentifier = `pw-reset:${user.email}`;
+  const { packTs } = await import('@/lib/db');
 
-  await prisma.verificationToken.deleteMany({ where: { identifier: resetIdentifier } });
-  await prisma.verificationToken.create({
-    data: {
-      identifier: resetIdentifier,
-      // Hash the token before storage — raw token travels only in the email link
-      token: createHash('sha256').update(resetToken).digest('hex'),
-      expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-    },
-  });
+  db.prepare('DELETE FROM verification_tokens WHERE identifier = ?').run(resetIdentifier);
+  db.prepare('INSERT INTO verification_tokens (identifier, token, expires) VALUES (?,?,?)').run(
+    resetIdentifier,
+    // Hash the token before storage — raw token travels only in the email link
+    createHash('sha256').update(resetToken).digest('hex'),
+    packTs(new Date(Date.now() + 24 * 60 * 60 * 1000)), // 24 hours
+  );
 
   const resetUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
   try {
@@ -416,12 +402,11 @@ export async function adminSendPasswordReset(userId: string) {
 export async function resetUserLockout(userId: string) {
   const actor = await requireCapability('admin:users.write');
 
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+  const db = getDb();
+  const user = db.prepare('SELECT email FROM users WHERE id = ?').get(userId) as { email: string } | undefined;
   if (!user?.email) return;
 
-  await prisma.verificationToken.deleteMany({
-    where: { identifier: `pw-fail:${user.email}` },
-  });
+  db.prepare('DELETE FROM verification_tokens WHERE identifier = ?').run(`pw-fail:${user.email}`);
 
   await logAudit({
     userId: actor.id,
@@ -442,11 +427,19 @@ export async function updateVolunteerAvailability(activities: string[], notes: s
   const { requireAuth } = await import('@/lib/auth-helpers');
   const actor = await requireAuth();
 
-  await prisma.volunteerAvailability.upsert({
-    where: { userId: actor.id },
-    update: { activities, notes: notes.trim() || null },
-    create: { userId: actor.id, activities, notes: notes.trim() || null },
-  });
+  const { packJson } = await import('@/lib/db');
+  const db = getDb();
+  const ts = now();
+  const existing = db.prepare('SELECT id FROM volunteer_availability WHERE userId = ?').get(actor.id);
+  if (existing) {
+    db.prepare('UPDATE volunteer_availability SET activities=?, notes=?, updatedAt=? WHERE userId=?').run(
+      packJson(activities), notes.trim() || null, ts, actor.id,
+    );
+  } else {
+    db.prepare('INSERT INTO volunteer_availability (id, userId, activities, notes, updatedAt) VALUES (?,?,?,?,?)').run(
+      createId(), actor.id, packJson(activities), notes.trim() || null, ts,
+    );
+  }
 
   revalidatePath('/volunteer/availability');
 }

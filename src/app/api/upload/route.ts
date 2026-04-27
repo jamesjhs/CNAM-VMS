@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { prisma } from '@/lib/prisma';
+import { createId } from '@paralleldrive/cuid2';
+import { getDb, now } from '@/lib/db';
 import { saveFile, validateFile } from '@/lib/uploads';
 import { logAudit } from '@/lib/audit';
 import type { SessionUser } from '@/lib/auth-helpers';
@@ -77,27 +78,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to save file' }, { status: 500 });
   }
 
-  const fileAsset = await prisma.fileAsset.create({
-    data: {
-      filename: uploadResult.filename,
-      originalName: uploadResult.originalName,
-      mimeType: uploadResult.mimeType,
-      size: uploadResult.size,
-      path: uploadResult.path,
-      uploadedBy: user.id,
-    },
-  });
+  const db = getDb();
+  const id = createId();
+  db.prepare(
+    'INSERT INTO file_assets (id, filename, originalName, mimeType, size, path, uploadedBy, createdAt) VALUES (?,?,?,?,?,?,?,?)',
+  ).run(id, uploadResult.filename, uploadResult.originalName, uploadResult.mimeType, uploadResult.size, uploadResult.path, user.id, now());
 
   await logAudit({
     userId: user.id,
     action: 'FILE_UPLOADED',
     resource: 'FileAsset',
-    resourceId: fileAsset.id,
+    resourceId: id,
     detail: { filename: uploadResult.filename, originalName, size: uploadResult.size },
   });
 
   return NextResponse.json({
-    id: fileAsset.id,
+    id,
     filename: uploadResult.filename,
     originalName: uploadResult.originalName,
     size: uploadResult.size,

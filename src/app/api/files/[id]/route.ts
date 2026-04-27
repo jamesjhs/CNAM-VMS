@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { prisma } from '@/lib/prisma';
+import { getDb } from '@/lib/db';
 import { safeUploadPath } from '@/lib/uploads';
 import type { SessionUser } from '@/lib/auth-helpers';
 import fs from 'fs/promises';
@@ -22,7 +22,9 @@ export async function GET(
 
   const { id } = await params;
 
-  const file = await prisma.fileAsset.findUnique({ where: { id } });
+  const db = getDb();
+  type FileRow = { filename: string; originalName: string; mimeType: string };
+  const file = db.prepare('SELECT filename, originalName, mimeType FROM file_assets WHERE id = ?').get(id) as FileRow | undefined;
   if (!file) {
     return NextResponse.json({ error: 'File not found' }, { status: 404 });
   }

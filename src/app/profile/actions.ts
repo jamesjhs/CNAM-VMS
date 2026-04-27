@@ -1,7 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { prisma } from '@/lib/prisma';
+import { createId } from '@paralleldrive/cuid2';
+import { getDb, now } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { logAudit } from '@/lib/audit';
 
@@ -9,11 +10,8 @@ export async function updateOwnProfile(name: string) {
   const actor = await requireAuth();
 
   const trimmedName = name.trim() || null;
-
-  await prisma.user.update({
-    where: { id: actor.id },
-    data: { name: trimmedName },
-  });
+  const db = getDb();
+  db.prepare('UPDATE users SET name=?, updatedAt=? WHERE id=?').run(trimmedName, now(), actor.id);
 
   await logAudit({
     userId: actor.id,
@@ -32,13 +30,10 @@ export async function addOwnPhone(number: string, label: string) {
   const trimmedNumber = number.trim();
   if (!trimmedNumber) return;
 
-  await prisma.userPhone.create({
-    data: {
-      userId: actor.id,
-      number: trimmedNumber,
-      label: label.trim() || null,
-    },
-  });
+  const db = getDb();
+  db.prepare('INSERT INTO user_phones (id, userId, number, label, createdAt) VALUES (?,?,?,?,?)').run(
+    createId(), actor.id, trimmedNumber, label.trim() || null, now(),
+  );
 
   await logAudit({
     userId: actor.id,
@@ -54,11 +49,12 @@ export async function addOwnPhone(number: string, label: string) {
 export async function removeOwnPhone(phoneId: string) {
   const actor = await requireAuth();
 
+  const db = getDb();
   // Verify ownership before deleting
-  const phone = await prisma.userPhone.findUnique({ where: { id: phoneId } });
+  const phone = db.prepare('SELECT userId FROM user_phones WHERE id = ?').get(phoneId) as { userId: string } | undefined;
   if (!phone || phone.userId !== actor.id) return;
 
-  await prisma.userPhone.delete({ where: { id: phoneId } });
+  db.prepare('DELETE FROM user_phones WHERE id = ?').run(phoneId);
 
   await logAudit({
     userId: actor.id,

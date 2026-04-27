@@ -2,10 +2,11 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
+import { createId } from '@paralleldrive/cuid2';
+import { getDb, now, packJson, unpackBool } from '@/lib/db';
 import { requireCapability, requireAuth, hasCapability } from '@/lib/auth-helpers';
 import { logAudit } from '@/lib/audit';
-import type { TaskType, TaskUrgency } from '@prisma/client';
+import type { TaskType, TaskUrgency } from '@/lib/db-types';
 
 // Allowed enum values — validated server-side to prevent invalid DB writes
 const VALID_TASK_TYPES: TaskType[] = ['SITE', 'DISPLAY', 'AIRFRAME'];
@@ -56,34 +57,28 @@ export async function createTeamTask(formData: FormData) {
     redirect('/admin/teams/tasks?error=MissingFields');
   }
 
+  const db = getDb();
   // Verify the team exists before writing
-  const teamExists = await prisma.team.findUnique({ where: { id: teamId }, select: { id: true } });
+  const teamExists = db.prepare('SELECT id FROM teams WHERE id = ?').get(teamId);
   if (!teamExists) redirect('/admin/teams/tasks?error=TeamNotFound');
 
-  const task = await prisma.teamTask.create({
-    data: {
-      teamId,
-      title,
-      taskType,
-      urgency,
-      description,
-      personnelRequired,
-      supervisorRequired,
-      equipment,
-      equipmentOther,
-      consumables,
-      consumablesOther,
-      safetyIssues,
-      safetyIssuesOther,
-      equipmentLocations,
-    },
-  });
+  const id = createId();
+  const ts = now();
+  db.prepare(
+    `INSERT INTO team_tasks (id, teamId, title, taskType, urgency, description, personnelRequired, supervisorRequired,
+     equipment, equipmentOther, consumables, consumablesOther, safetyIssues, safetyIssuesOther, equipmentLocations, createdAt, updatedAt)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+  ).run(
+    id, teamId, title, taskType, urgency, description, personnelRequired, supervisorRequired ? 1 : 0,
+    packJson(equipment), equipmentOther, packJson(consumables), consumablesOther,
+    packJson(safetyIssues), safetyIssuesOther, equipmentLocations, ts, ts,
+  );
 
   await logAudit({
     userId: actor.id,
     action: 'TASK_CREATED',
     resource: 'TeamTask',
-    resourceId: task.id,
+    resourceId: id,
     detail: { teamId, title },
   });
 
@@ -111,28 +106,20 @@ export async function updateTeamTask(taskId: string, formData: FormData) {
 
   if (!title) redirect('/admin/teams/tasks?error=MissingFields');
 
-  // Verify the task exists before updating (prevents unhandled Prisma P2025)
-  const existing = await prisma.teamTask.findUnique({ where: { id: taskId }, select: { teamId: true } });
+  const db = getDb();
+  // Verify the task exists before updating
+  const existing = db.prepare('SELECT teamId FROM team_tasks WHERE id = ?').get(taskId) as { teamId: string } | undefined;
   if (!existing) redirect('/admin/teams/tasks?error=NotFound');
 
-  await prisma.teamTask.update({
-    where: { id: taskId },
-    data: {
-      title,
-      taskType,
-      urgency,
-      description,
-      personnelRequired,
-      supervisorRequired,
-      equipment,
-      equipmentOther,
-      consumables,
-      consumablesOther,
-      safetyIssues,
-      safetyIssuesOther,
-      equipmentLocations,
-    },
-  });
+  db.prepare(
+    `UPDATE team_tasks SET title=?, taskType=?, urgency=?, description=?, personnelRequired=?, supervisorRequired=?,
+     equipment=?, equipmentOther=?, consumables=?, consumablesOther=?, safetyIssues=?, safetyIssuesOther=?,
+     equipmentLocations=?, updatedAt=? WHERE id=?`,
+  ).run(
+    title, taskType, urgency, description, personnelRequired, supervisorRequired ? 1 : 0,
+    packJson(equipment), equipmentOther, packJson(consumables), consumablesOther,
+    packJson(safetyIssues), safetyIssuesOther, equipmentLocations, now(), taskId,
+  );
 
   await logAudit({
     userId: actor.id,
@@ -150,10 +137,11 @@ export async function updateTeamTask(taskId: string, formData: FormData) {
 export async function deleteTeamTask(taskId: string) {
   const actor = await requireCapability('admin:tasks.write');
 
-  const task = await prisma.teamTask.findUnique({ where: { id: taskId }, select: { teamId: true } });
+  const db = getDb();
+  const task = db.prepare('SELECT teamId FROM team_tasks WHERE id = ?').get(taskId) as { teamId: string } | undefined;
   if (!task) redirect('/admin/teams/tasks?error=NotFound');
 
-  await prisma.teamTask.delete({ where: { id: taskId } });
+  db.prepare('DELETE FROM team_tasks WHERE id = ?').run(taskId);
 
   await logAudit({
     userId: actor.id,
@@ -177,24 +165,20 @@ export async function addWorkLogEntry(taskId: string, entry: string) {
   const trimmed = (entry ?? '').trim().slice(0, 2000);
   if (!trimmed) return;
 
+  const db = getDb();
   // Verify the task exists before writing (prevents FK constraint error)
-  const task = await prisma.teamTask.findUnique({
-    where: { id: taskId },
-    select: { teamId: true, isActive: true },
-  });
-  if (!task || !task.isActive) redirect('/teams?error=TaskNotFound');
+  const task = db.prepare('SELECT teamId, isActive FROM team_tasks WHERE id = ?').get(taskId) as { teamId: string; isActive: number } | undefined;
+  if (!task || !unpackBool(task.isActive)) redirect('/teams?error=TaskNotFound');
 
   // Enforce team membership — admins with admin:teams.read bypass this
   if (!hasCapability(actor, 'admin:teams.read')) {
-    const membership = await prisma.userTeam.findUnique({
-      where: { userId_teamId: { userId: actor.id, teamId: task.teamId } },
-    });
+    const membership = db.prepare('SELECT userId FROM user_teams WHERE userId = ? AND teamId = ?').get(actor.id, task.teamId);
     if (!membership) redirect(`/teams/${task.teamId}?error=NotMember`);
   }
 
-  await prisma.teamWorkLog.create({
-    data: { taskId, userId: actor.id, entry: trimmed },
-  });
+  db.prepare('INSERT INTO team_work_logs (id, taskId, userId, entry, createdAt) VALUES (?,?,?,?,?)').run(
+    createId(), taskId, actor.id, trimmed, now(),
+  );
 
   revalidatePath(`/teams/${task.teamId}`);
   redirect(`/teams/${task.teamId}?success=log`);
@@ -210,21 +194,20 @@ export async function addTeamFeedback(teamId: string, feedback: string) {
   const trimmed = (feedback ?? '').trim().slice(0, 2000);
   if (!trimmed) return;
 
+  const db = getDb();
   // Verify team exists
-  const team = await prisma.team.findUnique({ where: { id: teamId }, select: { id: true } });
+  const team = db.prepare('SELECT id FROM teams WHERE id = ?').get(teamId);
   if (!team) redirect('/teams?error=TeamNotFound');
 
   // Enforce team membership — admins bypass this
   if (!hasCapability(actor, 'admin:teams.read')) {
-    const membership = await prisma.userTeam.findUnique({
-      where: { userId_teamId: { userId: actor.id, teamId } },
-    });
+    const membership = db.prepare('SELECT userId FROM user_teams WHERE userId = ? AND teamId = ?').get(actor.id, teamId);
     if (!membership) redirect(`/teams/${teamId}?error=NotMember`);
   }
 
-  await prisma.teamFeedback.create({
-    data: { teamId, userId: actor.id, feedback: trimmed },
-  });
+  db.prepare('INSERT INTO team_feedback (id, teamId, userId, feedback, createdAt) VALUES (?,?,?,?,?)').run(
+    createId(), teamId, actor.id, trimmed, now(),
+  );
 
   revalidatePath(`/teams/${teamId}`);
   redirect(`/teams/${teamId}?success=feedback`);
@@ -237,18 +220,13 @@ export async function addTeamFeedback(teamId: string, feedback: string) {
 export async function toggleTeamLeader(teamId: string, userId: string) {
   const actor = await requireCapability('admin:teams.write');
 
+  const db = getDb();
   // The user must already be a member of the team
-  const membership = await prisma.userTeam.findUnique({
-    where: { userId_teamId: { userId, teamId } },
-  });
+  const membership = db.prepare('SELECT isLeader FROM user_teams WHERE userId = ? AND teamId = ?').get(userId, teamId) as { isLeader: number } | undefined;
   if (!membership) redirect('/admin/teams?error=NotMember');
 
-  const newIsLeader = !membership.isLeader;
-
-  await prisma.userTeam.update({
-    where: { userId_teamId: { userId, teamId } },
-    data: { isLeader: newIsLeader },
-  });
+  const newIsLeader = unpackBool(membership.isLeader) ? 0 : 1;
+  db.prepare('UPDATE user_teams SET isLeader=? WHERE userId=? AND teamId=?').run(newIsLeader, userId, teamId);
 
   await logAudit({
     userId: actor.id,
@@ -262,4 +240,3 @@ export async function toggleTeamLeader(teamId: string, userId: string) {
   revalidatePath(`/teams/${teamId}`);
   redirect('/admin/teams?success=leader');
 }
-

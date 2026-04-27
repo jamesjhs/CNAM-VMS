@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { prisma } from '@/lib/prisma';
+import { getDb, now } from '@/lib/db';
 import { requireCapability } from '@/lib/auth-helpers';
 import { logAudit } from '@/lib/audit';
 
@@ -11,11 +11,14 @@ export async function savePrivacyPolicy(content: string) {
   const trimmed = content.trim();
   if (!trimmed) return;
 
-  await prisma.siteContent.upsert({
-    where: { key: 'privacy-policy' },
-    update: { content: trimmed, updatedById: actor.id },
-    create: { key: 'privacy-policy', content: trimmed, updatedById: actor.id },
-  });
+  const db = getDb();
+  const ts = now();
+  const existing = db.prepare("SELECT key FROM site_content WHERE key = 'privacy-policy'").get();
+  if (existing) {
+    db.prepare("UPDATE site_content SET content=?, updatedAt=?, updatedById=? WHERE key='privacy-policy'").run(trimmed, ts, actor.id);
+  } else {
+    db.prepare("INSERT INTO site_content (key, content, updatedAt, updatedById) VALUES ('privacy-policy',?,?,?)").run(trimmed, ts, actor.id);
+  }
 
   await logAudit({
     userId: actor.id,
