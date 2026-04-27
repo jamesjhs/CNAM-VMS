@@ -1,6 +1,7 @@
 import { requireAuth, hasCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
 import { getDb, unpackDate, unpackBool, unpackArr } from '@/lib/db';
+import type { CalendarEventType } from '@/lib/db-types';
 import Link from 'next/link';
 import {
   getCalendarWeeks,
@@ -91,7 +92,7 @@ export default async function SchedulePage({
   `).all(startDateStr, endDateStr) as {
     id: string; title: string; description: string | null;
     date: string; startTime: string | null; endTime: string | null;
-    eventType: string; maxSignups: number | null;
+    eventType: CalendarEventType; maxSignups: number | null;
     job_id: string | null; job_title: string | null; job_colour: string | null;
     team_id: string | null; team_name: string | null;
     signupCount: number;
@@ -167,7 +168,7 @@ export default async function SchedulePage({
   `).all(targetId, nowStr) as {
     id: string; eventId: string; title: string; date: string;
     startTime: string | null; endTime: string | null;
-    eventType: string; maxSignups: number | null;
+    eventType: CalendarEventType; maxSignups: number | null;
     job_title: string | null; job_colour: string | null;
     team_name: string | null;
   }[];
