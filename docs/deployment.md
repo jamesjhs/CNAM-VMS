@@ -3,7 +3,6 @@
 ## Requirements
 
 - Node.js 20+
-- PostgreSQL 15+
 - SMTP server or mail service
 - Linux VPS (Ubuntu 22.04 recommended)
 
@@ -13,9 +12,10 @@ Copy `.env.example` to `.env` and fill in the values:
 
 | Variable | Description | Example |
 |---|---|---|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/cnam_vms` |
+| `DATABASE_URL` | SQLite file path | `file:./data/cnam-vms.db` |
+| `DB_ENCRYPTION_KEY` | AES-256/SQLCipher key (generate with `openssl rand -base64 32`) | — |
 | `AUTH_SECRET` | NextAuth secret (generate with `openssl rand -base64 32`) | — |
-| `AUTH_URL` | Public URL of the app | `https://vms.example.com` |
+| `AUTH_URL` | Public URL of the app | `http://vms.example.com` |
 | `EMAIL_SERVER_HOST` | SMTP hostname | `smtp.example.com` |
 | `EMAIL_SERVER_PORT` | SMTP port | `587` |
 | `EMAIL_SERVER_USER` | SMTP username | `noreply@example.com` |
@@ -41,16 +41,13 @@ npm ci
 cp .env.example .env
 # Edit .env with your values
 
-# 4. Run database migrations
-npx prisma migrate deploy
-
-# 5. Seed initial data (creates root user and roles)
+# 4. Seed initial data (creates root user and roles)
 npm run db:seed
 
-# 6. Build for production
+# 5. Build for production
 npm run build
 
-# 7. Start the server
+# 6. Start the server
 npm start
 ```
 
@@ -69,7 +66,6 @@ pm2 startup
 
 ```bash
 # Set environment variables
-export DATABASE_URL="postgresql://..."
 export BACKUP_DIR="/var/backups/cnam-vms"
 export UPLOAD_DIR="/var/uploads/cnam-vms"
 
@@ -82,19 +78,17 @@ chmod +x scripts/backup.sh
 
 ```bash
 # Daily backup at 2am
-0 2 * * * cd /opt/cnam-vms && DATABASE_URL="postgresql://..." ./scripts/backup.sh >> /var/log/cnam-vms-backup.log 2>&1
+0 2 * * * cd /opt/cnam-vms && ./scripts/backup.sh >> /var/log/cnam-vms-backup.log 2>&1
 ```
 
 ### Restore
 
 ```bash
-export DATABASE_URL="postgresql://..."
-
 # Restore database only
-./scripts/restore.sh --db /var/backups/cnam-vms/db_20260101_020000.dump
+./scripts/restore.sh --db /var/backups/cnam-vms/db_20260101_020000.sqlite3
 
 # Restore database and uploads
-./scripts/restore.sh --db /var/backups/cnam-vms/db_20260101_020000.dump \
+./scripts/restore.sh --db /var/backups/cnam-vms/db_20260101_020000.sqlite3 \
   --uploads /var/backups/cnam-vms/uploads_20260101_020000.tar.gz
 ```
 
@@ -104,18 +98,9 @@ export DATABASE_URL="postgresql://..."
 server {
     listen 80;
     server_name vms.example.com;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl;
-    server_name vms.example.com;
-
-    ssl_certificate /etc/letsencrypt/live/vms.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/vms.example.com/privkey.pem;
 
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://localhost:3001;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
