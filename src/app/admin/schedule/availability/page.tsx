@@ -1,6 +1,6 @@
 import { requireCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
-import { prisma } from '@/lib/prisma';
+import { getDb, unpackDate, unpackBool, unpackArr } from '@/lib/db';
 import Link from 'next/link';
 import {
   parseMonthParam,
@@ -13,7 +13,6 @@ import {
   parseDate,
   MONTH_NAMES,
   DAY_NAMES_SHORT,
-  monthDateRange,
 } from '@/lib/calendar';
 
 export default async function AdminAvailabilityPage({
@@ -28,17 +27,38 @@ export default async function AdminAvailabilityPage({
   const currentMonthStr = fmtMonth(year, month);
   const selectedDate = dayParam ? parseDate(dayParam) : null;
 
-  // Fetch all volunteer date slots for this month
-  const slots = await prisma.volunteerDateSlot.findMany({
-    where: { date: monthDateRange(year, month) },
-    orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
-    include: {
-      user: { select: { id: true, name: true, email: true, accountType: true } },
-    },
-  });
+  const db = getDb();
 
-  // Fetch all jobs for label lookup
-  const allJobs = await prisma.job.findMany({ orderBy: [{ isRolling: 'desc' }, { title: 'asc' }] });
+  const startDateStr = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
+  const endDateStr = new Date(Date.UTC(year, month + 1, 1)).toISOString().slice(0, 10);
+
+  const rawSlots = db.prepare(`
+    SELECT vds.id, vds.userId, vds.date, vds.startTime, vds.endTime, vds.notes, vds.jobIds,
+           u.id as uid, u.name as uname, u.email as uemail, u.accountType as uaccountType
+    FROM volunteer_date_slots vds
+    JOIN users u ON vds.userId = u.id
+    WHERE vds.date >= ? AND vds.date < ?
+    ORDER BY vds.date ASC, vds.startTime ASC
+  `).all(startDateStr, endDateStr) as {
+    id: string; userId: string; date: string; startTime: string | null; endTime: string | null;
+    notes: string | null; jobIds: string;
+    uid: string; uname: string | null; uemail: string; uaccountType: string;
+  }[];
+
+  const slots = rawSlots.map((s) => ({
+    ...s,
+    date: unpackDate(s.date)!,
+    jobIds: unpackArr<string>(s.jobIds, []),
+    user: { id: s.uid, name: s.uname, email: s.uemail, accountType: s.uaccountType },
+  }));
+
+  const rawJobs = db.prepare(`
+    SELECT id, title, colour, isRolling
+    FROM jobs
+    ORDER BY isRolling DESC, title ASC
+  `).all() as { id: string; title: string; colour: string; isRolling: number }[];
+
+  const allJobs = rawJobs.map((j) => ({ ...j, isRolling: unpackBool(j.isRolling) }));
   const jobMap = new Map(allJobs.map((j) => [j.id, j]));
 
   // Group slots by date
@@ -52,7 +72,6 @@ export default async function AdminAvailabilityPage({
   const selectedDateKey = selectedDate ? dateToParam(selectedDate) : null;
   const selectedSlots = selectedDate ? (slotsByDate.get(selectedDateKey!) ?? []) : [];
 
-  // Summary counts for the month
   const uniqueVolunteers = new Set(slots.map((s) => s.userId));
   const weeks = getCalendarWeeks(year, month);
   const today = new Date();

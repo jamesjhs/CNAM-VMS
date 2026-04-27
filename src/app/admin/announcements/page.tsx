@@ -1,16 +1,30 @@
 import { requireCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
-import { prisma } from '@/lib/prisma';
+import { getDb, unpackTs, unpackBool } from '@/lib/db';
 import Link from 'next/link';
 import { createAnnouncement, deleteAnnouncement, toggleAnnouncementPin } from './actions';
 
 export default async function AnnouncementsAdminPage() {
   await requireCapability('admin:announcements.write');
 
-  const announcements = await prisma.announcement.findMany({
-    orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
-    include: { author: { select: { email: true, name: true } } },
-  });
+  const db = getDb();
+  const rawAnnouncements = db.prepare(`
+    SELECT a.id, a.title, a.body, a.pinned, a.createdAt,
+           u.email as author_email, u.name as author_name
+    FROM announcements a
+    LEFT JOIN users u ON a.authorId = u.id
+    ORDER BY a.pinned DESC, a.createdAt DESC
+  `).all() as {
+    id: string; title: string; body: string; pinned: number; createdAt: string;
+    author_email: string | null; author_name: string | null;
+  }[];
+
+  const announcements = rawAnnouncements.map((a) => ({
+    ...a,
+    pinned: unpackBool(a.pinned),
+    createdAt: unpackTs(a.createdAt),
+    author: a.author_email ? { email: a.author_email, name: a.author_name } : null,
+  }));
 
   return (
     <div className="min-h-screen flex flex-col">

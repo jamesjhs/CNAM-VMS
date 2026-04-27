@@ -1,13 +1,5 @@
-import { PrismaClient } from '@prisma/client';
-
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
-
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-  });
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+/**
+ * Compatibility shim: exposes `getDb()` under the legacy `prisma` export name.
+ * All actual database access now goes through src/lib/db.ts.
+ */
+export { getDb as prisma } from './db';

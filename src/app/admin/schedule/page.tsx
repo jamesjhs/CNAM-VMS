@@ -1,6 +1,6 @@
 import { requireCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
-import { prisma } from '@/lib/prisma';
+import { getDb, unpackDate, unpackBool, unpackArr } from '@/lib/db';
 import Link from 'next/link';
 import {
   getCalendarWeeks,
@@ -15,12 +15,11 @@ import {
   DAY_NAMES_SHORT,
   EVENT_TYPE_BG,
   EVENT_TYPE_LABELS,
-  monthDateRange,
   getJobOccurrenceDates,
   WEEK_DAY_LABELS,
 } from '@/lib/calendar';
 import { createCalendarEvent, deleteCalendarEvent } from './actions';
-import type { CalendarEventType } from '@prisma/client';
+import type { CalendarEventType } from '@/lib/db-types';
 
 export default async function AdminSchedulePage({
   searchParams,
@@ -34,22 +33,77 @@ export default async function AdminSchedulePage({
   const currentMonthStr = fmtMonth(year, month);
   const selectedDate = dayParam ? parseDate(dayParam) : null;
 
-  const [events, teams, jobs] = await Promise.all([
-    prisma.calendarEvent.findMany({
-      where: { date: monthDateRange(year, month) },
-      orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
-      include: {
-        job: { select: { id: true, title: true, colour: true } },
-        team: { select: { id: true, name: true } },
-        signups: {
-          include: { user: { select: { id: true, name: true, email: true } } },
-          orderBy: { signedUpAt: 'asc' },
-        },
-      },
-    }),
-    prisma.team.findMany({ orderBy: { name: 'asc' } }),
-    prisma.job.findMany({ orderBy: { title: 'asc' } }),
-  ]);
+  const db = getDb();
+  const startDateStr = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
+  const endDateStr = new Date(Date.UTC(year, month + 1, 1)).toISOString().slice(0, 10);
+
+  // Fetch events for the month with job + team info
+  const rawEvents = db.prepare(`
+    SELECT ce.id, ce.title, ce.description, ce.date, ce.startTime, ce.endTime,
+           ce.eventType, ce.maxSignups,
+           j.id as job_id, j.title as job_title, j.colour as job_colour,
+           t.id as team_id, t.name as team_name
+    FROM calendar_events ce
+    LEFT JOIN jobs j ON ce.jobId = j.id
+    LEFT JOIN teams t ON ce.teamId = t.id
+    WHERE ce.date >= ? AND ce.date < ?
+    ORDER BY ce.date ASC, ce.startTime ASC
+  `).all(startDateStr, endDateStr) as {
+    id: string; title: string; description: string | null;
+    date: string; startTime: string | null; endTime: string | null;
+    eventType: string; maxSignups: number | null;
+    job_id: string | null; job_title: string | null; job_colour: string | null;
+    team_id: string | null; team_name: string | null;
+  }[];
+
+  // Fetch signups for all events in this month
+  const rawSignups = db.prepare(`
+    SELECT es.id, es.eventId, u.id as uid, u.name as uname, u.email as uemail
+    FROM event_signups es
+    JOIN users u ON es.userId = u.id
+    WHERE es.eventId IN (SELECT id FROM calendar_events WHERE date >= ? AND date < ?)
+    ORDER BY es.signedUpAt ASC
+  `).all(startDateStr, endDateStr) as {
+    id: string; eventId: string; uid: string; uname: string | null; uemail: string;
+  }[];
+
+  const signupsByEventId = new Map<string, typeof rawSignups>();
+  for (const s of rawSignups) {
+    if (!signupsByEventId.has(s.eventId)) signupsByEventId.set(s.eventId, []);
+    signupsByEventId.get(s.eventId)!.push(s);
+  }
+
+  const events = rawEvents.map((ev) => ({
+    ...ev,
+    date: unpackDate(ev.date)!,
+    job: ev.job_id ? { id: ev.job_id, title: ev.job_title!, colour: ev.job_colour! } : null,
+    team: ev.team_id ? { id: ev.team_id, name: ev.team_name! } : null,
+    signups: (signupsByEventId.get(ev.id) ?? []).map((s) => ({
+      id: s.id,
+      user: { id: s.uid, name: s.uname, email: s.uemail },
+    })),
+  }));
+
+  // Fetch teams and jobs for the create-event form
+  const teams = db.prepare('SELECT id, name FROM teams ORDER BY name ASC').all() as { id: string; name: string }[];
+
+  const rawJobs = db.prepare(`
+    SELECT id, title, description, colour, isRolling, scheduleType,
+           weekDays, monthDays, defaultStartTime, defaultEndTime, defaultMaxSignups
+    FROM jobs
+    ORDER BY title ASC
+  `).all() as {
+    id: string; title: string; description: string | null; colour: string;
+    isRolling: number; scheduleType: string; weekDays: string; monthDays: string;
+    defaultStartTime: string | null; defaultEndTime: string | null; defaultMaxSignups: number | null;
+  }[];
+
+  const jobs = rawJobs.map((j) => ({
+    ...j,
+    isRolling: unpackBool(j.isRolling),
+    weekDays: unpackArr<number>(j.weekDays, []),
+    monthDays: unpackArr<number>(j.monthDays, []),
+  }));
 
   // Build a set of (jobId + dateKey) pairs that already have a CalendarEvent
   const existingJobDateKeys = new Set<string>();
@@ -198,7 +252,6 @@ export default async function AdminSchedulePage({
                       >
                         {day.getUTCDate()}
                       </span>
-                      {/* Event indicators: dots on mobile, labels on sm+ */}
                       {totalItems > 0 && (
                         <>
                           <div className="sm:hidden flex flex-wrap gap-0.5 mt-0.5">
@@ -212,7 +265,7 @@ export default async function AdminSchedulePage({
                           </div>
                           <div className="hidden sm:block space-y-0.5">
                             {dayEvents.slice(0, 2).map((ev) => (
-                              <div key={ev.id} className={`text-xs px-1 py-0.5 rounded truncate border ${EVENT_TYPE_BG[ev.eventType]}`}>
+                              <div key={ev.id} className={`text-xs px-1 py-0.5 rounded truncate border ${EVENT_TYPE_BG[ev.eventType as keyof typeof EVENT_TYPE_BG]}`}>
                                 {ev.title}
                               </div>
                             ))}
@@ -251,14 +304,13 @@ export default async function AdminSchedulePage({
                 <p className="text-gray-500 text-sm">No events on this day. Use the form to add one.</p>
               ) : (
                 <div className="space-y-4">
-                  {/* Explicit calendar events */}
                   {selectedEvents.map((ev) => (
                     <div key={ev.id} className="p-4 rounded-lg border border-gray-100">
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
-                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border ${EVENT_TYPE_BG[ev.eventType]}`}>
-                              {EVENT_TYPE_LABELS[ev.eventType]}
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border ${EVENT_TYPE_BG[ev.eventType as keyof typeof EVENT_TYPE_BG]}`}>
+                              {EVENT_TYPE_LABELS[ev.eventType as keyof typeof EVENT_TYPE_LABELS]}
                             </span>
                             {ev.team && (
                               <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
@@ -299,7 +351,6 @@ export default async function AdminSchedulePage({
                     </div>
                   ))}
 
-                  {/* Recurring job occurrences (no CalendarEvent yet) */}
                   {selectedOccurrences.map((occ) => (
                     <div key={`${occ.job.id}__${occ.dateKey}`} className="p-4 rounded-lg border border-dashed border-gray-300 bg-gray-50">
                       <div className="flex flex-wrap items-center gap-1.5 mb-1.5">

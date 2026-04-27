@@ -1,69 +1,103 @@
 import { requireAuth } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
 import Link from 'next/link';
-import { prisma } from '@/lib/prisma';
+import { getDb, unpackTs, unpackBool, unpackDate } from '@/lib/db';
 import { EVENT_TYPE_BG, EVENT_TYPE_LABELS, fmtMonth, dateToParam } from '@/lib/calendar';
 
 export default async function DashboardPage() {
   const user = await requireAuth();
 
+  const db = getDb();
   const now = new Date();
-  const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const todayStr = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+    .toISOString()
+    .slice(0, 10);
+  const in30dStr = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 30))
+    .toISOString()
+    .slice(0, 10);
 
-  // Fetch upcoming events (next 30 days), user's signups, and team memberships
-  const [announcements, upcomingEvents, mySignupIds, myTeams] = await Promise.all([
-    prisma.announcement.findMany({
-      orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
-      take: 3,
-      select: { id: true, title: true, pinned: true, createdAt: true },
-    }),
-    prisma.calendarEvent.findMany({
-      where: {
-        date: {
-          gte: todayUTC,
-          lt: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 30)),
-        },
-      },
-      orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
-      take: 5,
-      include: {
-        job: { select: { title: true, colour: true } },
-        _count: { select: { signups: true } },
-      },
-    }),
-    prisma.eventSignup.findMany({
-      where: {
-        userId: user.id,
-        event: {
-          date: {
-            gte: todayUTC,
-            lt: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 30)),
-          },
-        },
-      },
-      select: { eventId: true },
-    }),
-    prisma.userTeam.findMany({
-      where: { userId: user.id },
-      include: {
-        team: {
-          include: {
-            userTeams: {
-              where: { isLeader: true },
-              include: { user: { select: { id: true, name: true, email: true } } },
-            },
-            tasks: {
-              where: { isActive: true },
-              select: { id: true, urgency: true },
-            },
-          },
-        },
-      },
-      orderBy: { joinedAt: 'asc' },
-    }),
-  ]);
+  const rawAnnouncements = db.prepare(`
+    SELECT id, title, pinned, createdAt
+    FROM announcements
+    ORDER BY pinned DESC, createdAt DESC
+    LIMIT 3
+  `).all() as { id: string; title: string; pinned: number; createdAt: string }[];
 
+  const announcements = rawAnnouncements.map((a) => ({
+    ...a,
+    pinned: unpackBool(a.pinned),
+    createdAt: unpackTs(a.createdAt),
+  }));
+
+  const rawUpcomingEvents = db.prepare(`
+    SELECT ce.id, ce.title, ce.date, ce.startTime, ce.eventType,
+           j.title as job_title, j.colour as job_colour,
+           COUNT(es.id) as signupCount
+    FROM calendar_events ce
+    LEFT JOIN jobs j ON ce.jobId = j.id
+    LEFT JOIN event_signups es ON es.eventId = ce.id
+    WHERE ce.date >= ? AND ce.date < ?
+    GROUP BY ce.id
+    ORDER BY ce.date ASC, ce.startTime ASC
+    LIMIT 5
+  `).all(todayStr, in30dStr) as {
+    id: string; title: string; date: string; startTime: string | null; eventType: string;
+    job_title: string | null; job_colour: string | null; signupCount: number;
+  }[];
+
+  const upcomingEvents = rawUpcomingEvents.map((ev) => ({
+    ...ev,
+    date: unpackDate(ev.date)!,
+    job: ev.job_title ? { title: ev.job_title, colour: ev.job_colour } : null,
+    _count: { signups: ev.signupCount },
+  }));
+
+  const mySignupIds = db.prepare(`
+    SELECT es.eventId
+    FROM event_signups es
+    JOIN calendar_events ce ON es.eventId = ce.id
+    WHERE es.userId = ? AND ce.date >= ? AND ce.date < ?
+  `).all(user.id, todayStr, in30dStr) as { eventId: string }[];
   const mySignupSet = new Set(mySignupIds.map((s) => s.eventId));
+
+  // Get teams for this user
+  const rawUserTeams = db.prepare(`
+    SELECT ut.teamId, t.id as tid, t.name as tname
+    FROM user_teams ut
+    JOIN teams t ON ut.teamId = t.id
+    WHERE ut.userId = ?
+    ORDER BY ut.joinedAt ASC
+  `).all(user.id) as { teamId: string; tid: string; tname: string }[];
+
+  const myTeams: {
+    team: {
+      id: string; name: string;
+      userTeams: { user: { name: string | null; email: string } }[];
+      tasks: { id: string; urgency: string }[];
+    };
+  }[] = [];
+
+  for (const ut of rawUserTeams) {
+    const teamLeaders = db.prepare(`
+      SELECT u.name, u.email
+      FROM user_teams tut
+      JOIN users u ON tut.userId = u.id
+      WHERE tut.teamId = ? AND tut.isLeader = 1
+    `).all(ut.teamId) as { name: string | null; email: string }[];
+
+    const teamTasks = db.prepare(
+      'SELECT id, urgency FROM team_tasks WHERE teamId = ? AND isActive = 1',
+    ).all(ut.teamId) as { id: string; urgency: string }[];
+
+    myTeams.push({
+      team: {
+        id: ut.tid,
+        name: ut.tname,
+        userTeams: teamLeaders.map((l) => ({ user: { name: l.name, email: l.email } })),
+        tasks: teamTasks,
+      },
+    });
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -109,8 +143,8 @@ export default async function DashboardPage() {
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 mb-1">
-                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border ${EVENT_TYPE_BG[ev.eventType]}`}>
-                          {EVENT_TYPE_LABELS[ev.eventType]}
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border ${EVENT_TYPE_BG[ev.eventType as keyof typeof EVENT_TYPE_BG]}`}>
+                          {EVENT_TYPE_LABELS[ev.eventType as keyof typeof EVENT_TYPE_LABELS]}
                         </span>
                         {mySignupSet.has(ev.id) && (
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">✓ Signed up</span>
@@ -231,4 +265,3 @@ function DashCard({
     </Link>
   );
 }
-

@@ -1,10 +1,11 @@
 import NextAuth from 'next-auth';
-import { PrismaAdapter } from '@auth/prisma-adapter';
 import Credentials from 'next-auth/providers/credentials';
 import { createHash, timingSafeEqual } from 'crypto';
-import { prisma } from '@/lib/prisma';
+import { createId } from '@paralleldrive/cuid2';
+import { getDb, now, unpackBool, packTs } from '@/lib/db';
 import { CAPABILITIES } from '@/lib/capabilities';
-import type { UserStatus } from '@prisma/client';
+import { createSqliteAdapter } from '@/lib/auth-adapter';
+import type { UserStatus } from '@/lib/db-types';
 
 // How long (in seconds) capability/status data cached in the JWT remains
 // fresh before being re-read from the database.  A short TTL (5 minutes)
@@ -22,37 +23,26 @@ async function fetchUserClaims(userId: string): Promise<{
   mustChangePassword: boolean;
   capabilities: string[];
 } | null> {
-  const dbUser = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      status: true,
-      mustChangePassword: true,
-      userRoles: {
-        select: {
-          role: {
-            select: {
-              roleCapabilities: {
-                select: { capability: { select: { key: true } } },
-              },
-            },
-          },
-        },
-      },
-    },
-  });
-
+  const db = getDb();
+  type UserRow = { status: string; mustChangePassword: number };
+  const dbUser = db.prepare('SELECT status, mustChangePassword FROM users WHERE id = ?').get(userId) as UserRow | undefined;
   if (!dbUser) return null;
 
+  const roles = db.prepare(
+    `SELECT rc.capabilityId FROM user_roles ur
+     JOIN role_capabilities rc ON rc.roleId = ur.roleId
+     WHERE ur.userId = ?`,
+  ).all(userId) as { capabilityId: string }[];
+
   const caps = new Set<string>();
-  for (const ur of dbUser.userRoles) {
-    for (const rc of ur.role.roleCapabilities) {
-      caps.add(rc.capability.key);
-    }
+  for (const row of roles) {
+    const cap = db.prepare('SELECT key FROM capabilities WHERE id = ?').get(row.capabilityId) as { key: string } | undefined;
+    if (cap) caps.add(cap.key);
   }
 
   return {
     status: dbUser.status,
-    mustChangePassword: dbUser.mustChangePassword,
+    mustChangePassword: unpackBool(dbUser.mustChangePassword),
     capabilities: Array.from(caps),
   };
 }
@@ -64,48 +54,41 @@ async function fetchUserClaims(userId: string): Promise<{
  * without requiring a separate seed step.
  * This is called automatically for the ROOT_USER_EMAIL on sign-in.
  */
-async function promoteToRootUser(userId: string): Promise<void> {
-  // Ensure every capability exists in the database (run concurrently)
-  await Promise.all(
-    CAPABILITIES.map((cap) =>
-      prisma.capability.upsert({
-        where: { key: cap.key },
-        update: { description: cap.description },
-        create: { key: cap.key, description: cap.description },
-      }),
-    ),
-  );
+function promoteToRootUser(userId: string): void {
+  const db = getDb();
+  const ts = now();
+
+  // Ensure every capability exists
+  for (const cap of CAPABILITIES) {
+    const existing = db.prepare('SELECT id FROM capabilities WHERE key = ?').get(cap.key) as { id: string } | undefined;
+    if (!existing) {
+      db.prepare('INSERT INTO capabilities (id, key, description, createdAt) VALUES (?,?,?,?)').run(createId(), cap.key, cap.description, ts);
+    } else {
+      db.prepare('UPDATE capabilities SET description = ? WHERE key = ?').run(cap.description, cap.key);
+    }
+  }
 
   // Ensure the Root role exists
-  const rootRole = await prisma.role.upsert({
-    where: { name: 'Root' },
-    update: { description: 'Superadmin with all capabilities', isSystem: true },
-    create: {
-      name: 'Root',
-      description: 'Superadmin with all capabilities',
-      isSystem: true,
-    },
-  });
+  let rootRole = db.prepare('SELECT id FROM roles WHERE name = ?').get('Root') as { id: string } | undefined;
+  if (!rootRole) {
+    const id = createId();
+    db.prepare('INSERT INTO roles (id, name, description, isSystem, createdAt, updatedAt) VALUES (?,?,?,1,?,?)').run(
+      id, 'Root', 'Superadmin with all capabilities', ts, ts,
+    );
+    rootRole = { id };
+  } else {
+    db.prepare('UPDATE roles SET description=?, isSystem=1, updatedAt=? WHERE id=?').run('Superadmin with all capabilities', ts, rootRole.id);
+  }
 
-  // Assign all capabilities to the Root role (skip any that already exist)
-  const allCapabilities = await prisma.capability.findMany();
-  await prisma.roleCapability.createMany({
-    data: allCapabilities.map((cap) => ({ roleId: rootRole.id, capabilityId: cap.id })),
-    skipDuplicates: true,
-  });
+  // Assign all capabilities to the Root role
+  const allCaps = db.prepare('SELECT id FROM capabilities').all() as { id: string }[];
+  for (const cap of allCaps) {
+    db.prepare('INSERT OR IGNORE INTO role_capabilities (roleId, capabilityId) VALUES (?,?)').run(rootRole.id, cap.id);
+  }
 
-  // Promote user to ACTIVE and assign Root role atomically
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { id: userId },
-      data: { status: 'ACTIVE' },
-    }),
-    prisma.userRole.upsert({
-      where: { userId_roleId: { userId, roleId: rootRole.id } },
-      update: {},
-      create: { userId, roleId: rootRole.id },
-    }),
-  ]);
+  // Promote user to ACTIVE and assign Root role
+  db.prepare('UPDATE users SET status=?, updatedAt=? WHERE id=?').run('ACTIVE', ts, userId);
+  db.prepare('INSERT OR IGNORE INTO user_roles (userId, roleId, grantedAt) VALUES (?,?,?)').run(userId, rootRole.id, ts);
 }
 
 /** Return the normalised ROOT_USER_EMAIL, or undefined if not configured. */
@@ -114,7 +97,7 @@ function getRootEmail(): string | undefined {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
-  adapter: PrismaAdapter(prisma),
+  adapter: createSqliteAdapter(),
   session: { strategy: 'jwt', maxAge: 7 * 24 * 60 * 60 }, // max 7 days
   providers: [
     /**
@@ -136,12 +119,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
 
         if (!userId || !completionToken) return null;
 
+        const db = getDb();
         const identifier = `auth:complete:${userId}`;
+        const cutoff = packTs(new Date());
 
         // Find the one-time completion token (valid for 2 minutes)
-        const tokenRecord = await prisma.verificationToken.findFirst({
-          where: { identifier, expires: { gt: new Date() } },
-        });
+        const tokenRecord = db.prepare(
+          'SELECT * FROM verification_tokens WHERE identifier = ? AND expires > ?',
+        ).get(identifier, cutoff) as { identifier: string; token: string; expires: string } | undefined;
 
         // Hash the incoming token and compare timing-safely against the stored hash
         const incomingHash = createHash('sha256').update(completionToken).digest('hex');
@@ -153,10 +138,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
         if (!tokenRecord || !tokenValid) return null;
 
         // Delete immediately — single-use token
-        await prisma.verificationToken.deleteMany({ where: { identifier } });
+        db.prepare('DELETE FROM verification_tokens WHERE identifier = ?').run(identifier);
 
         // Fetch the user
-        const user = await prisma.user.findUnique({ where: { id: userId } });
+        type UserRow = { id: string; email: string; name: string | null; image: string | null; status: string };
+        const user = db.prepare('SELECT id, email, name, image, status FROM users WHERE id = ?').get(userId) as UserRow | undefined;
         if (!user) return null;
         if (user.status === 'SUSPENDED') return null;
 
@@ -176,17 +162,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
       if (account?.provider !== 'credentials') return true;
       if (!user.email) return false;
 
+      const db = getDb();
       const email = user.email.toLowerCase().trim();
-      const dbUser = await prisma.user.findUnique({ where: { email } });
+      type UserRow = { id: string; status: string };
+      const dbUser = db.prepare('SELECT id, status FROM users WHERE email = ?').get(email) as UserRow | undefined;
       if (!dbUser) return false;
 
-      const status: UserStatus = dbUser.status;
+      const status: UserStatus = dbUser.status as UserStatus;
       if (status === 'SUSPENDED') return '/auth/error?error=AccountSuspended';
 
       // Ensure the root user always has the Root role and all capabilities assigned.
       const rootEmail = getRootEmail();
       if (rootEmail && email === rootEmail) {
-        await promoteToRootUser(dbUser.id);
+        promoteToRootUser(dbUser.id);
       }
 
       return true;
@@ -217,15 +205,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
       }
 
       // Subsequent calls — refresh claims from DB if the cache has expired.
-      const now = Math.floor(Date.now() / 1000);
+      const nowSec = Math.floor(Date.now() / 1000);
       const lastRefresh = token.capabilitiesAt ?? 0;
-      if (token.id && now - lastRefresh > CAPABILITIES_CACHE_TTL) {
+      if (token.id && nowSec - lastRefresh > CAPABILITIES_CACHE_TTL) {
         const claims = await fetchUserClaims(token.id);
         if (claims) {
           token.status = claims.status;
           token.mustChangePassword = claims.mustChangePassword;
           token.capabilities = claims.capabilities;
-          token.capabilitiesAt = now;
+          token.capabilitiesAt = nowSec;
         }
       }
 
@@ -250,15 +238,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
   events: {
     async signIn({ user }) {
       if (user.id) {
-        await prisma.auditLog.create({
-          data: {
-            userId: user.id,
-            action: 'USER_SIGNIN',
-            resource: 'User',
-            resourceId: user.id,
-          },
-        });
+        const db = getDb();
+        db.prepare(
+          `INSERT INTO audit_logs (id, userId, action, resource, resourceId, createdAt)
+           VALUES (?,?,?,?,?,?)`,
+        ).run(createId(), user.id, 'USER_SIGNIN', 'User', user.id, now());
       }
     },
   },
 }));
+
+
+// How long (in seconds) capability/status data cached in the JWT remains
+// fresh before being re-read from the database.  A short TTL (5 minutes)
+// means capability changes propagate quickly without a DB hit on every

@@ -1,6 +1,6 @@
 import { requireActiveUser } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
-import { prisma } from '@/lib/prisma';
+import { getDb, unpackArr } from '@/lib/db';
 import Link from 'next/link';
 import { updateVolunteerAvailability } from '@/app/admin/users/actions';
 
@@ -17,9 +17,14 @@ export const VOLUNTEER_ACTIVITIES = [
 export default async function AvailabilityPage() {
   const user = await requireActiveUser();
 
-  const availability = await prisma.volunteerAvailability.findUnique({
-    where: { userId: user.id },
-  });
+  const db = getDb();
+  type AvailRow = { activities: string; notes: string | null; updatedAt: string };
+  const rawAvail = db.prepare('SELECT activities, notes, updatedAt FROM volunteer_availability WHERE userId = ?').get(user.id) as AvailRow | undefined;
+  const availability = rawAvail ? {
+    activities: unpackArr<string>(rawAvail.activities),
+    notes: rawAvail.notes,
+    updatedAt: new Date(rawAvail.updatedAt),
+  } : undefined;
 
   const selectedActivities = new Set(availability?.activities ?? []);
 

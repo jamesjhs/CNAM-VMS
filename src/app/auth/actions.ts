@@ -3,7 +3,8 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { randomBytes, randomInt, createHash, timingSafeEqual } from 'crypto';
-import { prisma } from '@/lib/prisma';
+import { createId } from '@paralleldrive/cuid2';
+import { getDb, now, packTs, unpackBool } from '@/lib/db';
 import { signIn } from '@/auth';
 import { verifyPassword } from '@/lib/password';
 import { sendOtpEmail, sendPasswordResetEmail } from '@/lib/mail';
@@ -54,27 +55,29 @@ export async function submitPassword(formData: FormData) {
     redirect('/auth/signin?error=MissingFields');
   }
 
+  const db = getDb();
+  const cutoff = packTs(new Date());
+
   // Check password attempt rate limit before querying the user (prevents user enumeration timing)
   const pwFailIdentifier = `pw-fail:${email}`;
-  const recentPwFailures = await prisma.verificationToken.count({
-    where: { identifier: pwFailIdentifier, expires: { gt: new Date() } },
-  });
+  const { n: recentPwFailures } = db.prepare(
+    'SELECT COUNT(*) as n FROM verification_tokens WHERE identifier = ? AND expires > ?',
+  ).get(pwFailIdentifier, cutoff) as { n: number };
   if (recentPwFailures >= MAX_PASSWORD_ATTEMPTS) {
     redirect('/auth/signin?error=TooManyAttempts');
   }
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  type UserRow = { id: string; passwordHash: string | null; status: string; mustChangePassword: number };
+  const user = db.prepare('SELECT id, passwordHash, status, mustChangePassword FROM users WHERE email = ?').get(email) as UserRow | undefined;
 
   // Generic error — don't reveal whether the account exists
   if (!user || !user.passwordHash) {
     // Record a failed attempt even for unknown users (prevents timing oracle)
-    await prisma.verificationToken.create({
-      data: {
-        identifier: pwFailIdentifier,
-        token: randomBytes(12).toString('hex'),
-        expires: new Date(Date.now() + PASSWORD_LOCKOUT_MS),
-      },
-    });
+    db.prepare('INSERT INTO verification_tokens (identifier, token, expires) VALUES (?,?,?)').run(
+      pwFailIdentifier,
+      randomBytes(12).toString('hex'),
+      packTs(new Date(Date.now() + PASSWORD_LOCKOUT_MS)),
+    );
     redirect('/auth/signin?error=InvalidCredentials');
   }
 
@@ -84,35 +87,31 @@ export async function submitPassword(formData: FormData) {
 
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) {
-    await prisma.verificationToken.create({
-      data: {
-        identifier: pwFailIdentifier,
-        token: randomBytes(12).toString('hex'),
-        expires: new Date(Date.now() + PASSWORD_LOCKOUT_MS),
-      },
-    });
+    db.prepare('INSERT INTO verification_tokens (identifier, token, expires) VALUES (?,?,?)').run(
+      pwFailIdentifier,
+      randomBytes(12).toString('hex'),
+      packTs(new Date(Date.now() + PASSWORD_LOCKOUT_MS)),
+    );
     redirect('/auth/signin?error=InvalidCredentials');
   }
 
   // Successful password check — clear any failure records for this email
-  await prisma.verificationToken.deleteMany({ where: { identifier: pwFailIdentifier } });
+  db.prepare('DELETE FROM verification_tokens WHERE identifier = ?').run(pwFailIdentifier);
 
   // Generate 6-digit OTP (always exactly 6 digits, range 100000–999999)
   const otp = String(randomInt(100_000, 1_000_000));
   const identifier = `otp:${email}`;
 
-  // Upsert OTP in VerificationToken (delete old then create new)
-  await prisma.verificationToken.deleteMany({ where: { identifier } });
+  // Upsert OTP in verification_tokens (delete old then create new)
+  db.prepare('DELETE FROM verification_tokens WHERE identifier = ?').run(identifier);
   // Also clear any stale OTP failure records from a previous code
-  await prisma.verificationToken.deleteMany({ where: { identifier: `otp-fail:${email}` } });
-  await prisma.verificationToken.create({
-    data: {
-      identifier,
-      // Hash the OTP before storage — protects against DB-level read; verify by hashing the submission
-      token: createHash('sha256').update(otp).digest('hex'),
-      expires: new Date(Date.now() + OTP_EXPIRY_MS),
-    },
-  });
+  db.prepare('DELETE FROM verification_tokens WHERE identifier = ?').run(`otp-fail:${email}`);
+  db.prepare('INSERT INTO verification_tokens (identifier, token, expires) VALUES (?,?,?)').run(
+    identifier,
+    // Hash the OTP before storage — protects against DB-level read; verify by hashing the submission
+    createHash('sha256').update(otp).digest('hex'),
+    packTs(new Date(Date.now() + OTP_EXPIRY_MS)),
+  );
 
   // Send OTP email
   try {
@@ -170,30 +169,33 @@ export async function submitOtp(formData: FormData) {
     redirect('/auth/signin?error=SessionExpired');
   }
 
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const db = getDb();
+  type UserRow = { id: string; email: string; mustChangePassword: number };
+  const user = db.prepare('SELECT id, email, mustChangePassword FROM users WHERE id = ?').get(userId) as UserRow | undefined;
   if (!user) {
     redirect('/auth/signin?error=InvalidCredentials');
   }
 
   const identifier = `otp:${user.email}`;
   const failIdentifier = `otp-fail:${user.email}`;
+  const cutoff = packTs(new Date());
 
   // Check OTP attempt count before verifying — prevents brute force
-  const recentFailures = await prisma.verificationToken.count({
-    where: { identifier: failIdentifier, expires: { gt: new Date() } },
-  });
+  const { n: recentFailures } = db.prepare(
+    'SELECT COUNT(*) as n FROM verification_tokens WHERE identifier = ? AND expires > ?',
+  ).get(failIdentifier, cutoff) as { n: number };
   if (recentFailures >= MAX_OTP_ATTEMPTS) {
     // Too many wrong guesses: invalidate the OTP and force a fresh sign-in
-    await prisma.verificationToken.deleteMany({ where: { identifier } });
-    await prisma.verificationToken.deleteMany({ where: { identifier: failIdentifier } });
+    db.prepare('DELETE FROM verification_tokens WHERE identifier = ?').run(identifier);
+    db.prepare('DELETE FROM verification_tokens WHERE identifier = ?').run(failIdentifier);
     cookieStore.delete(PENDING_UID_COOKIE);
     cookieStore.delete(CALLBACK_URL_COOKIE);
     redirect('/auth/signin?error=TooManyAttempts');
   }
 
-  const tokenRecord = await prisma.verificationToken.findFirst({
-    where: { identifier, expires: { gt: new Date() } },
-  });
+  const tokenRecord = db.prepare(
+    'SELECT token FROM verification_tokens WHERE identifier = ? AND expires > ?',
+  ).get(identifier, cutoff) as { token: string } | undefined;
 
   const codeHash = createHash('sha256').update(code).digest('hex');
   const storedHash = tokenRecord?.token ?? '';
@@ -203,31 +205,27 @@ export async function submitOtp(formData: FormData) {
 
   if (!tokenRecord || !codeMatches) {
     // Record this failed attempt
-    await prisma.verificationToken.create({
-      data: {
-        identifier: failIdentifier,
-        token: randomBytes(12).toString('hex'),
-        expires: new Date(Date.now() + OTP_EXPIRY_MS),
-      },
-    });
+    db.prepare('INSERT INTO verification_tokens (identifier, token, expires) VALUES (?,?,?)').run(
+      failIdentifier,
+      randomBytes(12).toString('hex'),
+      packTs(new Date(Date.now() + OTP_EXPIRY_MS)),
+    );
     redirect('/auth/verify-otp?error=OtpInvalid');
   }
 
   // OTP is correct — delete it (single-use) and clear failure records
-  await prisma.verificationToken.deleteMany({ where: { identifier } });
-  await prisma.verificationToken.deleteMany({ where: { identifier: failIdentifier } });
+  db.prepare('DELETE FROM verification_tokens WHERE identifier = ?').run(identifier);
+  db.prepare('DELETE FROM verification_tokens WHERE identifier = ?').run(failIdentifier);
 
   // Create a one-time completion token (2-minute TTL) — hash before storage
   const completionToken = randomBytes(32).toString('hex');
   const completionIdentifier = `auth:complete:${userId}`;
-  await prisma.verificationToken.deleteMany({ where: { identifier: completionIdentifier } });
-  await prisma.verificationToken.create({
-    data: {
-      identifier: completionIdentifier,
-      token: createHash('sha256').update(completionToken).digest('hex'),
-      expires: new Date(Date.now() + COMPLETION_TOKEN_EXPIRY_MS),
-    },
-  });
+  db.prepare('DELETE FROM verification_tokens WHERE identifier = ?').run(completionIdentifier);
+  db.prepare('INSERT INTO verification_tokens (identifier, token, expires) VALUES (?,?,?)').run(
+    completionIdentifier,
+    createHash('sha256').update(completionToken).digest('hex'),
+    packTs(new Date(Date.now() + COMPLETION_TOKEN_EXPIRY_MS)),
+  );
 
   // Clear pending cookies
   cookieStore.delete(PENDING_UID_COOKIE);
@@ -235,7 +233,7 @@ export async function submitOtp(formData: FormData) {
   cookieStore.delete(KEEP_SIGNED_IN_COOKIE);
 
   // Determine redirect target — force change-password if flagged
-  const redirectTo = user.mustChangePassword
+  const redirectTo = unpackBool(user.mustChangePassword)
     ? '/auth/change-password'
     : callbackUrl;
 
@@ -259,22 +257,21 @@ export async function requestPasswordReset(formData: FormData) {
   const baseUrl = (process.env.AUTH_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 
   // Always show a "success" response to prevent user enumeration
-  const user = await prisma.user.findUnique({ where: { email } });
+  const db = getDb();
+  const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email) as { id: string } | undefined;
 
   if (user) {
     const resetToken = randomBytes(32).toString('hex');
     const resetIdentifier = `pw-reset:${email}`;
 
     // Invalidate any existing reset token for this email
-    await prisma.verificationToken.deleteMany({ where: { identifier: resetIdentifier } });
-    await prisma.verificationToken.create({
-      data: {
-        identifier: resetIdentifier,
-        // Hash the token before storage — raw token travels only in the email link
-        token: createHash('sha256').update(resetToken).digest('hex'),
-        expires: new Date(Date.now() + RESET_TOKEN_EXPIRY_MS),
-      },
-    });
+    db.prepare('DELETE FROM verification_tokens WHERE identifier = ?').run(resetIdentifier);
+    db.prepare('INSERT INTO verification_tokens (identifier, token, expires) VALUES (?,?,?)').run(
+      resetIdentifier,
+      // Hash the token before storage — raw token travels only in the email link
+      createHash('sha256').update(resetToken).digest('hex'),
+      packTs(new Date(Date.now() + RESET_TOKEN_EXPIRY_MS)),
+    );
 
     const resetUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
     try {
@@ -308,24 +305,22 @@ export async function completePasswordReset(formData: FormData) {
     redirect(`/auth/reset-password?token=${encodeURIComponent(token)}&error=TooShort`);
   }
 
-  // Look up the token — hash the raw token and find by identifier prefix
-  // (tokens are stored hashed; we can't look up by raw value any more)
+  const db = getDb();
   const tokenHash = createHash('sha256').update(token).digest('hex');
-  const cutoff = new Date();
-  const tokenRecord = await prisma.verificationToken.findFirst({
-    where: {
-      token: tokenHash,
-      identifier: { startsWith: 'pw-reset:' },
-      expires: { gt: cutoff },
-    },
-  });
+  const cutoff = packTs(new Date());
+
+  // Look up the token by hash (tokens are stored hashed; we can't look up by raw value)
+  const tokenRecord = db.prepare(
+    `SELECT identifier FROM verification_tokens
+     WHERE token = ? AND identifier LIKE 'pw-reset:%' AND expires > ?`,
+  ).get(tokenHash, cutoff) as { identifier: string } | undefined;
 
   if (!tokenRecord) {
     redirect('/auth/reset-password?error=InvalidToken');
   }
 
   const email = tokenRecord.identifier.slice('pw-reset:'.length);
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email) as { id: string } | undefined;
   if (!user) {
     redirect('/auth/reset-password?error=InvalidToken');
   }
@@ -333,13 +328,10 @@ export async function completePasswordReset(formData: FormData) {
   const { hashPassword } = await import('@/lib/password');
   const hash = await hashPassword(newPassword);
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { passwordHash: hash, mustChangePassword: false },
-  });
+  db.prepare('UPDATE users SET passwordHash=?, mustChangePassword=0, updatedAt=? WHERE id=?').run(hash, now(), user.id);
 
   // Invalidate the used token
-  await prisma.verificationToken.deleteMany({ where: { identifier: tokenRecord.identifier } });
+  db.prepare('DELETE FROM verification_tokens WHERE identifier = ?').run(tokenRecord.identifier);
 
   const { logAudit } = await import('@/lib/audit');
   await logAudit({

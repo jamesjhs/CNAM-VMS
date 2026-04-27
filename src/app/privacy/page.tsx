@@ -1,5 +1,5 @@
 import NavBar from '@/components/NavBar';
-import { prisma } from '@/lib/prisma';
+import { getDb } from '@/lib/db';
 import { DEFAULT_PRIVACY_POLICY } from '@/lib/default-privacy-policy';
 import Link from 'next/link';
 
@@ -8,7 +8,8 @@ export const metadata = {
 };
 
 export default async function PrivacyPolicyPage() {
-  const record = await prisma.siteContent.findUnique({ where: { key: 'privacy-policy' } });
+  const db = getDb();
+  const record = db.prepare("SELECT content FROM site_content WHERE key = 'privacy-policy'").get() as { content: string } | undefined;
   const content = record?.content ?? DEFAULT_PRIVACY_POLICY;
 
   return (

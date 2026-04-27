@@ -1,8 +1,8 @@
 import { requireCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
-import { prisma } from '@/lib/prisma';
+import { getDb, unpackTs } from '@/lib/db';
 import Link from 'next/link';
-import type { UserStatus, UserAccountType } from '@prisma/client';
+import type { UserStatus, UserAccountType } from '@/lib/db-types';
 import { createUser } from './actions';
 
 const STATUS_STYLES: Record<UserStatus, string> = {
@@ -20,13 +20,47 @@ const ACCOUNT_TYPE_STYLES: Record<UserAccountType, string> = {
 export default async function UsersAdminPage() {
   await requireCapability('admin:users.read');
 
-  const users = await prisma.user.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: {
-      userRoles: { include: { role: { select: { name: true } } } },
-      userTeams: { include: { team: { select: { name: true } } } },
-    },
-  });
+  const db = getDb();
+
+  const rawUsers = db.prepare(
+    'SELECT id, email, name, status, accountType, createdAt FROM users ORDER BY createdAt DESC',
+  ).all() as {
+    id: string; email: string; name: string | null; status: string;
+    accountType: string; createdAt: string;
+  }[];
+
+  const rawUserRoles = db.prepare(`
+    SELECT ur.userId, r.id as roleId, r.name as roleName
+    FROM user_roles ur
+    JOIN roles r ON ur.roleId = r.id
+  `).all() as { userId: string; roleId: string; roleName: string }[];
+
+  const rawUserTeams = db.prepare(`
+    SELECT ut.userId, t.id as teamId, t.name as teamName
+    FROM user_teams ut
+    JOIN teams t ON ut.teamId = t.id
+  `).all() as { userId: string; teamId: string; teamName: string }[];
+
+  const rolesByUser = new Map<string, { roleId: string; role: { name: string } }[]>();
+  for (const ur of rawUserRoles) {
+    if (!rolesByUser.has(ur.userId)) rolesByUser.set(ur.userId, []);
+    rolesByUser.get(ur.userId)!.push({ roleId: ur.roleId, role: { name: ur.roleName } });
+  }
+
+  const teamsByUser = new Map<string, { teamId: string; team: { name: string } }[]>();
+  for (const ut of rawUserTeams) {
+    if (!teamsByUser.has(ut.userId)) teamsByUser.set(ut.userId, []);
+    teamsByUser.get(ut.userId)!.push({ teamId: ut.teamId, team: { name: ut.teamName } });
+  }
+
+  const users = rawUsers.map((u) => ({
+    ...u,
+    status: u.status as UserStatus,
+    accountType: u.accountType as UserAccountType,
+    createdAt: unpackTs(u.createdAt),
+    userRoles: rolesByUser.get(u.id) ?? [],
+    userTeams: teamsByUser.get(u.id) ?? [],
+  }));
 
   return (
     <div className="min-h-screen flex flex-col">

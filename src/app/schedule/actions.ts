@@ -1,7 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { prisma } from '@/lib/prisma';
+import { createId } from '@paralleldrive/cuid2';
+import { getDb, now, packDate, packJson } from '@/lib/db';
 import { requireAuth, requireCapability } from '@/lib/auth-helpers';
 import { logAudit } from '@/lib/audit';
 import { parseDate } from '@/lib/calendar';
@@ -13,23 +14,17 @@ import { parseDate } from '@/lib/calendar';
 export async function signupForEvent(eventId: string) {
   const actor = await requireAuth();
 
+  const db = getDb();
   // Verify the event exists and has capacity
-  const event = await prisma.calendarEvent.findUnique({
-    where: { id: eventId },
-    include: { _count: { select: { signups: true } } },
-  });
+  const event = db.prepare('SELECT id, maxSignups FROM calendar_events WHERE id = ?').get(eventId) as { id: string; maxSignups: number | null } | undefined;
   if (!event) return;
 
-  if (event.maxSignups !== null && event._count.signups >= event.maxSignups) {
-    // Silently ignore if fully booked (UI should prevent this but just in case)
-    return;
+  if (event.maxSignups !== null) {
+    const { n } = db.prepare('SELECT COUNT(*) as n FROM event_signups WHERE eventId = ?').get(eventId) as { n: number };
+    if (n >= event.maxSignups) return; // full
   }
 
-  await prisma.eventSignup.upsert({
-    where: { eventId_userId: { eventId, userId: actor.id } },
-    update: {},
-    create: { eventId, userId: actor.id },
-  });
+  db.prepare('INSERT OR IGNORE INTO event_signups (id, eventId, userId, signedUpAt) VALUES (?,?,?,?)').run(createId(), eventId, actor.id, now());
 
   await logAudit({
     userId: actor.id,
@@ -44,9 +39,8 @@ export async function signupForEvent(eventId: string) {
 export async function withdrawFromEvent(eventId: string) {
   const actor = await requireAuth();
 
-  await prisma.eventSignup.deleteMany({
-    where: { eventId, userId: actor.id },
-  });
+  const db = getDb();
+  db.prepare('DELETE FROM event_signups WHERE eventId = ? AND userId = ?').run(eventId, actor.id);
 
   await logAudit({
     userId: actor.id,
@@ -60,8 +54,6 @@ export async function withdrawFromEvent(eventId: string) {
 
 // ---------------------------------------------------------------------------
 // Recurring job occurrence sign-up / withdrawal.
-// A CalendarEvent is lazily created on first sign-up so the existing
-// EventSignup model can be reused for tracking.
 // ---------------------------------------------------------------------------
 
 export async function signupForJobOccurrence(jobId: string, dateStr: string) {
@@ -70,44 +62,35 @@ export async function signupForJobOccurrence(jobId: string, dateStr: string) {
   const date = parseDate(dateStr);
   if (!date) return;
 
-  const job = await prisma.job.findUnique({ where: { id: jobId } });
+  const db = getDb();
+  type JobRow = { title: string; description: string | null; defaultStartTime: string | null; defaultEndTime: string | null; defaultMaxSignups: number | null };
+  const job = db.prepare('SELECT title, description, defaultStartTime, defaultEndTime, defaultMaxSignups FROM jobs WHERE id = ?').get(jobId) as JobRow | undefined;
   if (!job) return;
 
-  // Find or auto-create the CalendarEvent for this job on this date
-  let event = await prisma.calendarEvent.findFirst({ where: { jobId, date } });
+  const dateKey = packDate(date);
+  let eventId = (db.prepare('SELECT id FROM calendar_events WHERE jobId = ? AND date = ?').get(jobId, dateKey) as { id: string } | undefined)?.id;
 
-  if (!event) {
-    event = await prisma.calendarEvent.create({
-      data: {
-        title: job.title,
-        description: job.description,
-        eventType: 'HELP_NEEDED',
-        date,
-        startTime: job.defaultStartTime,
-        endTime: job.defaultEndTime,
-        maxSignups: job.defaultMaxSignups,
-        jobId,
-        createdById: actor.id,
-      },
-    });
+  if (!eventId) {
+    eventId = createId();
+    const ts = now();
+    db.prepare(
+      `INSERT INTO calendar_events (id, title, description, eventType, date, startTime, endTime, maxSignups, jobId, createdById, createdAt, updatedAt)
+       VALUES (?,?,?,'HELP_NEEDED',?,?,?,?,?,?,?,?)`,
+    ).run(eventId, job.title, job.description, dateKey, job.defaultStartTime, job.defaultEndTime, job.defaultMaxSignups, jobId, actor.id, ts, ts);
   }
 
-  if (event.maxSignups !== null) {
-    const count = await prisma.eventSignup.count({ where: { eventId: event.id } });
-    if (count >= event.maxSignups) return; // full
+  if (job.defaultMaxSignups !== null) {
+    const { n } = db.prepare('SELECT COUNT(*) as n FROM event_signups WHERE eventId = ?').get(eventId) as { n: number };
+    if (n >= (job.defaultMaxSignups ?? Infinity)) return; // full
   }
 
-  await prisma.eventSignup.upsert({
-    where: { eventId_userId: { eventId: event.id, userId: actor.id } },
-    update: {},
-    create: { eventId: event.id, userId: actor.id },
-  });
+  db.prepare('INSERT OR IGNORE INTO event_signups (id, eventId, userId, signedUpAt) VALUES (?,?,?,?)').run(createId(), eventId, actor.id, now());
 
   await logAudit({
     userId: actor.id,
     action: 'EVENT_SIGNUP',
     resource: 'CalendarEvent',
-    resourceId: event.id,
+    resourceId: eventId,
     detail: { jobId, dateStr, source: 'recurring_job_occurrence' },
   });
 
@@ -121,12 +104,11 @@ export async function withdrawFromJobOccurrence(jobId: string, dateStr: string) 
   const date = parseDate(dateStr);
   if (!date) return;
 
-  const event = await prisma.calendarEvent.findFirst({ where: { jobId, date } });
+  const db = getDb();
+  const event = db.prepare('SELECT id FROM calendar_events WHERE jobId = ? AND date = ?').get(jobId, packDate(date)) as { id: string } | undefined;
   if (!event) return;
 
-  await prisma.eventSignup.deleteMany({
-    where: { eventId: event.id, userId: actor.id },
-  });
+  db.prepare('DELETE FROM event_signups WHERE eventId = ? AND userId = ?').run(event.id, actor.id);
 
   await logAudit({
     userId: actor.id,
@@ -155,23 +137,19 @@ export async function saveVolunteerDateSlot(
   const date = parseDate(dateStr);
   if (!date) return;
 
-  await prisma.volunteerDateSlot.upsert({
-    where: { userId_date: { userId: actor.id, date } },
-    update: {
-      startTime: startTime.trim() || null,
-      endTime: endTime.trim() || null,
-      jobIds,
-      notes: notes.trim() || null,
-    },
-    create: {
-      userId: actor.id,
-      date,
-      startTime: startTime.trim() || null,
-      endTime: endTime.trim() || null,
-      jobIds,
-      notes: notes.trim() || null,
-    },
-  });
+  const db = getDb();
+  const dateKey = packDate(date);
+  const ts = now();
+  const existing = db.prepare('SELECT id FROM volunteer_date_slots WHERE userId = ? AND date = ?').get(actor.id, dateKey);
+  if (existing) {
+    db.prepare('UPDATE volunteer_date_slots SET startTime=?, endTime=?, jobIds=?, notes=?, updatedAt=? WHERE userId=? AND date=?').run(
+      startTime.trim() || null, endTime.trim() || null, packJson(jobIds), notes.trim() || null, ts, actor.id, dateKey,
+    );
+  } else {
+    db.prepare('INSERT INTO volunteer_date_slots (id, userId, date, startTime, endTime, jobIds, notes, createdAt, updatedAt) VALUES (?,?,?,?,?,?,?,?,?)').run(
+      createId(), actor.id, dateKey, startTime.trim() || null, endTime.trim() || null, packJson(jobIds), notes.trim() || null, ts, ts,
+    );
+  }
 
   revalidatePath('/schedule');
 }
@@ -182,45 +160,37 @@ export async function deleteVolunteerDateSlot(dateStr: string) {
   const date = parseDate(dateStr);
   if (!date) return;
 
-  await prisma.volunteerDateSlot.deleteMany({
-    where: { userId: actor.id, date },
-  });
+  const db = getDb();
+  db.prepare('DELETE FROM volunteer_date_slots WHERE userId = ? AND date = ?').run(actor.id, packDate(date));
 
   revalidatePath('/schedule');
 }
 
 // ---------------------------------------------------------------------------
 // Admin-on-behalf actions
-// Allow an admin to perform schedule actions on behalf of another user.
 // ---------------------------------------------------------------------------
 
 async function resolveTargetUser(targetUserId: string) {
-  const target = await prisma.user.findUnique({
-    where: { id: targetUserId },
-    select: { id: true, name: true, email: true },
-  });
+  const target = getDb().prepare('SELECT id, name, email FROM users WHERE id = ?').get(targetUserId) as { id: string; name: string | null; email: string } | undefined;
   return target;
 }
 
 export async function adminSignupForEventAs(eventId: string, targetUserId: string) {
   const actor = await requireCapability('admin:calendar.write');
 
+  const db = getDb();
   const target = await resolveTargetUser(targetUserId);
   if (!target) return;
 
-  const event = await prisma.calendarEvent.findUnique({
-    where: { id: eventId },
-    include: { _count: { select: { signups: true } } },
-  });
+  const event = db.prepare('SELECT id, maxSignups FROM calendar_events WHERE id = ?').get(eventId) as { id: string; maxSignups: number | null } | undefined;
   if (!event) return;
 
-  if (event.maxSignups !== null && event._count.signups >= event.maxSignups) return;
+  if (event.maxSignups !== null) {
+    const { n } = db.prepare('SELECT COUNT(*) as n FROM event_signups WHERE eventId = ?').get(eventId) as { n: number };
+    if (n >= event.maxSignups) return;
+  }
 
-  await prisma.eventSignup.upsert({
-    where: { eventId_userId: { eventId, userId: target.id } },
-    update: {},
-    create: { eventId, userId: target.id },
-  });
+  db.prepare('INSERT OR IGNORE INTO event_signups (id, eventId, userId, signedUpAt) VALUES (?,?,?,?)').run(createId(), eventId, target.id, now());
 
   await logAudit({
     userId: actor.id,
@@ -236,12 +206,11 @@ export async function adminSignupForEventAs(eventId: string, targetUserId: strin
 export async function adminWithdrawFromEventAs(eventId: string, targetUserId: string) {
   const actor = await requireCapability('admin:calendar.write');
 
+  const db = getDb();
   const target = await resolveTargetUser(targetUserId);
   if (!target) return;
 
-  await prisma.eventSignup.deleteMany({
-    where: { eventId, userId: target.id },
-  });
+  db.prepare('DELETE FROM event_signups WHERE eventId = ? AND userId = ?').run(eventId, target.id);
 
   await logAudit({
     userId: actor.id,
@@ -261,56 +230,42 @@ export async function adminSignupForJobOccurrenceAs(
 ) {
   const actor = await requireCapability('admin:calendar.write');
 
+  const db = getDb();
   const target = await resolveTargetUser(targetUserId);
   if (!target) return;
 
   const date = parseDate(dateStr);
   if (!date) return;
 
-  const job = await prisma.job.findUnique({ where: { id: jobId } });
+  type JobRow = { title: string; description: string | null; defaultStartTime: string | null; defaultEndTime: string | null; defaultMaxSignups: number | null };
+  const job = db.prepare('SELECT title, description, defaultStartTime, defaultEndTime, defaultMaxSignups FROM jobs WHERE id = ?').get(jobId) as JobRow | undefined;
   if (!job) return;
 
-  let event = await prisma.calendarEvent.findFirst({ where: { jobId, date } });
+  const dateKey = packDate(date);
+  let eventId = (db.prepare('SELECT id FROM calendar_events WHERE jobId = ? AND date = ?').get(jobId, dateKey) as { id: string } | undefined)?.id;
 
-  if (!event) {
-    event = await prisma.calendarEvent.create({
-      data: {
-        title: job.title,
-        description: job.description,
-        eventType: 'HELP_NEEDED',
-        date,
-        startTime: job.defaultStartTime,
-        endTime: job.defaultEndTime,
-        maxSignups: job.defaultMaxSignups,
-        jobId,
-        createdById: actor.id,
-      },
-    });
+  if (!eventId) {
+    eventId = createId();
+    const ts = now();
+    db.prepare(
+      `INSERT INTO calendar_events (id, title, description, eventType, date, startTime, endTime, maxSignups, jobId, createdById, createdAt, updatedAt)
+       VALUES (?,?,?,'HELP_NEEDED',?,?,?,?,?,?,?,?)`,
+    ).run(eventId, job.title, job.description, dateKey, job.defaultStartTime, job.defaultEndTime, job.defaultMaxSignups, jobId, actor.id, ts, ts);
   }
 
-  if (event.maxSignups !== null) {
-    const count = await prisma.eventSignup.count({ where: { eventId: event.id } });
-    if (count >= event.maxSignups) return;
+  if (job.defaultMaxSignups !== null) {
+    const { n } = db.prepare('SELECT COUNT(*) as n FROM event_signups WHERE eventId = ?').get(eventId) as { n: number };
+    if (n >= job.defaultMaxSignups) return;
   }
 
-  await prisma.eventSignup.upsert({
-    where: { eventId_userId: { eventId: event.id, userId: target.id } },
-    update: {},
-    create: { eventId: event.id, userId: target.id },
-  });
+  db.prepare('INSERT OR IGNORE INTO event_signups (id, eventId, userId, signedUpAt) VALUES (?,?,?,?)').run(createId(), eventId, target.id, now());
 
   await logAudit({
     userId: actor.id,
     action: 'EVENT_SIGNUP',
     resource: 'CalendarEvent',
-    resourceId: event.id,
-    detail: {
-      jobId,
-      dateStr,
-      source: 'recurring_job_occurrence',
-      onBehalfOf: target.id,
-      onBehalfOfName: target.name ?? target.email,
-    },
+    resourceId: eventId,
+    detail: { jobId, dateStr, source: 'recurring_job_occurrence', onBehalfOf: target.id, onBehalfOfName: target.name ?? target.email },
   });
 
   revalidatePath('/schedule');
@@ -324,18 +279,17 @@ export async function adminWithdrawFromJobOccurrenceAs(
 ) {
   const actor = await requireCapability('admin:calendar.write');
 
+  const db = getDb();
   const target = await resolveTargetUser(targetUserId);
   if (!target) return;
 
   const date = parseDate(dateStr);
   if (!date) return;
 
-  const event = await prisma.calendarEvent.findFirst({ where: { jobId, date } });
+  const event = db.prepare('SELECT id FROM calendar_events WHERE jobId = ? AND date = ?').get(jobId, packDate(date)) as { id: string } | undefined;
   if (!event) return;
 
-  await prisma.eventSignup.deleteMany({
-    where: { eventId: event.id, userId: target.id },
-  });
+  db.prepare('DELETE FROM event_signups WHERE eventId = ? AND userId = ?').run(event.id, target.id);
 
   await logAudit({
     userId: actor.id,
@@ -359,29 +313,25 @@ export async function adminSaveVolunteerDateSlotAs(
 ) {
   const actor = await requireCapability('admin:calendar.write');
 
+  const db = getDb();
   const target = await resolveTargetUser(targetUserId);
   if (!target) return;
 
   const date = parseDate(dateStr);
   if (!date) return;
 
-  await prisma.volunteerDateSlot.upsert({
-    where: { userId_date: { userId: target.id, date } },
-    update: {
-      startTime: startTime.trim() || null,
-      endTime: endTime.trim() || null,
-      jobIds,
-      notes: notes.trim() || null,
-    },
-    create: {
-      userId: target.id,
-      date,
-      startTime: startTime.trim() || null,
-      endTime: endTime.trim() || null,
-      jobIds,
-      notes: notes.trim() || null,
-    },
-  });
+  const dateKey = packDate(date);
+  const ts = now();
+  const existing = db.prepare('SELECT id FROM volunteer_date_slots WHERE userId = ? AND date = ?').get(target.id, dateKey);
+  if (existing) {
+    db.prepare('UPDATE volunteer_date_slots SET startTime=?, endTime=?, jobIds=?, notes=?, updatedAt=? WHERE userId=? AND date=?').run(
+      startTime.trim() || null, endTime.trim() || null, packJson(jobIds), notes.trim() || null, ts, target.id, dateKey,
+    );
+  } else {
+    db.prepare('INSERT INTO volunteer_date_slots (id, userId, date, startTime, endTime, jobIds, notes, createdAt, updatedAt) VALUES (?,?,?,?,?,?,?,?,?)').run(
+      createId(), target.id, dateKey, startTime.trim() || null, endTime.trim() || null, packJson(jobIds), notes.trim() || null, ts, ts,
+    );
+  }
 
   await logAudit({
     userId: actor.id,
@@ -398,15 +348,14 @@ export async function adminSaveVolunteerDateSlotAs(
 export async function adminDeleteVolunteerDateSlotAs(targetUserId: string, dateStr: string) {
   const actor = await requireCapability('admin:calendar.write');
 
+  const db = getDb();
   const target = await resolveTargetUser(targetUserId);
   if (!target) return;
 
   const date = parseDate(dateStr);
   if (!date) return;
 
-  await prisma.volunteerDateSlot.deleteMany({
-    where: { userId: target.id, date },
-  });
+  db.prepare('DELETE FROM volunteer_date_slots WHERE userId = ? AND date = ?').run(target.id, packDate(date));
 
   await logAudit({
     userId: actor.id,

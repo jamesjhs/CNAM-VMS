@@ -1,10 +1,11 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { prisma } from '@/lib/prisma';
+import { createId } from '@paralleldrive/cuid2';
+import { getDb, now, packDate, packJson } from '@/lib/db';
 import { requireCapability } from '@/lib/auth-helpers';
 import { logAudit } from '@/lib/audit';
-import type { CalendarEventType } from '@prisma/client';
+import type { CalendarEventType } from '@/lib/db-types';
 import { parseDate } from '@/lib/calendar';
 
 /** Accept only 3- or 6-digit hex colour codes (e.g. #fff or #6366f1). */
@@ -38,26 +39,23 @@ export async function createCalendarEvent(
   const date = parseDate(dateStr);
   if (!date) return;
 
-  const event = await prisma.calendarEvent.create({
-    data: {
-      title: trimmedTitle,
-      description: description.trim() || null,
-      eventType,
-      date,
-      startTime: startTime.trim() || null,
-      endTime: endTime.trim() || null,
-      jobId: jobId || null,
-      teamId: teamId || null,
-      maxSignups: maxSignupsStr ? parseInt(maxSignupsStr, 10) : null,
-      createdById: actor.id,
-    },
-  });
+  const db = getDb();
+  const id = createId();
+  const ts = now();
+  db.prepare(
+    `INSERT INTO calendar_events (id, title, description, eventType, date, startTime, endTime, jobId, teamId, maxSignups, createdById, createdAt, updatedAt)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+  ).run(
+    id, trimmedTitle, description.trim() || null, eventType, packDate(date),
+    startTime.trim() || null, endTime.trim() || null, jobId || null, teamId || null,
+    maxSignupsStr ? parseInt(maxSignupsStr, 10) : null, actor.id, ts, ts,
+  );
 
   await logAudit({
     userId: actor.id,
     action: 'CALENDAR_EVENT_CREATED',
     resource: 'CalendarEvent',
-    resourceId: event.id,
+    resourceId: id,
     detail: { title: trimmedTitle, date: dateStr, eventType },
   });
 
@@ -68,7 +66,8 @@ export async function createCalendarEvent(
 export async function deleteCalendarEvent(eventId: string) {
   const actor = await requireCapability('admin:calendar.write');
 
-  await prisma.calendarEvent.delete({ where: { id: eventId } });
+  const db = getDb();
+  db.prepare('DELETE FROM calendar_events WHERE id = ?').run(eventId);
 
   await logAudit({
     userId: actor.id,
@@ -102,26 +101,24 @@ export async function createJob(
   const trimmedTitle = title.trim();
   if (!trimmedTitle) return;
 
-  const job = await prisma.job.create({
-    data: {
-      title: trimmedTitle,
-      description: description.trim() || null,
-      isRolling,
-      colour: safeColour(colour),
-      scheduleType: (scheduleType as 'ONE_OFF' | 'WEEKLY' | 'MONTHLY') || 'ONE_OFF',
-      weekDays,
-      monthDays,
-      defaultStartTime: defaultStartTime.trim() || null,
-      defaultEndTime: defaultEndTime.trim() || null,
-      defaultMaxSignups: defaultMaxSignupsStr ? parseInt(defaultMaxSignupsStr, 10) : null,
-    },
-  });
+  const db = getDb();
+  const id = createId();
+  const ts = now();
+  db.prepare(
+    `INSERT INTO jobs (id, title, description, isRolling, colour, scheduleType, weekDays, monthDays, defaultStartTime, defaultEndTime, defaultMaxSignups, createdAt, updatedAt)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+  ).run(
+    id, trimmedTitle, description.trim() || null, isRolling ? 1 : 0, safeColour(colour),
+    scheduleType || 'ONE_OFF', packJson(weekDays), packJson(monthDays),
+    defaultStartTime.trim() || null, defaultEndTime.trim() || null,
+    defaultMaxSignupsStr ? parseInt(defaultMaxSignupsStr, 10) : null, ts, ts,
+  );
 
   await logAudit({
     userId: actor.id,
     action: 'JOB_CREATED',
     resource: 'Job',
-    resourceId: job.id,
+    resourceId: id,
     detail: { title: trimmedTitle, isRolling, scheduleType },
   });
 
@@ -148,21 +145,16 @@ export async function updateJob(
   const trimmedTitle = title.trim();
   if (!trimmedTitle) return;
 
-  await prisma.job.update({
-    where: { id: jobId },
-    data: {
-      title: trimmedTitle,
-      description: description.trim() || null,
-      isRolling,
-      colour: safeColour(colour),
-      scheduleType: (scheduleType as 'ONE_OFF' | 'WEEKLY' | 'MONTHLY') || 'ONE_OFF',
-      weekDays,
-      monthDays,
-      defaultStartTime: defaultStartTime.trim() || null,
-      defaultEndTime: defaultEndTime.trim() || null,
-      defaultMaxSignups: defaultMaxSignupsStr ? parseInt(defaultMaxSignupsStr, 10) : null,
-    },
-  });
+  const db = getDb();
+  db.prepare(
+    `UPDATE jobs SET title=?, description=?, isRolling=?, colour=?, scheduleType=?, weekDays=?, monthDays=?,
+     defaultStartTime=?, defaultEndTime=?, defaultMaxSignups=?, updatedAt=? WHERE id=?`,
+  ).run(
+    trimmedTitle, description.trim() || null, isRolling ? 1 : 0, safeColour(colour),
+    scheduleType || 'ONE_OFF', packJson(weekDays), packJson(monthDays),
+    defaultStartTime.trim() || null, defaultEndTime.trim() || null,
+    defaultMaxSignupsStr ? parseInt(defaultMaxSignupsStr, 10) : null, now(), jobId,
+  );
 
   await logAudit({
     userId: actor.id,
@@ -180,7 +172,8 @@ export async function updateJob(
 export async function deleteJob(jobId: string) {
   const actor = await requireCapability('admin:calendar.write');
 
-  await prisma.job.delete({ where: { id: jobId } });
+  const db = getDb();
+  db.prepare('DELETE FROM jobs WHERE id = ?').run(jobId);
 
   await logAudit({
     userId: actor.id,
@@ -205,38 +198,30 @@ export async function adminSignupForJobOccurrence(jobId: string, dateStr: string
   const date = parseDate(dateStr);
   if (!date) return;
 
-  const job = await prisma.job.findUnique({ where: { id: jobId } });
+  const db = getDb();
+  type JobRow = { title: string; description: string | null; defaultStartTime: string | null; defaultEndTime: string | null; defaultMaxSignups: number | null };
+  const job = db.prepare('SELECT title, description, defaultStartTime, defaultEndTime, defaultMaxSignups FROM jobs WHERE id = ?').get(jobId) as JobRow | undefined;
   if (!job) return;
 
-  let event = await prisma.calendarEvent.findFirst({ where: { jobId, date } });
+  const dateStr2 = packDate(date);
+  let eventId = (db.prepare('SELECT id FROM calendar_events WHERE jobId = ? AND date = ?').get(jobId, dateStr2) as { id: string } | undefined)?.id;
 
-  if (!event) {
-    event = await prisma.calendarEvent.create({
-      data: {
-        title: job.title,
-        description: job.description,
-        eventType: 'HELP_NEEDED',
-        date,
-        startTime: job.defaultStartTime,
-        endTime: job.defaultEndTime,
-        maxSignups: job.defaultMaxSignups,
-        jobId,
-        createdById: actor.id,
-      },
-    });
+  if (!eventId) {
+    eventId = createId();
+    const ts = now();
+    db.prepare(
+      `INSERT INTO calendar_events (id, title, description, eventType, date, startTime, endTime, maxSignups, jobId, createdById, createdAt, updatedAt)
+       VALUES (?,?,?,'HELP_NEEDED',?,?,?,?,?,?,?,?)`,
+    ).run(eventId, job.title, job.description, dateStr2, job.defaultStartTime, job.defaultEndTime, job.defaultMaxSignups, jobId, actor.id, ts, ts);
   }
 
-  await prisma.eventSignup.upsert({
-    where: { eventId_userId: { eventId: event.id, userId: actor.id } },
-    update: {},
-    create: { eventId: event.id, userId: actor.id },
-  });
+  db.prepare('INSERT OR IGNORE INTO event_signups (id, eventId, userId, signedUpAt) VALUES (?,?,?,?)').run(createId(), eventId, actor.id, now());
 
   await logAudit({
     userId: actor.id,
     action: 'EVENT_SIGNUP',
     resource: 'CalendarEvent',
-    resourceId: event.id,
+    resourceId: eventId,
   });
 
   revalidatePath('/admin/schedule');

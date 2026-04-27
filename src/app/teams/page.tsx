@@ -1,8 +1,8 @@
 import { requireAuth } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
-import { prisma } from '@/lib/prisma';
+import { getDb, unpackBool } from '@/lib/db';
 import Link from 'next/link';
-import type { TaskUrgency } from '@prisma/client';
+import type { TaskUrgency } from '@/lib/db-types';
 
 const URGENCY_COLOURS: Record<TaskUrgency, string> = {
   ROUTINE: 'bg-green-100 text-green-800',
@@ -19,31 +19,54 @@ const URGENCY_LABELS: Record<TaskUrgency, string> = {
 export default async function TeamsPage() {
   await requireAuth();
 
-  const teams = await prisma.team.findMany({
-    orderBy: { name: 'asc' },
-    include: {
-      userTeams: {
-        where: { isLeader: true },
-        include: { user: { select: { name: true, email: true } } },
-      },
-      tasks: {
-        where: { isActive: true },
-        orderBy: [{ urgency: 'asc' }, { createdAt: 'desc' }],
-        select: {
-          id: true,
-          title: true,
-          taskType: true,
-          urgency: true,
-          description: true,
-          personnelRequired: true,
-          supervisorRequired: true,
-        },
-      },
-      _count: { select: { userTeams: true } },
-    },
-  });
+  const db = getDb();
+
+  const rawTeams = db.prepare('SELECT id, name, description FROM teams ORDER BY name ASC').all() as {
+    id: string; name: string; description: string | null;
+  }[];
+
+  const rawLeaders = db.prepare(`
+    SELECT ut.teamId, ut.userId, ut.isLeader, u.name as uname, u.email as uemail
+    FROM user_teams ut
+    JOIN users u ON ut.userId = u.id
+    WHERE ut.isLeader = 1
+  `).all() as { teamId: string; userId: string; isLeader: number; uname: string | null; uemail: string }[];
+
+  const memberCounts = db.prepare(
+    'SELECT teamId, COUNT(*) as cnt FROM user_teams GROUP BY teamId',
+  ).all() as { teamId: string; cnt: number }[];
+  const memberCountMap = new Map(memberCounts.map((m) => [m.teamId, m.cnt]));
+
+  const rawTasks = db.prepare(`
+    SELECT id, teamId, title, taskType, urgency, description, personnelRequired, supervisorRequired
+    FROM team_tasks
+    WHERE isActive = 1
+    ORDER BY CASE urgency WHEN 'URGENT' THEN 0 WHEN 'MODERATE' THEN 1 ELSE 2 END ASC, createdAt DESC
+  `).all() as {
+    id: string; teamId: string; title: string; taskType: string; urgency: string;
+    description: string | null; personnelRequired: number | null; supervisorRequired: number;
+  }[];
+
+  const leadersByTeam = new Map<string, { user: { name: string | null; email: string } }[]>();
+  for (const l of rawLeaders) {
+    if (!leadersByTeam.has(l.teamId)) leadersByTeam.set(l.teamId, []);
+    leadersByTeam.get(l.teamId)!.push({ user: { name: l.uname, email: l.uemail } });
+  }
+
+  const tasksByTeam = new Map<string, typeof rawTasks>();
+  for (const t of rawTasks) {
+    if (!tasksByTeam.has(t.teamId)) tasksByTeam.set(t.teamId, []);
+    tasksByTeam.get(t.teamId)!.push(t);
+  }
 
   const urgencyOrder: Record<TaskUrgency, number> = { URGENT: 0, MODERATE: 1, ROUTINE: 2 };
+
+  const teams = rawTeams.map((team) => ({
+    ...team,
+    userTeams: leadersByTeam.get(team.id) ?? [],
+    tasks: tasksByTeam.get(team.id) ?? [],
+    _count: { userTeams: memberCountMap.get(team.id) ?? 0 },
+  }));
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -62,7 +85,7 @@ export default async function TeamsPage() {
           <div className="space-y-8">
             {teams.map((team) => {
               const sortedTasks = [...team.tasks].sort(
-                (a, b) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency],
+                (a, b) => urgencyOrder[a.urgency as TaskUrgency] - urgencyOrder[b.urgency as TaskUrgency],
               );
               return (
                 <div key={team.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -99,8 +122,8 @@ export default async function TeamsPage() {
                     <div className="divide-y divide-gray-50">
                       {sortedTasks.map((task) => (
                         <div key={task.id} className="px-6 py-4 flex items-start gap-3">
-                          <span className={`mt-0.5 text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${URGENCY_COLOURS[task.urgency]}`}>
-                            {URGENCY_LABELS[task.urgency]}
+                          <span className={`mt-0.5 text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${URGENCY_COLOURS[task.urgency as TaskUrgency]}`}>
+                            {URGENCY_LABELS[task.urgency as TaskUrgency]}
                           </span>
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-gray-900 text-sm truncate">{task.title}</p>
@@ -112,7 +135,7 @@ export default async function TeamsPage() {
                               {task.personnelRequired && (
                                 <span className="text-xs text-gray-400">👷 {task.personnelRequired} personnel</span>
                               )}
-                              {task.supervisorRequired && (
+                              {unpackBool(task.supervisorRequired) && (
                                 <span className="text-xs text-amber-600">⚠️ Supervisor needed</span>
                               )}
                             </div>

@@ -1,6 +1,6 @@
 import { requireCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
-import { prisma } from '@/lib/prisma';
+import { getDb, unpackTs } from '@/lib/db';
 import Link from 'next/link';
 
 const PAGE_SIZE = 50;
@@ -15,30 +15,44 @@ export default async function AuditLogPage({
   const { page: pageParam, action: actionFilter, user: userFilter } = await searchParams;
   const page = Math.max(1, parseInt(pageParam ?? '1', 10));
 
-  const where = {
-    ...(actionFilter ? { action: { contains: actionFilter, mode: 'insensitive' as const } } : {}),
-    ...(userFilter
-      ? {
-          user: {
-            OR: [
-              { email: { contains: userFilter, mode: 'insensitive' as const } },
-              { name: { contains: userFilter, mode: 'insensitive' as const } },
-            ],
-          },
-        }
-      : {}),
-  };
+  const db = getDb();
 
-  const [total, logs] = await Promise.all([
-    prisma.auditLog.count({ where }),
-    prisma.auditLog.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-      include: { user: { select: { email: true, name: true } } },
-    }),
-  ]);
+  const conditions: string[] = [];
+  const params: string[] = [];
+
+  if (actionFilter) {
+    conditions.push('al.action LIKE ?');
+    params.push(`%${actionFilter}%`);
+  }
+  if (userFilter) {
+    conditions.push('(u.email LIKE ? OR u.name LIKE ?)');
+    params.push(`%${userFilter}%`, `%${userFilter}%`);
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const { total } = db.prepare(
+    `SELECT COUNT(*) as total FROM audit_logs al LEFT JOIN users u ON al.userId = u.id ${where}`,
+  ).get(...params) as { total: number };
+
+  const rawLogs = db.prepare(
+    `SELECT al.id, al.action, al.resource, al.resourceId, al.detail, al.createdAt,
+            u.email as user_email, u.name as user_name
+     FROM audit_logs al
+     LEFT JOIN users u ON al.userId = u.id
+     ${where}
+     ORDER BY al.createdAt DESC
+     LIMIT ? OFFSET ?`,
+  ).all(...params, PAGE_SIZE, (page - 1) * PAGE_SIZE) as {
+    id: string; action: string; resource: string | null; resourceId: string | null;
+    detail: string | null; createdAt: string; user_email: string | null; user_name: string | null;
+  }[];
+
+  const logs = rawLogs.map((l) => ({
+    ...l,
+    createdAt: unpackTs(l.createdAt),
+    user: l.user_email ? { email: l.user_email, name: l.user_name } : null,
+  }));
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -149,7 +163,7 @@ export default async function AuditLogPage({
                       <td className="py-3 px-4 text-gray-500 text-xs max-w-xs">
                         {log.detail ? (
                           <span className="font-mono text-gray-400 text-xs truncate block">
-                            {JSON.stringify(log.detail)}
+                            {log.detail}
                           </span>
                         ) : '—'}
                       </td>

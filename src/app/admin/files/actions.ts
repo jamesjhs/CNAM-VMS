@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { prisma } from '@/lib/prisma';
+import { getDb } from '@/lib/db';
 import { requireCapability } from '@/lib/auth-helpers';
 import { logAudit } from '@/lib/audit';
 import fs from 'fs/promises';
@@ -9,7 +9,9 @@ import fs from 'fs/promises';
 export async function deleteFileAsset(fileId: string) {
   const actor = await requireCapability('admin:files.write');
 
-  const file = await prisma.fileAsset.findUnique({ where: { id: fileId } });
+  const db = getDb();
+  type FileRow = { path: string; originalName: string };
+  const file = db.prepare('SELECT path, originalName FROM file_assets WHERE id = ?').get(fileId) as FileRow | undefined;
   if (!file) return;
 
   // Remove the physical file if it exists
@@ -22,7 +24,7 @@ export async function deleteFileAsset(fileId: string) {
     }
   }
 
-  await prisma.fileAsset.delete({ where: { id: fileId } });
+  db.prepare('DELETE FROM file_assets WHERE id = ?').run(fileId);
 
   await logAudit({
     userId: actor.id,
