@@ -8,6 +8,10 @@ const nextConfig = {
   // memory usage and are rarely needed in production.
   productionBrowserSourceMaps: false,
 
+  // Keep the native SQLite addon external so that Node.js resolves it from
+  // node_modules at runtime rather than Turbopack trying to bundle the binary.
+  serverExternalPackages: ['better-sqlite3-multiple-ciphers'],
+
   // Tell Next.js to tree-shake this large package at the module level so
   // only the code paths actually used end up in bundles.
   experimental: {

@@ -422,6 +422,7 @@ node_modules/
 .next/
 dist-seed/
 uploads/
+data/
 
 # Env
 .env

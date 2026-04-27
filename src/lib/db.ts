@@ -305,7 +305,6 @@ function openDb(): BetterSqlite3.Database {
   const dbPath = resolveDbPath();
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db: BetterSqlite3.Database = new (Database as any)(dbPath);
 
   // Encryption — must be applied before any other operation.
