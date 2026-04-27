@@ -6,7 +6,7 @@
  * All methods are still implemented correctly for completeness and future use.
  */
 
-import type { Adapter, AdapterUser, AdapterSession, AdapterAccount, VerificationToken } from '@auth/core/adapters';
+import type { Adapter, AdapterUser, AdapterSession, AdapterAccount, VerificationToken } from 'next-auth/adapters';
 import { createId } from '@paralleldrive/cuid2';
 import { getDb, now, unpackTs } from './db';
 

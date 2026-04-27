@@ -9,7 +9,6 @@
  * is reused across Next.js hot-module replacement cycles in development.
  */
 
-// @ts-expect-error – better-sqlite3-multiple-ciphers is API-compatible with
 // better-sqlite3 but ships without its own .d.ts; @types/better-sqlite3 covers it.
 import Database from 'better-sqlite3-multiple-ciphers';
 import type BetterSqlite3 from 'better-sqlite3';

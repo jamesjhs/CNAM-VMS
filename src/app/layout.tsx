@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import CookieBanner from '@/components/CookieBanner';
+import VersionNotice from '@/components/VersionNotice';
 import Link from 'next/link';
+import { APP_VERSION } from '@/lib/version';
 
 export const metadata: Metadata = {
   title: 'CNAM Volunteer Management System',
@@ -38,8 +40,11 @@ export default function RootLayout({
           </Link>
           {' · '}
           <span>© {new Date().getFullYear()} City of Norwich Aviation Museum</span>
+          {' · '}
+          <span className="opacity-60">v{APP_VERSION}</span>
         </footer>
         <CookieBanner />
+        <VersionNotice />
       </body>
     </html>
   );

@@ -1,21 +1,18 @@
 {
   "name": "cnam-vms",
-  "version": "0.2.0",
+  "version": "0.5.0",
   "private": true,
   "scripts": {
-    "dev": "prisma generate && next dev",
-    "build": "prisma generate && NODE_OPTIONS=--max-old-space-size=512 next build",
+    "dev": "next dev",
+    "build": "NODE_OPTIONS=--max-old-space-size=512 next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:seed": "ts-node --project tsconfig.seed.json prisma/seed.ts",
-    "db:set-initial-password": "ts-node --project tsconfig.seed.json scripts/set-initial-password.ts",
-    "db:studio": "prisma studio"
+    "db:seed": "ts-node --project tsconfig.seed.json scripts/seed.ts",
+    "db:set-initial-password": "ts-node --project tsconfig.seed.json scripts/set-initial-password.ts"
   },
   "dependencies": {
-    "@paralleldrive/cuid2": "^3.3.0",
+    "@paralleldrive/cuid2": "^2.2.2",
     "better-sqlite3-multiple-ciphers": "^12.9.0",
     "next": "^16.2.4",
     "next-auth": "^5.0.0-beta.25",

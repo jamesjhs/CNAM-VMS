@@ -1,6 +1,6 @@
 import { requireAuth } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
-import { prisma } from '@/lib/prisma';
+import { getDb, unpackTs } from '@/lib/db';
 import Link from 'next/link';
 import { updateOwnProfile, addOwnPhone, removeOwnPhone } from './actions';
 
@@ -13,18 +13,33 @@ const STATUS_STYLES: Record<string, string> = {
 export default async function ProfilePage() {
   const sessionUser = await requireAuth();
 
-  const user = await prisma.user.findUnique({
-    where: { id: sessionUser.id },
-    include: {
-      phones: { orderBy: { createdAt: 'asc' } },
-      userRoles: { include: { role: { select: { name: true, description: true } } } },
-      userTeams: { include: { team: { select: { name: true, description: true } } } },
-    },
-  });
+  const db = getDb();
+  type UserRow = { id: string; email: string; name: string | null; status: string; accountType: string; createdAt: string };
+  const rawUser = db.prepare('SELECT id, email, name, status, accountType, createdAt FROM users WHERE id = ?').get(sessionUser.id) as UserRow | undefined;
+  if (!rawUser) return null;
 
-  if (!user) {
-    return null;
-  }
+  type PhoneRow = { id: string; number: string; label: string | null };
+  const phones = db.prepare('SELECT id, number, label FROM user_phones WHERE userId = ? ORDER BY createdAt ASC').all(sessionUser.id) as PhoneRow[];
+
+  type RoleRow = { roleId: string; roleName: string; roleDescription: string | null };
+  const userRoles = (db.prepare(
+    `SELECT ur.roleId, r.name as roleName, r.description as roleDescription
+     FROM user_roles ur JOIN roles r ON r.id = ur.roleId WHERE ur.userId = ?`
+  ).all(sessionUser.id) as RoleRow[]).map(r => ({ roleId: r.roleId, role: { name: r.roleName, description: r.roleDescription } }));
+
+  type TeamRow = { teamId: string; teamName: string; teamDescription: string | null };
+  const userTeams = (db.prepare(
+    `SELECT ut.teamId, t.name as teamName, t.description as teamDescription
+     FROM user_teams ut JOIN teams t ON t.id = ut.teamId WHERE ut.userId = ?`
+  ).all(sessionUser.id) as TeamRow[]).map(t => ({ teamId: t.teamId, team: { name: t.teamName, description: t.teamDescription } }));
+
+  const user = {
+    ...rawUser,
+    createdAt: unpackTs(rawUser.createdAt),
+    phones,
+    userRoles,
+    userTeams,
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
