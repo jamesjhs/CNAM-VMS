@@ -95,6 +95,7 @@ export async function sendMail(opts: {
     return;
   }
 
+  console.log(`[mail] Sending "${opts.subject}" to ${opts.to} via SMTP (${process.env.EMAIL_SERVER_HOST})`);
   await getTransport().sendMail({
     from: process.env.EMAIL_FROM ?? 'noreply@example.com',
     to: opts.to,

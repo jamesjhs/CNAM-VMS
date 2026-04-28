@@ -123,9 +123,10 @@ export async function submitPassword(formData: FormData) {
   // Send OTP email
   try {
     await sendOtpEmail(email, otp);
-  } catch {
-    // If email fails, still redirect to verify page but user can request a resend
-    // (better UX than failing silently on missing SMTP config during development)
+  } catch (err) {
+    // Log the SMTP error so it is visible in PM2 logs, but don't surface it to
+    // the user — they can still proceed to the verify page and request a resend.
+    console.error('[mail] Failed to send OTP email:', err);
   }
 
   // Set pending cookies (httpOnly, short-lived)
@@ -283,8 +284,10 @@ export async function requestPasswordReset(formData: FormData) {
     const resetUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
     try {
       await sendPasswordResetEmail(email, resetUrl);
-    } catch {
-      // Log but don't reveal to the user
+    } catch (err) {
+      // Log the SMTP error so it is visible in PM2 logs, but don't reveal it
+      // to the caller — the user always sees the generic "email sent" response.
+      console.error('[mail] Failed to send password reset email:', err);
     }
   }
 
