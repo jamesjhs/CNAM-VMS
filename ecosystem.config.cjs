@@ -5,6 +5,10 @@ module.exports = {
       script: 'node',
       // Standalone output places the production server at this path.
       args: '.next/standalone/server.js',
+      // Always run from the project root so that relative paths (DATABASE_URL,
+      // UPLOAD_DIR, .env loading) resolve correctly regardless of where PM2
+      // was invoked from.
+      cwd: __dirname,
       env: {
         // Read from the environment so the port can be changed in .env.
         // Falls back to 3001 if PORT is not exported in the shell.

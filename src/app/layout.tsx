@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     title: 'CNAM Volunteer Management System',
     description: 'City of Norwich Aviation Museum — Volunteer Management System',
     siteName: 'CNAM VMS',
-    url: 'https://cnamvps.jahosi.co.uk',
+    url: process.env.AUTH_URL ?? undefined,
     locale: 'en_GB',
     type: 'website',
   },

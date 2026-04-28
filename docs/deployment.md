@@ -45,6 +45,8 @@ cp .env.example .env
 npm run db:seed
 
 # 5. Build for production
+# The postbuild step automatically copies .next/static and public/ into
+# .next/standalone/ so the standalone server can serve CSS/JS assets.
 npm run build
 
 # 6. Start the server
@@ -55,7 +57,7 @@ npm start
 
 ```bash
 npm install -g pm2
-pm2 start npm --name cnam-vms -- start
+pm2 start ecosystem.config.cjs
 pm2 save
 pm2 startup
 ```

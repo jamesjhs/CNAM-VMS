@@ -3,10 +3,23 @@
  * This content is used as a fallback when no custom content has been saved in the database.
  * It is stored in the database under the key "privacy-policy" and is editable by root users
  * via the admin content management page (/admin/content).
+ *
+ * The site URL is read from the AUTH_URL environment variable so that the default policy
+ * reflects the actual deployment URL rather than a hard-coded domain.
  */
-export const DEFAULT_PRIVACY_POLICY = `PRIVACY AND COOKIE POLICY
+export function getDefaultPrivacyPolicy(): string {
+  const raw = (process.env.AUTH_URL ?? '').replace(/\/$/, '');
+  if (!raw) {
+    console.warn('AUTH_URL is not set — the default privacy policy will show a placeholder URL. Set AUTH_URL in .env to the public-facing URL of this deployment.');
+  }
+  const siteUrl = raw || '[site URL not configured — set AUTH_URL in .env]';
+  return defaultPrivacyPolicyTemplate(siteUrl);
+}
+
+function defaultPrivacyPolicyTemplate(siteUrl: string): string {
+  return `PRIVACY AND COOKIE POLICY
 City of Norwich Aviation Museum — Volunteer Management System
-Site: https://cnamvps.jahosi.co.uk
+Site: ${siteUrl}
 
 ⚠ IMPORTANT NOTICE: This policy was generated with the assistance of artificial intelligence (AI) and reviewed in draft by the system administrator. It is provided in good faith as a starting point and should be reviewed and approved by a qualified legal professional before formal adoption.
 
@@ -16,7 +29,7 @@ Last updated: March 2026
 
 1. INTRODUCTION
 
-City of Norwich Aviation Museum ("CNAM", "we", "us", or "our") operates the CNAM Volunteer Management System ("VMS") at https://cnamvps.jahosi.co.uk ("the Site"). This Privacy and Cookie Policy explains what personal data we collect, why we collect it, how we use it, and what your rights are in relation to it.
+City of Norwich Aviation Museum ("CNAM", "we", "us", or "our") operates the CNAM Volunteer Management System ("VMS") at ${siteUrl} ("the Site"). This Privacy and Cookie Policy explains what personal data we collect, why we collect it, how we use it, and what your rights are in relation to it.
 
 This policy applies to all users of the VMS, including volunteers, staff, and members.
 
@@ -171,3 +184,4 @@ We may update this policy from time to time to reflect changes in the law, our d
 ───────────────────────────────────────────────────────────────
 
 ⚠ REMINDER: This policy was generated with the assistance of artificial intelligence. While it has been written to reflect the actual technical characteristics of this system and relevant UK data protection law, it has not been reviewed by a qualified legal professional. CNAM should seek appropriate legal advice before formally adopting this policy.`;
+}
