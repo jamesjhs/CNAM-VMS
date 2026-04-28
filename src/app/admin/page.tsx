@@ -101,11 +101,10 @@ export default async function AdminPage() {
             badge={`${eventCount} event${eventCount !== 1 ? 's' : ''}`}
           />
           <AdminCard
-            href="#"
+            href="/admin/settings"
             icon="⚙️"
             title="System Settings"
-            description="Configure site-wide settings and appearance."
-            comingSoon
+            description="Configure site-wide settings including SMTP email delivery."
           />
         </div>
 

@@ -263,6 +263,13 @@ function initSchema(db: BetterSqlite3.Database): void {
       updatedById TEXT REFERENCES users(id) ON DELETE SET NULL
     );
 
+    CREATE TABLE IF NOT EXISTS system_settings (
+      key TEXT PRIMARY KEY NOT NULL,
+      value TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      updatedById TEXT REFERENCES users(id) ON DELETE SET NULL
+    );
+
     CREATE TABLE IF NOT EXISTS team_tasks (
       id TEXT PRIMARY KEY NOT NULL,
       teamId TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,

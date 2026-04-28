@@ -2,37 +2,73 @@
  * Thin nodemailer wrapper used for 2FA OTP emails.
  * Reuses the same SMTP env vars as the previous NextAuth Email provider.
  *
- * Supported env vars:
- *   EMAIL_SERVER_HOST         – SMTP hostname (required to enable SMTP)
- *   EMAIL_SERVER_PORT         – SMTP port (default: 587)
- *   EMAIL_SERVER_USER         – SMTP username
- *   EMAIL_SERVER_PASSWORD     – SMTP password
- *   EMAIL_FROM                – From address / display name
- *   EMAIL_SERVER_SECURE       – "true" → implicit TLS/SSL on connect (port 465)
- *   EMAIL_SERVER_REQUIRE_TLS  – "true" → force STARTTLS upgrade (port 587/25)
- *   EMAIL_TLS_REJECT_UNAUTHORIZED – "false" → accept self-signed certificates
+ * SMTP configuration priority (highest wins):
+ *   1. Values stored in the system_settings table (editable via /admin/settings)
+ *   2. Environment variables (EMAIL_SERVER_HOST, etc.)
  *
- * When EMAIL_SERVER_HOST is not set the full email is written to stdout so
+ * Supported env vars / system_settings keys:
+ *   EMAIL_SERVER_HOST / smtp.host         – SMTP hostname (required to enable SMTP)
+ *   EMAIL_SERVER_PORT / smtp.port         – SMTP port (default: 587)
+ *   EMAIL_SERVER_USER / smtp.user         – SMTP username
+ *   EMAIL_SERVER_PASSWORD / smtp.password – SMTP password
+ *   EMAIL_FROM / smtp.from                – From address / display name
+ *   EMAIL_SERVER_SECURE / smtp.secure     – "true" → implicit TLS/SSL on connect (port 465)
+ *   EMAIL_SERVER_REQUIRE_TLS / smtp.requireTls – "true" → force STARTTLS upgrade (port 587/25)
+ *   EMAIL_TLS_REJECT_UNAUTHORIZED / smtp.tlsRejectUnauthorized – "false" → accept self-signed certs
+ *
+ * When the effective host is not set the full email is written to stdout so
  * that secret links and OTP codes are accessible via `pm2 logs`.
  */
 
 import nodemailer, { type Transporter } from 'nodemailer';
+import { getDb } from '@/lib/db';
+
+// ─── SMTP settings helpers ────────────────────────────────────────────────────
+
+/** Read a single system setting from the database.  Returns null if not set. */
+function getSystemSetting(key: string): string | null {
+  try {
+    const db = getDb();
+    const row = db.prepare('SELECT value FROM system_settings WHERE key = ?').get(key) as { value: string } | undefined;
+    return row?.value ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Return the effective SMTP configuration, merging DB settings over env vars. */
+export function getSmtpConfig(): {
+  host: string;
+  port: string;
+  user: string;
+  password: string;
+  from: string;
+  secure: string;
+  requireTls: string;
+  tlsRejectUnauthorized: string;
+} {
+  return {
+    host:                 getSystemSetting('smtp.host')                 ?? process.env.EMAIL_SERVER_HOST                ?? '',
+    port:                 getSystemSetting('smtp.port')                 ?? process.env.EMAIL_SERVER_PORT                ?? '587',
+    user:                 getSystemSetting('smtp.user')                 ?? process.env.EMAIL_SERVER_USER                ?? '',
+    password:             getSystemSetting('smtp.password')             ?? process.env.EMAIL_SERVER_PASSWORD            ?? '',
+    from:                 getSystemSetting('smtp.from')                 ?? process.env.EMAIL_FROM                       ?? '',
+    secure:               getSystemSetting('smtp.secure')               ?? process.env.EMAIL_SERVER_SECURE              ?? 'false',
+    requireTls:           getSystemSetting('smtp.requireTls')           ?? process.env.EMAIL_SERVER_REQUIRE_TLS         ?? 'false',
+    tlsRejectUnauthorized: getSystemSetting('smtp.tlsRejectUnauthorized') ?? process.env.EMAIL_TLS_REJECT_UNAUTHORIZED  ?? 'true',
+  };
+}
+
+// ─── Nodemailer transport ─────────────────────────────────────────────────────
 
 // Lazily-created singleton transport.  We rebuild it whenever any of the
-// SMTP-related env vars change (detected via a cached config key).
+// SMTP-related settings change (detected via a cached config key).
 let _transport: Transporter | null = null;
 let _transportKey: string | undefined;
 
 function smtpConfigKey(): string {
-  return [
-    process.env.EMAIL_SERVER_HOST ?? '',
-    process.env.EMAIL_SERVER_PORT ?? '',
-    process.env.EMAIL_SERVER_USER ?? '',
-    process.env.EMAIL_SERVER_PASSWORD ?? '',
-    process.env.EMAIL_SERVER_SECURE ?? '',
-    process.env.EMAIL_SERVER_REQUIRE_TLS ?? '',
-    process.env.EMAIL_TLS_REJECT_UNAUTHORIZED ?? '',
-  ].join('|');
+  const cfg = getSmtpConfig();
+  return [cfg.host, cfg.port, cfg.user, cfg.password, cfg.secure, cfg.requireTls, cfg.tlsRejectUnauthorized].join('|');
 }
 
 function getTransport(): Transporter {
@@ -40,18 +76,16 @@ function getTransport(): Transporter {
   if (_transport && _transportKey === key) return _transport;
 
   _transportKey = key;
+  const cfg = getSmtpConfig();
   _transport = nodemailer.createTransport({
-    host: process.env.EMAIL_SERVER_HOST,
-    port: Number(process.env.EMAIL_SERVER_PORT ?? 587),
-    secure: process.env.EMAIL_SERVER_SECURE === 'true',
-    requireTLS: process.env.EMAIL_SERVER_REQUIRE_TLS === 'true',
+    host: cfg.host || undefined,
+    port: Number(cfg.port || 587),
+    secure: cfg.secure === 'true',
+    requireTLS: cfg.requireTls === 'true',
     tls: {
-      rejectUnauthorized: process.env.EMAIL_TLS_REJECT_UNAUTHORIZED !== 'false',
+      rejectUnauthorized: cfg.tlsRejectUnauthorized !== 'false',
     },
-    auth: {
-      user: process.env.EMAIL_SERVER_USER,
-      pass: process.env.EMAIL_SERVER_PASSWORD,
-    },
+    auth: cfg.user ? { user: cfg.user, pass: cfg.password } : undefined,
     pool: true,      // keep connections alive between sends
     maxConnections: 2,
   });
@@ -64,18 +98,20 @@ export async function sendMail(opts: {
   text: string;
   html: string;
 }): Promise<void> {
-  // Read env var at call time so that changes during development take effect
+  // Read effective config at call time so that settings changes take effect
   // without a full process restart.
-  if (!process.env.EMAIL_SERVER_HOST) {
+  const cfg = getSmtpConfig();
+
+  if (!cfg.host) {
     // SMTP is not configured — dump the full email to stdout so it is
     // visible in PM2 logs.  This is intentional for development / initial
     // setup and must never be used in a production environment with real
     // user data.
     if (process.env.NODE_ENV === 'production') {
       console.warn(
-        '[mail] WARNING: EMAIL_SERVER_HOST is not set in a production environment. ' +
+        '[mail] WARNING: SMTP host is not configured in a production environment. ' +
         'Email content is being written to stdout in plain text. ' +
-        'Configure SMTP to send emails securely.',
+        'Configure SMTP via /admin/settings or the EMAIL_SERVER_HOST env var to send emails securely.',
       );
     }
     console.log(
@@ -95,9 +131,9 @@ export async function sendMail(opts: {
     return;
   }
 
-  console.log(`[mail] Sending "${opts.subject}" to ${opts.to} via SMTP (${process.env.EMAIL_SERVER_HOST})`);
+  console.log(`[mail] Sending "${opts.subject}" to ${opts.to} via SMTP (${cfg.host})`);
   await getTransport().sendMail({
-    from: process.env.EMAIL_FROM ?? 'noreply@example.com',
+    from: cfg.from || 'noreply@example.com',
     to: opts.to,
     subject: opts.subject,
     text: opts.text,
