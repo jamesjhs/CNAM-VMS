@@ -72,6 +72,13 @@ export async function submitPassword(formData: FormData) {
 
   // Generic error — don't reveal whether the account exists
   if (!user || !user.passwordHash) {
+    if (user && !user.passwordHash) {
+      // The account exists but has no password set — likely set-initial-password was never run.
+      // Log server-side so administrators can distinguish this from a genuinely wrong password.
+      // Avoid logging the full email; include only the domain part to limit PII exposure.
+      const emailDomain = email.includes('@') ? email.split('@')[1] : '(unknown domain)';
+      console.warn(`[auth] submitPassword: a user @${emailDomain} has no passwordHash — run db:set-initial-password`);
+    }
     // Record a failed attempt even for unknown users (prevents timing oracle)
     db.prepare('INSERT INTO verification_tokens (identifier, token, expires) VALUES (?,?,?)').run(
       pwFailIdentifier,

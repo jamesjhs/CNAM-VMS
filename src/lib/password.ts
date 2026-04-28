@@ -37,7 +37,8 @@ export async function verifyPassword(
     const stored = Buffer.from(hashHex, 'hex');
     if (incoming.length !== stored.length) return false;
     return timingSafeEqual(incoming, stored);
-  } catch {
+  } catch (err) {
+    console.error('[password] verifyPassword: scrypt threw unexpectedly:', err);
     return false;
   }
 }

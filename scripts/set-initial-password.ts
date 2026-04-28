@@ -12,7 +12,7 @@
 
 import './load-env';
 import { getDb, now } from '../src/lib/db';
-import { hashPassword } from '../src/lib/password';
+import { hashPassword, verifyPassword } from '../src/lib/password';
 import { createId } from '@paralleldrive/cuid2';
 
 async function main() {
@@ -40,6 +40,22 @@ async function main() {
   const ts = now();
 
   db.prepare('UPDATE users SET passwordHash=?, mustChangePassword=1, updatedAt=? WHERE id=?').run(hash, ts, user.id);
+
+  // Verify the stored hash can be round-tripped before declaring success.
+  // This catches issues such as a DB encryption key mismatch that would cause
+  // the UPDATE to silently target a different (empty) database view.
+  const stored = db.prepare('SELECT passwordHash FROM users WHERE id = ?').get(user.id) as { passwordHash: string | null } | undefined;
+  if (!stored?.passwordHash) {
+    console.error('\n❌  Hash was not persisted — the row was not updated. Check DATABASE_URL and DB_ENCRYPTION_KEY.');
+    process.exit(1);
+  }
+  const verified = await verifyPassword(defaultPassword, stored.passwordHash);
+  if (!verified) {
+    console.error('\n❌  Self-verification failed: the stored hash does not match the password.');
+    console.error('    The database may have been opened with the wrong DB_ENCRYPTION_KEY, or the data file is corrupt.');
+    process.exit(1);
+  }
+
   db.prepare('INSERT INTO audit_logs (id, userId, action, resource, resourceId, detail, createdAt) VALUES (?,?,?,?,?,?,?)').run(
     createId(), user.id, 'PASSWORD_RESET_BY_SCRIPT', 'User', user.id,
     JSON.stringify({ note: 'Initial password set via set-initial-password script' }), ts,
