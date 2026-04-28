@@ -364,7 +364,7 @@ export async function adminSendPasswordReset(userId: string) {
   const { sendPasswordResetEmail } = await import('@/lib/mail');
 
   // Use the configured public URL — never trust Host/X-Forwarded-Proto headers
-  const baseUrl = (process.env.AUTH_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+  const baseUrl = (process.env.AUTH_URL ?? `http://localhost:${process.env.PORT ?? 3001}`).replace(/\/$/, '');
 
   const resetToken = randomBytes(32).toString('hex');
   const resetIdentifier = `pw-reset:${user.email}`;

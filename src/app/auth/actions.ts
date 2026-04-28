@@ -254,7 +254,7 @@ export async function requestPasswordReset(formData: FormData) {
 
   // Use the configured public URL — never trust Host/X-Forwarded-Proto headers
   // (prevents password-reset poisoning via Host header injection).
-  const baseUrl = (process.env.AUTH_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+  const baseUrl = (process.env.AUTH_URL ?? `http://localhost:${process.env.PORT ?? 3001}`).replace(/\/$/, '');
 
   // Always show a "success" response to prevent user enumeration
   const db = getDb();
