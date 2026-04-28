@@ -21,15 +21,15 @@ function defaultPrivacyPolicyTemplate(siteUrl: string): string {
 City of Norwich Aviation Museum — Volunteer Management System
 Site: ${siteUrl}
 
-⚠ IMPORTANT NOTICE: This policy was generated with the assistance of artificial intelligence (AI) and reviewed in draft by the system administrator. It is provided in good faith as a starting point and should be reviewed and approved by a qualified legal professional before formal adoption.
-
-Last updated: March 2026
+Last updated: April 2026
 
 ───────────────────────────────────────────────────────────────
 
-1. INTRODUCTION
+1. WHO WE ARE
 
-City of Norwich Aviation Museum ("CNAM", "we", "us", or "our") operates the CNAM Volunteer Management System ("VMS") at ${siteUrl} ("the Site"). This Privacy and Cookie Policy explains what personal data we collect, why we collect it, how we use it, and what your rights are in relation to it.
+City of Norwich Aviation Museum ("CNAM", "we", "us", or "our") operates the CNAM Volunteer Management System ("VMS") at ${siteUrl} ("the Site"). CNAM is the Data Controller for all personal data processed through this system.
+
+This Privacy and Cookie Policy explains what personal data we collect, why we collect it, how we use it, and your rights under the UK General Data Protection Regulation (UK GDPR) and the Data Protection Act 2018.
 
 This policy applies to all users of the VMS, including volunteers, staff, and members.
 
@@ -37,7 +37,7 @@ This policy applies to all users of the VMS, including volunteers, staff, and me
 
 2. WHAT INFORMATION WE COLLECT
 
-a) Personal Information
+a) Personal information
   • Full name
   • Email address
   • Mobile telephone number(s)
@@ -45,12 +45,12 @@ a) Personal Information
   • Availability preferences and scheduling information
   • Sign-up history for museum events and duty rotas
 
-b) Technical Information
+b) Technical information
   • IP address (recorded in audit logs for security purposes)
   • Browser and device information (User-Agent string, recorded in audit logs)
   • Session tokens (stored as secure, HttpOnly cookies)
 
-c) Authentication Data
+c) Authentication data
   • Hashed passwords (using the scrypt algorithm — we never store plain-text passwords)
   • One-time passcodes (OTPs) sent by email during two-step sign-in (deleted immediately after use or expiry)
 
@@ -69,17 +69,25 @@ We do not sell, rent, or share your personal data with third parties for commerc
 
 ───────────────────────────────────────────────────────────────
 
-4. LEGAL BASIS FOR PROCESSING
+4. LAWFUL BASIS FOR PROCESSING (Article 6, UK GDPR)
 
-Under the UK General Data Protection Regulation (UK GDPR) and the Data Protection Act 2018, we process your personal data on the following legal bases:
+We process your personal data on the following lawful bases:
 
-  • Legitimate interests: Operating, securing, and auditing the volunteer management system in a manner consistent with running a museum and managing a volunteer workforce
-  • Contract / quasi-contractual obligation: Fulfilling obligations to registered volunteers and staff
-  • Consent: Where you have explicitly opted in to specific communications or data uses
+  • Contract (Article 6(1)(b)): processing is necessary to provide the VMS service you have registered to use and to fulfil obligations to registered volunteers and staff.
+  • Legitimate interests (Article 6(1)(f)): operating, securing, and auditing the system in a manner consistent with running a museum and managing a volunteer workforce.
+  • Consent (Article 6(1)(a)): where you have explicitly opted in to specific communications or data uses.
 
 ───────────────────────────────────────────────────────────────
 
-5. COOKIES
+5. WHERE YOUR DATA IS STORED
+
+All data is stored in a SQLite database on the server hosting the CNAM VMS. No data is transmitted to third-party cloud services, advertising networks, or analytics platforms. The server is controlled by CNAM.
+
+Outbound emails (such as OTP codes and password-reset links) are sent via a configured SMTP service. Please refer to that service provider's privacy policy if applicable.
+
+───────────────────────────────────────────────────────────────
+
+6. COOKIES
 
 What are cookies?
 Cookies are small text files placed on your device by your web browser when you visit a website. They help websites remember information about your visit and enable certain functionality.
@@ -96,7 +104,7 @@ Cookies we use:
 │ cookie-consent                  │ Preferences│ Remembers your acknowledgement of this cookie notice    │ Until cleared            │
 └─────────────────────────────────┴────────────┴─────────────────────────────────────────────────────────┴──────────────────────────┘
 
-We use only ESSENTIAL cookies — cookies that are strictly necessary for the Site to function. We do not use tracking cookies, advertising cookies, analytics cookies, or any third-party cookies.
+We use only ESSENTIAL cookies — cookies that are strictly necessary for the Site to function. We do not use tracking, advertising, analytics, or any third-party cookies.
 
 Because we use only essential cookies, you cannot opt out of functional cookies without also losing the ability to sign in to the Site. You may dismiss the cookie notice banner without affecting your ability to use the Site.
 
@@ -109,7 +117,7 @@ You can delete or block cookies through your browser settings. Please be aware t
 
 ───────────────────────────────────────────────────────────────
 
-6. DATA RETENTION
+7. DATA RETENTION
 
 ┌──────────────────────┬──────────────────────────────────────────────────────────────────────────────────┐
 │ Data Type            │ Retention Period                                                                 │
@@ -121,21 +129,6 @@ You can delete or block cookies through your browser settings. Please be aware t
 │ OTP tokens           │ 5 minutes maximum (deleted automatically after use or expiry)                    │
 │ Cookie consent flag  │ Until you clear your browser's local storage                                     │
 └──────────────────────┴──────────────────────────────────────────────────────────────────────────────────┘
-
-───────────────────────────────────────────────────────────────
-
-7. YOUR RIGHTS
-
-Under UK GDPR, you have the following rights in relation to your personal data:
-
-  • Right of access: You may request a copy of the personal data we hold about you.
-  • Right to rectification: You may ask us to correct inaccurate or incomplete data.
-  • Right to erasure ("right to be forgotten"): You may request that we delete your personal data, subject to any legal obligation to retain it.
-  • Right to restriction of processing: You may ask us to restrict how we process your data in certain circumstances.
-  • Right to object: You may object to processing based on legitimate interests.
-  • Right to data portability: Where processing is automated and based on consent or contract, you may request your data in a structured, commonly used, machine-readable format.
-
-To exercise any of these rights, please contact the museum using the details in Section 10. We aim to respond to all requests within one calendar month.
 
 ───────────────────────────────────────────────────────────────
 
@@ -153,13 +146,28 @@ Despite these measures, no system is entirely secure. In the event of a data bre
 
 ───────────────────────────────────────────────────────────────
 
-9. THIRD-PARTY SERVICES
+9. YOUR RIGHTS UNDER UK GDPR
 
-The VMS does not integrate with third-party analytics, advertising, or social media platforms. All data is stored on CNAM-controlled infrastructure. Outbound emails (such as OTP codes) are sent via a configured SMTP service; please refer to that service provider's privacy policy if applicable.
+You have the following rights regarding your personal data:
+
+  • Right of access (Article 15): you may request a copy of all personal data we hold about you.
+  • Right to rectification (Article 16): you may correct inaccurate or incomplete data via your profile settings or by contacting the administrator.
+  • Right to erasure / "right to be forgotten" (Article 17): you may request that we delete your personal data. Subject to any legal obligation to retain it, we will action such requests promptly.
+  • Right to restriction of processing (Article 18): you may ask us to restrict how we process your data in certain circumstances.
+  • Right to data portability (Article 20): where processing is automated and based on consent or contract, you may request your data in a structured, commonly used, machine-readable format.
+  • Right to object (Article 21): you may object to processing based on legitimate interests. Note that objecting may prevent us from providing the service.
+
+To exercise any of these rights, please contact CNAM using the details in Section 11. We will respond within one calendar month as required by UK GDPR.
 
 ───────────────────────────────────────────────────────────────
 
-10. CONTACT AND COMPLAINTS
+10. CHANGES TO THIS POLICY
+
+This policy may be updated when the application or our data processing activities change. The "Last updated" date at the top of this document will be revised accordingly. Significant changes will be communicated via an announcement on the Site.
+
+───────────────────────────────────────────────────────────────
+
+11. CONTACT AND COMPLAINTS
 
 For any data protection queries or to exercise your rights, please contact:
 
@@ -173,15 +181,5 @@ For any data protection queries or to exercise your rights, please contact:
 
 If you are not satisfied with our response, you have the right to lodge a complaint with the Information Commissioner's Office (ICO):
   Website: https://ico.org.uk/make-a-complaint
-  Telephone: 0303 123 1113
-
-───────────────────────────────────────────────────────────────
-
-11. CHANGES TO THIS POLICY
-
-We may update this policy from time to time to reflect changes in the law, our data processing activities, or for other operational reasons. The "Last updated" date at the top of this document will be revised accordingly. Significant changes will be communicated via an announcement on the Site.
-
-───────────────────────────────────────────────────────────────
-
-⚠ REMINDER: This policy was generated with the assistance of artificial intelligence. While it has been written to reflect the actual technical characteristics of this system and relevant UK data protection law, it has not been reviewed by a qualified legal professional. CNAM should seek appropriate legal advice before formally adopting this policy.`;
+  Telephone: 0303 123 1113`;
 }
