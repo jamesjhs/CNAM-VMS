@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import CookieBanner from '@/components/CookieBanner';
 import VersionNotice from '@/components/VersionNotice';
+import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration';
 import Link from 'next/link';
 import { APP_VERSION } from '@/lib/version';
 
@@ -22,7 +23,6 @@ export const metadata: Metadata = {
     capable: true,
     title: 'CNAM VMS',
     statusBarStyle: 'black-translucent',
-    startupImage: '/apple-touch-icon.png',
   },
   openGraph: {
     title: 'CNAM Volunteer Management System',
@@ -60,6 +60,7 @@ export default function RootLayout({
         </footer>
         <CookieBanner />
         <VersionNotice />
+        <ServiceWorkerRegistration />
       </body>
     </html>
   );
