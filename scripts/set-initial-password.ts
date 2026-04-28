@@ -10,6 +10,7 @@
  * The script is idempotent — it can safely be run multiple times.
  */
 
+import './load-env';
 import { getDb, now } from '../src/lib/db';
 import { hashPassword } from '../src/lib/password';
 import { createId } from '@paralleldrive/cuid2';

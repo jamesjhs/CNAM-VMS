@@ -11,6 +11,7 @@
  *   npm run db:seed
  */
 
+import './load-env';
 import { getDb, now } from '../src/lib/db';
 import { CAPABILITIES } from '../src/lib/capabilities';
 import { createId } from '@paralleldrive/cuid2';
