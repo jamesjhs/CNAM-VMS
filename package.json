@@ -10,7 +10,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "db:seed": "ts-node --project tsconfig.seed.json scripts/seed.ts",
-    "db:set-initial-password": "ts-node --project tsconfig.seed.json scripts/set-initial-password.ts"
+    "db:set-initial-password": "ts-node --project tsconfig.seed.json scripts/set-initial-password.ts",
+    "db:reset-password": "ts-node --project tsconfig.seed.json scripts/reset-password.ts",
+    "db:create-user": "ts-node --project tsconfig.seed.json scripts/create-user.ts"
   },
   "dependencies": {
     "@paralleldrive/cuid2": "^3.3.0",
