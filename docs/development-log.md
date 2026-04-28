@@ -17,6 +17,43 @@ Entries are listed in reverse chronological order (newest first). Each entry rec
 
 ---
 
+## 28 April 2026 — Build Warning Fixes, Code Modernisation & Quality Pass (v0.6.1)
+
+**Agent session:** GitHub Copilot Coding Agent
+
+**What was done:**
+
+Version bumped from 0.5.1 to 0.6.1. Addressed all warnings emitted by `npm run build`, eliminated a performance anti-pattern, and made targeted quality improvements throughout.
+
+### Build warning fixes
+
+- **Deprecated `middleware` file convention (Next.js 16.x):** Renamed `src/middleware.ts` → `src/proxy.ts` and updated the named export from `middleware` to `proxy`. Next.js 16 introduced the "proxy" convention as a replacement for the legacy "middleware" name; the build emitted a deprecation warning until this rename was done. The `export const runtime = 'nodejs'` segment config was also removed from the proxy file — the proxy always runs on the Node.js runtime in Next.js 16 and the declaration is disallowed there.
+
+- **Turbopack NFT (Node File Tracing) trace warning:** The build warned that the entire project was being traced unintentionally, pointing to `next.config.mjs`. Root cause: three files used dynamic `path.resolve` / `path.join` calls that Turbopack could not statically scope, causing it to fall back to tracing all project files. Fixed by:
+  - **`next.config.mjs`:** Removed the `fileURLToPath` + `path.dirname(import.meta.url)` pattern that derived `__dirname` at module level; replaced `outputFileTracingRoot: __dirname` with `outputFileTracingRoot: process.cwd()`. In a standard Next.js project the config is always executed from the project root, making these equivalent.
+  - **`src/lib/uploads.ts`:** Added `/*turbopackIgnore: true*/` inline comments to the `path.join(process.cwd(), …)` and `path.resolve(UPLOAD_DIR, …)` calls.
+  - **`src/lib/db.ts`:** Added `/*turbopackIgnore: true*/` to `path.resolve(process.cwd(), filePath)` inside `resolveDbPath()`.
+
+### Performance improvement
+
+- **N+1 query eliminated in `fetchUserClaims` (`src/auth.ts`):** The previous implementation fetched role→capability mappings in two stages: one query to get all `capabilityId` values, then a separate `SELECT key FROM capabilities WHERE id = ?` for each ID. This issued O(n) database round-trips per capabilities refresh. Replaced with a single three-table JOIN (`user_roles → role_capabilities → capabilities`) that returns all capability keys in one query. The result is deduplicated with `DISTINCT` at the SQL level, removing the need for a `Set`.
+
+### Code quality fixes
+
+- **Duplicate comment block removed (`src/auth.ts`):** A stale partial comment block appeared after the closing `}));` of the `NextAuth(…)` call — a copy/paste remnant. Removed.
+
+- **Unreachable guard removed (`src/app/api/files/[id]/route.ts`):** A redundant `if (!user) { return 401 }` check appeared immediately after `const user = session.user as SessionUser;`. Since `session.user` was already asserted non-null by the check directly above, this branch could never be reached. Removed.
+
+**Decisions:**
+
+- `process.cwd()` was chosen over `import.meta.dirname` for `next.config.mjs` because `import.meta.dirname` requires Node.js ≥ 21.2, and the project targets Node.js 20+. `process.cwd()` is semantically identical for a config file that is always executed from the project root.
+- The `/*turbopackIgnore: true*/` annotations are the approach recommended in the build warning itself; they suppress tracing for specific expressions without changing runtime behaviour.
+- The N+1 fix is a drop-in replacement: same return type, same logic — only the number of DB round-trips changes (from 1 + N to 1).
+
+**Result:** `npm run build` completes with 0 warnings and 0 errors.
+
+---
+
 ## 27 April 2026 — Documentation & Dependency Update (v0.5.1)
 
 **Agent session:** GitHub Copilot Coding Agent

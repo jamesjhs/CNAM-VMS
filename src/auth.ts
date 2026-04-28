@@ -28,22 +28,17 @@ async function fetchUserClaims(userId: string): Promise<{
   const dbUser = db.prepare('SELECT status, mustChangePassword FROM users WHERE id = ?').get(userId) as UserRow | undefined;
   if (!dbUser) return null;
 
-  const roles = db.prepare(
-    `SELECT rc.capabilityId FROM user_roles ur
+  const capRows = db.prepare(
+    `SELECT DISTINCT c.key FROM user_roles ur
      JOIN role_capabilities rc ON rc.roleId = ur.roleId
+     JOIN capabilities c ON c.id = rc.capabilityId
      WHERE ur.userId = ?`,
-  ).all(userId) as { capabilityId: string }[];
-
-  const caps = new Set<string>();
-  for (const row of roles) {
-    const cap = db.prepare('SELECT key FROM capabilities WHERE id = ?').get(row.capabilityId) as { key: string } | undefined;
-    if (cap) caps.add(cap.key);
-  }
+  ).all(userId) as { key: string }[];
 
   return {
     status: dbUser.status,
     mustChangePassword: unpackBool(dbUser.mustChangePassword),
-    capabilities: Array.from(caps),
+    capabilities: capRows.map((r) => r.key),
   };
 }
 
@@ -247,8 +242,3 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
     },
   },
 }));
-
-
-// How long (in seconds) capability/status data cached in the JWT remains
-// fresh before being re-read from the database.  A short TTL (5 minutes)
-// means capability changes propagate quickly without a DB hit on every

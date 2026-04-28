@@ -2,7 +2,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import crypto from 'crypto';
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR ?? path.join(process.cwd(), 'uploads');
+const UPLOAD_DIR = process.env.UPLOAD_DIR ?? path.join(/*turbopackIgnore: true*/ process.cwd(), 'uploads');
 const MAX_SIZE_MB = Number(process.env.UPLOAD_MAX_SIZE_MB ?? 10);
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 
@@ -46,8 +46,8 @@ export async function ensureUploadDir(): Promise<void> {
  * Safely resolve upload path, preventing directory traversal.
  */
 export function safeUploadPath(filename: string): string {
-  const resolved = path.resolve(UPLOAD_DIR, filename);
-  if (!resolved.startsWith(path.resolve(UPLOAD_DIR))) {
+  const resolved = path.resolve(/*turbopackIgnore: true*/ UPLOAD_DIR, filename);
+  if (!resolved.startsWith(path.resolve(/*turbopackIgnore: true*/ UPLOAD_DIR))) {
     throw new Error('Path traversal attempt detected');
   }
   return resolved;

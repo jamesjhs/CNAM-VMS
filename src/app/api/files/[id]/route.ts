@@ -16,9 +16,6 @@ export async function GET(
   }
 
   const user = session.user as SessionUser;
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
 
   const { id } = await params;
 
