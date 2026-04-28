@@ -17,24 +17,40 @@ Entries are listed in reverse chronological order (newest first). Each entry rec
 
 ---
 
-## 28 April 2026 — Documentation Update: Prisma → SQLite
+## 27 April 2026 — Documentation & Dependency Update (v0.5.1)
 
 **Agent session:** GitHub Copilot Coding Agent
 
 **What was done:**
 
-Updated all user-facing documentation to reflect the completed migration from Prisma + PostgreSQL to `better-sqlite3-multiple-ciphers` (SQLite with optional AES-256/SQLCipher encryption).
+Version bumped from 0.5.0 to 0.5.1. Documentation, configuration, and dependency references updated throughout the project.
 
-Files changed:
+### Documentation changes
 
-- **README.md** — Updated tech-stack description, Quick Start commands (removed `npx prisma generate` / `npx prisma migrate deploy`), and project structure (removed `prisma/` directory, updated `src/lib/` description).
-- **docs/deployment.md** — Removed PostgreSQL requirement; added SQLite/`DB_ENCRYPTION_KEY` env vars; replaced `prisma migrate deploy` with a note that schema creation is automatic; updated backup/restore commands to use `.sqlite3` file format.
-- **docs/startup-guide.md** — Removed PostgreSQL prerequisite and `psql` check; replaced `DATABASE_URL` PostgreSQL example with SQLite file path; added `DB_ENCRYPTION_KEY` documentation; replaced Step 4 `prisma migrate deploy` instructions with automatic schema creation explanation; updated backup commands and troubleshooting table.
-- **docs/development-log.md** — Added this entry.
+- **README.md:** Updated stack description from "PostgreSQL + Prisma ORM" to "SQLite + better-sqlite3"; removed Prisma CLI commands from Quick Start; corrected project structure section (removed stale `prisma/` directory listing; updated `lib/` description).
+- **docs/deployment.md:** Removed PostgreSQL requirement; updated environment variable table to reflect SQLite (`DATABASE_URL`, `DB_ENCRYPTION_KEY`); removed `npx prisma migrate deploy` step; replaced HTTPS/SSL Nginx config with a plain HTTP reverse-proxy example (TLS termination is handled upstream by Cloudflare tunnel or a separate proxy, not by the app); updated backup/restore examples to use SQLite file paths.
+- **docs/startup-guide.md:** Removed PostgreSQL prerequisite and setup instructions; replaced `DATABASE_URL` (PostgreSQL connection string) docs with SQLite path and `DB_ENCRYPTION_KEY` instructions; removed `npx prisma migrate deploy` step; merged Steps 4 & 5 (migrate + seed) into a single seed step; changed `AUTH_URL` example from `https://` to `http://`; removed SSL certificate requirement from "Making It Accessible on the Internet"; updated backup command (no longer needs `DATABASE_URL` exported); updated troubleshooting table.
+- **.env.example:** Changed `AUTH_URL` example and comment from `https://` to `http://`.
+
+### Server file changes
+
+- **ecosystem.config.cjs:** Updated comment to reflect that the server runs on plain HTTP and TLS (if needed) is handled upstream.
+- **tsconfig.json:** Removed stale `prisma/seed.ts` from the `exclude` list (the file no longer exists at that path).
+
+### Dependency updates
+
+- `react` updated from `^18.3.1` to `^19.2.5` (React 19; supported by Next.js 16).
+- `react-dom` updated from `^18.3.1` to `^19.2.5`.
+- `@types/react` updated from `^18.3.28` to `^19.2.14`.
+- `@types/react-dom` updated from `^18.3.7` to `^19.2.3`.
+- All other dependencies were already at their latest versions within their current major version ranges.
 
 **Decisions:**
 
-No code changes were made. The SQLite migration itself (replacing Prisma with `better-sqlite3-multiple-ciphers`, adding the `DB_ENCRYPTION_KEY` env var, updating seed and backup/restore scripts) was already complete in the codebase; only documentation lagged behind.
+- HTTPS is intentionally not required at the application layer — the system is deployed behind a Cloudflare tunnel which provides TLS termination. Documenting an HTTPS/SSL nginx setup was misleading and unnecessary.
+- Prisma and PostgreSQL were replaced by `better-sqlite3-multiple-ciphers` (SQLite with optional encryption) in an earlier session. This update removes all remaining documentation references to Prisma and PostgreSQL to avoid confusion.
+- React 19 is the latest stable release and is explicitly supported by Next.js 16 (its peer dependency range includes `^19.0.0`). Upgrading avoids accumulating major-version debt.
+- `tailwindcss`, `eslint`, and `typescript` were not upgraded to their new major versions (4.x, 10.x, and 6.x respectively) as these involve breaking configuration changes that are out of scope for this maintenance update.
 
 ---
 

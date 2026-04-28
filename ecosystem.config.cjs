@@ -10,8 +10,10 @@ module.exports = {
         // Falls back to 3001 if PORT is not exported in the shell.
         PORT: process.env.PORT || '3001',
         // AUTH_URL is intentionally not hard-coded here.
-        // The server runs behind a Cloudflare tunnel — set AUTH_URL in .env
-        // to your tunnel URL (e.g. https://your-subdomain.trycloudflare.com).
+        // Set AUTH_URL in .env to the public address of the application
+        // (e.g. http://your-subdomain.trycloudflare.com or your domain name).
+        // The server listens on plain HTTP; TLS termination (if any) is
+        // handled upstream (e.g. by a reverse proxy or Cloudflare tunnel).
         // Cap Node's heap so the process does not silently eat all available
         // RAM.  Adjust upward if you add heavier workloads.
         NODE_OPTIONS: '--max-old-space-size=384',

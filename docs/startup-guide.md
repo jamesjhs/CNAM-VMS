@@ -17,8 +17,6 @@ Before following any steps below, make sure you have the following:
 | An **SMTP email account** (e.g. a Gmail/Outlook app password, or a transactional mail service such as Mailgun or Postmark) | The system sends sign-in links by email |
 | The **CNAM-VMS source code** — either downloaded from GitHub or provided to you | The application itself |
 
-> **No separate database server needed.** The application uses an embedded SQLite database that is created automatically in the `data/` folder when the application first starts.
-
 ### Checking whether Node.js is installed
 
 Open a terminal and type:
@@ -72,21 +70,19 @@ Now open the `.env` file in a text editor (e.g. `nano .env`) and fill in the val
 DATABASE_URL="file:./data/cnam-vms.db"
 ```
 
-This sets the location of the SQLite database file. The path is relative to the project root. The file and its parent folder are created automatically — you do not need to set up a database server.
-
-#### Optional: Database encryption
+This tells the application where to store its SQLite database file. The default value is fine for most installations — the database will be created automatically in the `data/` folder inside the application directory. You can change the path if you prefer to store it elsewhere.
 
 ```
-DB_ENCRYPTION_KEY="paste-a-long-random-string-here"
+DB_ENCRYPTION_KEY="generate-with-openssl-rand-base64-32"
 ```
 
-If set, the database is encrypted at rest using AES-256 (SQLCipher). Generate a key with:
+This is used to encrypt the database file at rest. Generate a secure key by running:
 
 ```bash
 openssl rand -base64 32
 ```
 
-**Important:** Back up this key securely. If you lose it, you lose access to the database. You can leave this variable unset for unencrypted operation, which is fine for development or low-risk environments.
+Copy the output and paste it as the value. **Keep this key safe** — it is required to open the database. If you lose it, the database cannot be decrypted.
 
 ### Security Secret
 
@@ -105,7 +101,7 @@ Copy the output and paste it as the value. This is used to secure user sessions 
 ### Application URL
 
 ```
-AUTH_URL="https://vms.yourcnam.org"
+AUTH_URL="http://vms.yourcnam.org"
 ```
 
 Set this to the web address where the application will be accessed. If you are just testing on your own computer, use `http://localhost:3000`.
@@ -148,15 +144,7 @@ This sets where uploaded files are stored and how large a single file is allowed
 
 ---
 
-## Step 4 — Set Up the Database Tables
-
-The SQLite database file and all required tables are created **automatically** the first time the application (or the seed script in Step 5) starts. You do not need to run any migration commands.
-
-If you need to verify the database was created after the next step, you will find it at the path specified in `DATABASE_URL` (default: `data/cnam-vms.db` inside the project folder).
-
----
-
-## Step 5 — Seed the Initial Data
+## Step 4 — Seed the Initial Data
 
 This step creates the built-in roles, permissions, and your first administrator account:
 
@@ -168,16 +156,19 @@ You should see output like:
 
 ```
 🌱 Seeding database...
-✅ Created 10 capabilities
-✅ Root role configured with 10 capabilities
-✅ Volunteer role configured
-✅ Root user created/updated: your-email@example.com
+✅ 10 capabilities
+✅ Root role
+✅ Admin role
+✅ Volunteer role
+✅ 5 default teams
+✅ 7 default jobs
+✅ Root user: your-email@example.com
 🎉 Seeding complete!
 ```
 
 ---
 
-## Step 6 — Build the Application
+## Step 5 — Build the Application
 
 For a production installation, you need to build the application first:
 
@@ -269,7 +260,6 @@ If the VMS needs to be accessed by volunteers over the internet (rather than jus
 
 1. A **domain name** pointing to your server's IP address
 2. A **web server** (such as Nginx) to pass requests through to the application
-3. An **SSL certificate** (free from Let's Encrypt) to secure the connection
 
 A sample Nginx configuration is provided in [`docs/deployment.md`](deployment.md).
 
@@ -280,12 +270,11 @@ A sample Nginx configuration is provided in [`docs/deployment.md`](deployment.md
 The system includes backup scripts. To take a manual backup:
 
 ```bash
-export DATABASE_URL="file:./data/cnam-vms.db"
 export BACKUP_DIR="/var/backups/cnam-vms"
 ./scripts/backup.sh
 ```
 
-The backup script creates a `.sqlite3` snapshot of the database and a `.tar.gz` archive of the upload directory. To schedule automatic daily backups, see [`docs/deployment.md`](deployment.md).
+To schedule automatic daily backups, see [`docs/deployment.md`](deployment.md).
 
 ---
 
@@ -293,11 +282,11 @@ The backup script creates a `.sqlite3` snapshot of the database and a `.tar.gz` 
 
 | Symptom | What to check |
 |---|---|
-| "Cannot open database" or database errors on start | Check `DATABASE_URL` in `.env` points to a writable path; ensure the `data/` directory exists or is creatable |
+| "Cannot open database" | Check `DATABASE_URL` and `DB_ENCRYPTION_KEY` in `.env`; ensure the `data/` directory is writable |
 | Sign-in emails not arriving | Check your SMTP settings in `.env`; look in the application log (`pm2 logs cnam-vms`) for errors |
 | "Application crashed" | Check `pm2 logs cnam-vms` for the error message |
 | Port 3000 already in use | Another process is using that port; run `pm2 stop cnam-vms` and try again, or restart the server |
 
 ---
 
-*This guide will be updated as the application develops. Last updated: March 2026.*
+*This guide will be updated as the application develops. Last updated: April 2026.*

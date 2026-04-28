@@ -17,7 +17,7 @@ A web-based volunteer and task management application built with Next.js, TypeSc
 - 📊 **Audit logging** for all key actions with paginated viewer and filters
 - ✏️ **Site content editor** — manage the privacy policy and other site-wide text
 - 📧 **Notification service** (email with stub fallback)
-- 🗄️ **SQLite** (via `better-sqlite3`) with optional AES-256 encryption at rest
+- 🗄️ **SQLite + better-sqlite3** (encrypted at rest with SQLCipher)
 - 🔄 **Backup & restore** scripts
 
 ## Quick Start
@@ -34,7 +34,6 @@ cp .env.example .env
 # Edit .env with your values
 
 # Seed database (creates root user and roles)
-# The SQLite database and schema are created automatically on first run
 npm run db:seed
 
 # Start development server
