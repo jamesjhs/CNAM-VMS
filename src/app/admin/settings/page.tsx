@@ -165,7 +165,7 @@ export default async function AdminSettingsPage() {
                   ]}
                 />
                 <SelectGroup
-                  label="Reject unauthorised certs"
+                  label="Reject unauthorized certs"
                   name="smtp.tlsRejectUnauthorized"
                   defaultValue={effectiveRejectU}
                   fromEnv={envOnlyRejectU}
