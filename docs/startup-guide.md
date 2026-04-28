@@ -146,6 +146,8 @@ This sets where uploaded files are stored and how large a single file is allowed
 
 ## Step 4 — Seed the Initial Data
 
+> **Important:** Complete Step 3 (create and fill in `.env`) before running this command. The seed script reads `DB_ENCRYPTION_KEY` and other settings from `.env` to open the database with the correct encryption key.
+
 This step creates the built-in roles, permissions, and your first administrator account:
 
 ```bash
@@ -180,6 +182,18 @@ This compiles and optimises the application. It typically takes 30–60 seconds.
 
 ---
 
+## Step 6 — Set an Initial Password (optional)
+
+If you want volunteers to sign in with a password rather than via the email sign-in link on first use, set an initial password for the root account now:
+
+```bash
+npm run db:set-initial-password
+```
+
+The account will be flagged so that the password **must** be changed on first login.
+
+---
+
 ## Step 7 — Start the Application
 
 ### Starting for production use
@@ -188,18 +202,18 @@ This compiles and optimises the application. It typically takes 30–60 seconds.
 npm start
 ```
 
-The application will start and listen on port 3000. Open a browser and go to `http://localhost:3000` (or the address you set in `AUTH_URL`) to confirm it is working.
+The application will start and listen on port 3001 by default (or the `PORT` value set in `.env`). Open a browser and go to `http://localhost:3001` (or the address you set in `AUTH_URL`) to confirm it is working.
 
 ### Keeping it running in the background (recommended for production)
 
-To keep the application running even after you close the terminal, use **PM2**:
+To keep the application running even after you close the terminal, use **PM2** with the supplied ecosystem configuration file:
 
 ```bash
 # Install PM2 (only needed once)
 npm install -g pm2
 
-# Start the application
-pm2 start npm --name cnam-vms -- start
+# Start the application using the supplied PM2 config
+pm2 start ecosystem.config.cjs
 
 # Save the process list so it restarts on reboot
 pm2 save
@@ -285,7 +299,7 @@ To schedule automatic daily backups, see [`docs/deployment.md`](deployment.md).
 | "Cannot open database" | Check `DATABASE_URL` and `DB_ENCRYPTION_KEY` in `.env`; ensure the `data/` directory is writable |
 | Sign-in emails not arriving | Check your SMTP settings in `.env`; look in the application log (`pm2 logs cnam-vms`) for errors |
 | "Application crashed" | Check `pm2 logs cnam-vms` for the error message |
-| Port 3000 already in use | Another process is using that port; run `pm2 stop cnam-vms` and try again, or restart the server |
+| Port 3001 already in use | Another process is using that port; run `pm2 stop cnam-vms` and try again, or restart the server |
 
 ---
 

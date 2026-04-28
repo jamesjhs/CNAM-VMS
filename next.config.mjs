@@ -1,5 +1,15 @@
+import { fileURLToPath } from 'url';
+import path from 'path';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Silence the "multiple lockfiles" warning by explicitly declaring the
+  // project root.  Without this, Next.js walks up the directory tree and may
+  // pick up a lockfile in a parent directory instead of the project directory.
+  outputFileTracingRoot: __dirname,
+
   // Produce a self-contained deployment folder — dramatically reduces what
   // needs to be copied to the VPS and eliminates unused node_modules.
   output: 'standalone',
