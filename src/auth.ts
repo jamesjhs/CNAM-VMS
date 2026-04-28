@@ -91,7 +91,7 @@ function getRootEmail(): string | undefined {
   return process.env.ROOT_USER_EMAIL?.toLowerCase().trim();
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
+export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: createSqliteAdapter(),
   session: { strategy: 'jwt', maxAge: 7 * 24 * 60 * 60 }, // max 7 days
   providers: [
@@ -241,4 +241,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
       }
     },
   },
-}));
+});

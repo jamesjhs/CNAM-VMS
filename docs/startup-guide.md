@@ -303,4 +303,4 @@ To schedule automatic daily backups, see [`docs/deployment.md`](deployment.md).
 
 ---
 
-*This guide will be updated as the application develops. Last updated: April 2026.*
+*This guide will be updated as the application develops. Last updated: April 2026 (v0.6.2).*

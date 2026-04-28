@@ -17,6 +17,56 @@ Entries are listed in reverse chronological order (newest first). Each entry rec
 
 ---
 
+## 28 April 2026 — Runtime Proxy Error Fix & PM2 CWD Fix (v0.6.2)
+
+**Agent session:** GitHub Copilot Coding Agent
+
+**What was done:**
+
+Version bumped from 0.6.1 to 0.6.2. Fixed a critical startup error that caused every request to return a 500 Internal Server Error immediately after server boot, and corrected a PM2 configuration issue that could prevent relative paths from resolving on some installations.
+
+### Critical fix — `proxy` export not recognised as a function
+
+**Symptom:** On `npm start` (and PM2), the server started but threw the following error on the very first request:
+
+```
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+```
+
+**Root cause:** `src/auth.ts` initialised NextAuth using the _async factory_ form:
+
+```ts
+export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({ … }));
+```
+
+In next-auth v5, when the factory argument is an `async` function, the returned `auth` export is itself declared as an `async` function (`async (...args) => { … }`). Calling `auth(callback)` therefore returns a **`Promise`** (not a `Function`). Next.js 16 validates the proxy export with `typeof handlerUserland !== 'function'`; since a Promise has type `'object'`, the check fails and the error is thrown.
+
+**Fix:** Changed to the static (non-async) configuration form:
+
+```ts
+export const { handlers, auth, signIn, signOut } = NextAuth({ … });
+```
+
+With static config, `auth` is a synchronous function, so `auth(callback)` immediately returns a plain function — satisfying the Next.js check. No runtime behaviour changes: the database adapter and all callbacks are still called lazily (via `getDb()`) on each request, exactly as before.
+
+### PM2 fix — working directory not guaranteed
+
+`ecosystem.config.cjs` did not set a `cwd` option. When PM2 resurrected a saved process list after a reboot (or was started from a different directory), the working directory could differ from the project root, causing relative paths (e.g. `DATABASE_URL=file:./data/…`, `UPLOAD_DIR`) and the automatic `.env` loader bundled into the standalone server to fail.
+
+Added `cwd: __dirname` to the ecosystem configuration. `__dirname` in a CommonJS module always resolves to the directory containing the file, so PM2 will always start the server process from the project root regardless of how PM2 itself is invoked.
+
+### Documentation fixes
+
+- `docs/deployment.md`: Updated the PM2 section to use `pm2 start ecosystem.config.cjs` instead of `pm2 start npm --name cnam-vms -- start`. Using the ecosystem file is more reliable (correct cwd, memory limits, restart policy) and consistent with the startup guide.
+- `README.md`: Corrected the Quick Start URL from `http://localhost:3000` to `http://localhost:3001` (the default port used by this project).
+
+**Decisions:**
+
+- The static NextAuth config was chosen over an `await`-at-top-level workaround because top-level `await` in the proxy module would itself be a violation of the proxy file contract (the export must be a function value, not an awaited value). Static config is the intended pattern when no per-request dynamic configuration is needed.
+- `__dirname` was used in `ecosystem.config.cjs` rather than `path.resolve(__filename, '..')` or `process.cwd()` because `__dirname` is always the directory of the file containing the expression, making it immune to how or where PM2 is launched.
+
+---
+
 ## 28 April 2026 — Build Warning Fixes, Code Modernisation & Quality Pass (v0.6.1)
 
 **Agent session:** GitHub Copilot Coding Agent
