@@ -45,6 +45,8 @@ cp .env.example .env
 npm run db:seed
 
 # 5. Build for production
+# The postbuild step automatically copies .next/static and public/ into
+# .next/standalone/ so the standalone server can serve CSS/JS assets.
 npm run build
 
 # 6. Start the server

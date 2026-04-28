@@ -1,6 +1,6 @@
 import NavBar from '@/components/NavBar';
 import { getDb } from '@/lib/db';
-import { DEFAULT_PRIVACY_POLICY } from '@/lib/default-privacy-policy';
+import { getDefaultPrivacyPolicy } from '@/lib/default-privacy-policy';
 import Link from 'next/link';
 
 export const metadata = {
@@ -10,7 +10,7 @@ export const metadata = {
 export default async function PrivacyPolicyPage() {
   const db = getDb();
   const record = db.prepare("SELECT content FROM site_content WHERE key = 'privacy-policy'").get() as { content: string } | undefined;
-  const content = record?.content ?? DEFAULT_PRIVACY_POLICY;
+  const content = record?.content ?? getDefaultPrivacyPolicy();
 
   return (
     <div className="min-h-screen flex flex-col">

@@ -1,7 +1,7 @@
 import { requireCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
 import { getDb, unpackTs } from '@/lib/db';
-import { DEFAULT_PRIVACY_POLICY } from '@/lib/default-privacy-policy';
+import { getDefaultPrivacyPolicy } from '@/lib/default-privacy-policy';
 import Link from 'next/link';
 import { savePrivacyPolicy } from './actions';
 
@@ -17,7 +17,7 @@ export default async function AdminContentPage() {
     | { key: string; content: string; updatedAt: string; updatedById: string | null }
     | undefined;
 
-  const currentContent = record?.content ?? DEFAULT_PRIVACY_POLICY;
+  const currentContent = record?.content ?? getDefaultPrivacyPolicy();
   const updatedAt = record ? unpackTs(record.updatedAt) : null;
 
   return (
