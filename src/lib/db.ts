@@ -20,7 +20,11 @@ import fs from 'fs';
 function resolveDbPath(): string {
   const raw = (process.env.DATABASE_URL ?? 'file:./data/cnam-vms.db').trim();
   const filePath = raw.startsWith('file:') ? raw.slice(5) : raw;
-  return path.resolve(/*turbopackIgnore: true*/ process.cwd(), filePath);
+  // Use APP_ROOT when set (explicitly passed via ecosystem.config.cjs) so that
+  // relative database paths are always resolved from the project root even if
+  // the standalone server.js changes process.cwd() internally.
+  const base = process.env.APP_ROOT ?? /*turbopackIgnore: true*/ process.cwd();
+  return path.resolve(base, filePath);
 }
 
 function initSchema(db: BetterSqlite3.Database): void {
@@ -305,7 +309,16 @@ function openDb(): BetterSqlite3.Database {
   const dbPath = resolveDbPath();
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
-  const db: BetterSqlite3.Database = new (Database as any)(dbPath);
+  const keySet = !!process.env.DB_ENCRYPTION_KEY;
+  console.log(`[db] Opening database: ${dbPath} (encryption: ${keySet ? 'enabled' : 'disabled'})`);
+
+  let db: BetterSqlite3.Database;
+  try {
+    db = new (Database as any)(dbPath);
+  } catch (err) {
+    console.error(`[db] Failed to open database file at: ${dbPath}`, err);
+    throw err;
+  }
 
   // Encryption — must be applied before any other operation.
   const rawKey = process.env.DB_ENCRYPTION_KEY;
@@ -316,12 +329,22 @@ function openDb(): BetterSqlite3.Database {
   }
 
   // Performance and reliability settings.
-  db.pragma('journal_mode = WAL');
-  db.pragma('synchronous = NORMAL');
-  db.pragma('foreign_keys = ON');
-  db.pragma('busy_timeout = 5000');
+  try {
+    db.pragma('journal_mode = WAL');
+    db.pragma('synchronous = NORMAL');
+    db.pragma('foreign_keys = ON');
+    db.pragma('busy_timeout = 5000');
 
-  initSchema(db);
+    initSchema(db);
+  } catch (err) {
+    console.error(
+      `[db] Failed to initialise database at: ${dbPath}. ` +
+      `This usually means DB_ENCRYPTION_KEY is wrong, missing, or was changed after the database was created. ` +
+      `Error:`, err,
+    );
+    throw err;
+  }
+
   return db;
 }
 
@@ -331,7 +354,11 @@ const g = globalThis as typeof globalThis & { _cnamDb?: BetterSqlite3.Database }
 export function getDb(): BetterSqlite3.Database {
   if (g._cnamDb?.open) return g._cnamDb;
   const db = openDb();
-  if (process.env.NODE_ENV !== 'production') g._cnamDb = db;
+  // Always cache the singleton.  In previous versions this was skipped in
+  // production, which caused a new database connection to be opened on every
+  // request — unnecessarily expensive and a source of confusion when debugging
+  // path/key issues because each openDb() call emits a log line.
+  g._cnamDb = db;
   return db;
 }
 
