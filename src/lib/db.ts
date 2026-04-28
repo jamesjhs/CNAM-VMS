@@ -20,7 +20,7 @@ import fs from 'fs';
 function resolveDbPath(): string {
   const raw = (process.env.DATABASE_URL ?? 'file:./data/cnam-vms.db').trim();
   const filePath = raw.startsWith('file:') ? raw.slice(5) : raw;
-  return path.resolve(process.cwd(), filePath);
+  return path.resolve(/*turbopackIgnore: true*/ process.cwd(), filePath);
 }
 
 function initSchema(db: BetterSqlite3.Database): void {

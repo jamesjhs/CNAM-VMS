@@ -1,9 +1,7 @@
 import { auth } from '@/auth';
 import { NextResponse } from 'next/server';
 
-export const runtime = 'nodejs';
-
-export const middleware = auth((req) => {
+export const proxy = auth((req) => {
   const { pathname } = req.nextUrl;
   const user = req.auth?.user as { mustChangePassword?: boolean } | undefined;
 
