@@ -23,6 +23,15 @@ const CALLBACK_URL_COOKIE = '_cnam_cb';
 const KEEP_SIGNED_IN_COOKIE = '_cnam_keep';
 
 /**
+ * Extract the domain portion of an email address for log messages.
+ * Only the domain is logged to limit PII exposure.
+ */
+function emailDomain(email: string): string {
+  const at = email.indexOf('@');
+  return at >= 0 ? email.slice(at + 1) : '(unknown domain)';
+}
+
+/**
  * Validate that a callbackUrl is a safe same-origin relative path (prevents open redirect).
  * Uses URL parsing to guard against bypass tricks like backslash-slashes or encoded separators.
  */
@@ -64,6 +73,7 @@ export async function submitPassword(formData: FormData) {
     'SELECT COUNT(*) as n FROM verification_tokens WHERE identifier = ? AND expires > ?',
   ).get(pwFailIdentifier, cutoff) as { n: number };
   if (recentPwFailures >= MAX_PASSWORD_ATTEMPTS) {
+    console.warn(`[auth] submitPassword: too many failed attempts for @${emailDomain(email)} — account temporarily locked`);
     redirect('/auth/signin?error=TooManyAttempts');
   }
 
@@ -72,6 +82,21 @@ export async function submitPassword(formData: FormData) {
 
   // Generic error — don't reveal whether the account exists
   if (!user || !user.passwordHash) {
+    if (!user) {
+      // No account found — most common cause is the database has not been seeded,
+      // or the server is pointing at a different database file than the seed scripts.
+      console.warn(
+        `[auth] submitPassword: no account found for @${emailDomain(email)}. ` +
+        `If the database was recently seeded, check that DB_ENCRYPTION_KEY and DATABASE_URL ` +
+        `are identical between the seed scripts and the running server (see pm2 logs startup line).`,
+      );
+    } else {
+      // The account exists but has no password set — set-initial-password was never run.
+      console.warn(
+        `[auth] submitPassword: account @${emailDomain(email)} exists but has no passwordHash — ` +
+        `run  npm run db:set-initial-password  or  npm run db:reset-password`,
+      );
+    }
     // Record a failed attempt even for unknown users (prevents timing oracle)
     db.prepare('INSERT INTO verification_tokens (identifier, token, expires) VALUES (?,?,?)').run(
       pwFailIdentifier,
@@ -82,11 +107,13 @@ export async function submitPassword(formData: FormData) {
   }
 
   if (user.status === 'SUSPENDED') {
+    console.warn(`[auth] submitPassword: account @${emailDomain(email)} is SUSPENDED`);
     redirect('/auth/error?error=AccountSuspended');
   }
 
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) {
+    console.warn(`[auth] submitPassword: password verification failed for @${emailDomain(email)}`);
     db.prepare('INSERT INTO verification_tokens (identifier, token, expires) VALUES (?,?,?)').run(
       pwFailIdentifier,
       randomBytes(12).toString('hex'),
@@ -116,10 +143,13 @@ export async function submitPassword(formData: FormData) {
   // Send OTP email
   try {
     await sendOtpEmail(email, otp);
-  } catch {
-    // If email fails, still redirect to verify page but user can request a resend
-    // (better UX than failing silently on missing SMTP config during development)
+  } catch (err) {
+    // Log the SMTP error so it is visible in PM2 logs, but don't surface it to
+    // the user — they can still proceed to the verify page and request a resend.
+    console.error('[mail] Failed to send OTP email:', err);
   }
+
+  console.log(`[auth] submitPassword: OTP issued for @${emailDomain(email)} — check pm2 out-log for the code if SMTP is not configured`);
 
   // Set pending cookies (httpOnly, short-lived)
   const cookieStore = await cookies();
@@ -276,8 +306,10 @@ export async function requestPasswordReset(formData: FormData) {
     const resetUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
     try {
       await sendPasswordResetEmail(email, resetUrl);
-    } catch {
-      // Log but don't reveal to the user
+    } catch (err) {
+      // Log the SMTP error so it is visible in PM2 logs, but don't reveal it
+      // to the caller — the user always sees the generic "email sent" response.
+      console.error('[mail] Failed to send password reset email:', err);
     }
   }
 
