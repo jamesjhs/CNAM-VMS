@@ -9,6 +9,21 @@ export const metadata: Metadata = {
   title: 'CNAM Volunteer Management System',
   description: 'City of Norwich Aviation Museum — Volunteer Management System. Coordinate schedules, manage tasks, and keep the museum running smoothly.',
   robots: { index: false, follow: false },
+  manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: 'CNAM VMS',
+    statusBarStyle: 'black-translucent',
+    startupImage: '/apple-touch-icon.png',
+  },
   openGraph: {
     title: 'CNAM Volunteer Management System',
     description: 'City of Norwich Aviation Museum — Volunteer Management System',

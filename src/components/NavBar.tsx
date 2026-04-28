@@ -49,7 +49,7 @@ export default async function NavBar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center gap-6">
-            <Link href="/" className="font-bold text-lg tracking-tight text-white hover:text-amber-300 transition-colors">
+            <Link href={session ? '/dashboard' : '/'} className="font-bold text-lg tracking-tight text-white hover:text-amber-300 transition-colors">
               CNAM VMS
             </Link>
 
