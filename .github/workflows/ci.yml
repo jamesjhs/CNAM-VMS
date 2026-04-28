@@ -34,4 +34,4 @@ jobs:
         run: npm run build
         env:
           AUTH_SECRET: ci-test-secret-not-for-production
-          AUTH_URL: http://localhost:3000
+          AUTH_URL: http://localhost:3001
