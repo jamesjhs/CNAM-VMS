@@ -17,6 +17,27 @@ Entries are listed in reverse chronological order (newest first). Each entry rec
 
 ---
 
+## 28 April 2026 — Documentation Update: Prisma → SQLite
+
+**Agent session:** GitHub Copilot Coding Agent
+
+**What was done:**
+
+Updated all user-facing documentation to reflect the completed migration from Prisma + PostgreSQL to `better-sqlite3-multiple-ciphers` (SQLite with optional AES-256/SQLCipher encryption).
+
+Files changed:
+
+- **README.md** — Updated tech-stack description, Quick Start commands (removed `npx prisma generate` / `npx prisma migrate deploy`), and project structure (removed `prisma/` directory, updated `src/lib/` description).
+- **docs/deployment.md** — Removed PostgreSQL requirement; added SQLite/`DB_ENCRYPTION_KEY` env vars; replaced `prisma migrate deploy` with a note that schema creation is automatic; updated backup/restore commands to use `.sqlite3` file format.
+- **docs/startup-guide.md** — Removed PostgreSQL prerequisite and `psql` check; replaced `DATABASE_URL` PostgreSQL example with SQLite file path; added `DB_ENCRYPTION_KEY` documentation; replaced Step 4 `prisma migrate deploy` instructions with automatic schema creation explanation; updated backup commands and troubleshooting table.
+- **docs/development-log.md** — Added this entry.
+
+**Decisions:**
+
+No code changes were made. The SQLite migration itself (replacing Prisma with `better-sqlite3-multiple-ciphers`, adding the `DB_ENCRYPTION_KEY` env var, updating seed and backup/restore scripts) was already complete in the codebase; only documentation lagged behind.
+
+---
+
 ## 21 April 2026 — Security Audit (v0.2.0)
 
 **Agent session:** GitHub Copilot Coding Agent

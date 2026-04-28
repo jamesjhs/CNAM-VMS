@@ -3,9 +3,10 @@
 ## Requirements
 
 - Node.js 20+
-- PostgreSQL 15+
 - SMTP server or mail service
 - Linux VPS (Ubuntu 22.04 recommended)
+
+> **No external database required.** The application uses an embedded SQLite database (`better-sqlite3`). The database file and schema are created automatically on first start.
 
 ## Environment Variables
 
@@ -13,7 +14,8 @@ Copy `.env.example` to `.env` and fill in the values:
 
 | Variable | Description | Example |
 |---|---|---|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/cnam_vms` |
+| `DATABASE_URL` | SQLite file path (relative to project root or absolute) | `file:./data/cnam-vms.db` |
+| `DB_ENCRYPTION_KEY` | AES-256/SQLCipher encryption key (optional; generate with `openssl rand -base64 32`) | — |
 | `AUTH_SECRET` | NextAuth secret (generate with `openssl rand -base64 32`) | — |
 | `AUTH_URL` | Public URL of the app | `https://vms.example.com` |
 | `EMAIL_SERVER_HOST` | SMTP hostname | `smtp.example.com` |
@@ -25,6 +27,7 @@ Copy `.env.example` to `.env` and fill in the values:
 | `ROOT_USER_NAME` | Bootstrap admin name | `Root Admin` |
 | `UPLOAD_DIR` | File upload directory | `/var/uploads/cnam-vms` |
 | `UPLOAD_MAX_SIZE_MB` | Max upload size (MB) | `10` |
+| `PORT` | Port for `next start` / PM2 (default: `3001`) | `3001` |
 
 ## First-time Setup
 
@@ -41,16 +44,14 @@ npm ci
 cp .env.example .env
 # Edit .env with your values
 
-# 4. Run database migrations
-npx prisma migrate deploy
-
-# 5. Seed initial data (creates root user and roles)
+# 4. Seed initial data (creates root user and roles)
+# The SQLite database file and schema are created automatically on first run
 npm run db:seed
 
-# 6. Build for production
+# 5. Build for production
 npm run build
 
-# 7. Start the server
+# 6. Start the server
 npm start
 ```
 
@@ -69,7 +70,7 @@ pm2 startup
 
 ```bash
 # Set environment variables
-export DATABASE_URL="postgresql://..."
+export DATABASE_URL="file:./data/cnam-vms.db"
 export BACKUP_DIR="/var/backups/cnam-vms"
 export UPLOAD_DIR="/var/uploads/cnam-vms"
 
@@ -82,19 +83,19 @@ chmod +x scripts/backup.sh
 
 ```bash
 # Daily backup at 2am
-0 2 * * * cd /opt/cnam-vms && DATABASE_URL="postgresql://..." ./scripts/backup.sh >> /var/log/cnam-vms-backup.log 2>&1
+0 2 * * * cd /opt/cnam-vms && DATABASE_URL="file:./data/cnam-vms.db" ./scripts/backup.sh >> /var/log/cnam-vms-backup.log 2>&1
 ```
 
 ### Restore
 
 ```bash
-export DATABASE_URL="postgresql://..."
+export DATABASE_URL="file:./data/cnam-vms.db"
 
 # Restore database only
-./scripts/restore.sh --db /var/backups/cnam-vms/db_20260101_020000.dump
+./scripts/restore.sh --db /var/backups/cnam-vms/db_20260101_020000.sqlite3
 
 # Restore database and uploads
-./scripts/restore.sh --db /var/backups/cnam-vms/db_20260101_020000.dump \
+./scripts/restore.sh --db /var/backups/cnam-vms/db_20260101_020000.sqlite3 \
   --uploads /var/backups/cnam-vms/uploads_20260101_020000.tar.gz
 ```
 

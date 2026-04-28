@@ -14,9 +14,10 @@ Before following any steps below, make sure you have the following:
 |---|---|
 | A server or computer running **Ubuntu 22.04** (or similar Linux) | The application runs on Linux |
 | **Node.js version 20 or newer** | The application is built with Node.js |
-| A running **PostgreSQL** database (version 15 or newer) | All data is stored in PostgreSQL |
 | An **SMTP email account** (e.g. a Gmail/Outlook app password, or a transactional mail service such as Mailgun or Postmark) | The system sends sign-in links by email |
 | The **CNAM-VMS source code** — either downloaded from GitHub or provided to you | The application itself |
+
+> **No separate database server needed.** The application uses an embedded SQLite database that is created automatically in the `data/` folder when the application first starts.
 
 ### Checking whether Node.js is installed
 
@@ -27,14 +28,6 @@ node --version
 ```
 
 You should see something like `v20.x.x` or higher. If you see a lower version number or an error, you will need to install or upgrade Node.js. Instructions can be found at [nodejs.org](https://nodejs.org/en/download).
-
-### Checking whether PostgreSQL is installed
-
-```bash
-psql --version
-```
-
-You should see something like `psql (PostgreSQL) 15.x`. If not, follow the [PostgreSQL installation guide](https://www.postgresql.org/download/).
 
 ---
 
@@ -76,23 +69,24 @@ Now open the `.env` file in a text editor (e.g. `nano .env`) and fill in the val
 ### Database
 
 ```
-DATABASE_URL="postgresql://myuser:mypassword@localhost:5432/cnam_vms"
+DATABASE_URL="file:./data/cnam-vms.db"
 ```
 
-Replace `myuser`, `mypassword`, and `cnam_vms` with your PostgreSQL username, password, and database name. If you are unsure, ask whoever set up the database, or see the section below on creating the database.
+This sets the location of the SQLite database file. The path is relative to the project root. The file and its parent folder are created automatically — you do not need to set up a database server.
 
-#### Creating the database (if it does not already exist)
+#### Optional: Database encryption
+
+```
+DB_ENCRYPTION_KEY="paste-a-long-random-string-here"
+```
+
+If set, the database is encrypted at rest using AES-256 (SQLCipher). Generate a key with:
 
 ```bash
-sudo -u postgres psql -c "CREATE USER cnam_vms_user WITH PASSWORD 'choose-a-strong-password';"
-sudo -u postgres psql -c "CREATE DATABASE cnam_vms OWNER cnam_vms_user;"
+openssl rand -base64 32
 ```
 
-Then set `DATABASE_URL` to:
-
-```
-DATABASE_URL="postgresql://cnam_vms_user:choose-a-strong-password@localhost:5432/cnam_vms"
-```
+**Important:** Back up this key securely. If you lose it, you lose access to the database. You can leave this variable unset for unencrypted operation, which is fine for development or low-risk environments.
 
 ### Security Secret
 
@@ -156,13 +150,9 @@ This sets where uploaded files are stored and how large a single file is allowed
 
 ## Step 4 — Set Up the Database Tables
 
-Run the following command to create all the necessary database tables:
+The SQLite database file and all required tables are created **automatically** the first time the application (or the seed script in Step 5) starts. You do not need to run any migration commands.
 
-```bash
-npx prisma migrate deploy
-```
-
-You should see a series of messages confirming that each migration has been applied.
+If you need to verify the database was created after the next step, you will find it at the path specified in `DATABASE_URL` (default: `data/cnam-vms.db` inside the project folder).
 
 ---
 
@@ -290,12 +280,12 @@ A sample Nginx configuration is provided in [`docs/deployment.md`](deployment.md
 The system includes backup scripts. To take a manual backup:
 
 ```bash
-export DATABASE_URL="postgresql://cnam_vms_user:password@localhost:5432/cnam_vms"
+export DATABASE_URL="file:./data/cnam-vms.db"
 export BACKUP_DIR="/var/backups/cnam-vms"
 ./scripts/backup.sh
 ```
 
-To schedule automatic daily backups, see [`docs/deployment.md`](deployment.md).
+The backup script creates a `.sqlite3` snapshot of the database and a `.tar.gz` archive of the upload directory. To schedule automatic daily backups, see [`docs/deployment.md`](deployment.md).
 
 ---
 
@@ -303,7 +293,7 @@ To schedule automatic daily backups, see [`docs/deployment.md`](deployment.md).
 
 | Symptom | What to check |
 |---|---|
-| "Cannot connect to database" | Check `DATABASE_URL` in `.env`, and that PostgreSQL is running (`sudo systemctl status postgresql`) |
+| "Cannot open database" or database errors on start | Check `DATABASE_URL` in `.env` points to a writable path; ensure the `data/` directory exists or is creatable |
 | Sign-in emails not arriving | Check your SMTP settings in `.env`; look in the application log (`pm2 logs cnam-vms`) for errors |
 | "Application crashed" | Check `pm2 logs cnam-vms` for the error message |
 | Port 3000 already in use | Another process is using that port; run `pm2 stop cnam-vms` and try again, or restart the server |

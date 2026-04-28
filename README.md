@@ -2,7 +2,7 @@
 
 City of Norwich Aviation Museum — Volunteer Management System
 
-A web-based volunteer and task management application built with Next.js, TypeScript, Tailwind CSS, and PostgreSQL.
+A web-based volunteer and task management application built with Next.js, TypeScript, Tailwind CSS, and SQLite.
 
 ## Features
 
@@ -17,7 +17,7 @@ A web-based volunteer and task management application built with Next.js, TypeSc
 - 📊 **Audit logging** for all key actions with paginated viewer and filters
 - ✏️ **Site content editor** — manage the privacy policy and other site-wide text
 - 📧 **Notification service** (email with stub fallback)
-- 🗄️ **PostgreSQL + Prisma ORM**
+- 🗄️ **SQLite** (via `better-sqlite3`) with optional AES-256 encryption at rest
 - 🔄 **Backup & restore** scripts
 
 ## Quick Start
@@ -33,11 +33,8 @@ npm ci
 cp .env.example .env
 # Edit .env with your values
 
-# Generate Prisma client and apply migrations
-npx prisma generate
-npx prisma migrate deploy
-
 # Seed database (creates root user and roles)
+# The SQLite database and schema are created automatically on first run
 npm run db:seed
 
 # Start development server
@@ -63,13 +60,10 @@ src/
     upload/            # File upload page
     volunteer/         # Volunteer availability preferences
   components/          # Shared React components
-  lib/                 # Utilities (prisma, auth helpers, uploads, notifications, calendar)
+  lib/                 # Utilities (db, auth helpers, uploads, notifications, calendar)
   types/               # TypeScript type declarations
   auth.ts              # Auth.js configuration
-prisma/
-  schema.prisma        # Database schema
-  seed.ts              # Seed script
-scripts/               # Backup and restore scripts
+scripts/               # Backup, restore, and seed scripts
 docs/                  # Documentation
 ```
 
