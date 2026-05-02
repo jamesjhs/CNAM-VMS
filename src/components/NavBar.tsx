@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { auth } from '@/auth';
 import { signOutAction } from '@/lib/signout-action';
 import MobileMenu, { type NavLink } from './MobileMenu';
+import VersionDisplay from './VersionDisplay';
 
 export default async function NavBar() {
   const session = await auth();
@@ -61,18 +62,19 @@ export default async function NavBar() {
   }
 
   return (
-    <nav className="bg-[#1a3a5c] text-white shadow-md relative">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <div className="flex items-center gap-6">
-            <Link href={session ? '/dashboard' : '/'} className="font-bold text-lg tracking-tight text-white hover:text-amber-300 transition-colors">
-              CNAM VMS
-            </Link>
+    <>
+      <nav className="bg-[#1a3a5c] text-white shadow-md relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo */}
+            <div className="flex items-center gap-6">
+              <Link href={session ? '/dashboard' : '/'} className="font-bold text-lg tracking-tight text-white hover:text-amber-300 transition-colors">
+                CNAM VMS
+              </Link>
 
-            {/* Desktop nav links (hidden on mobile) */}
-            {session && (
-              <div className="hidden md:flex items-center gap-6">
+              {/* Desktop nav links (hidden on mobile) */}
+              {session && (
+                <div className="hidden md:flex items-center gap-6">
                 <Link href="/dashboard" className="text-gray-300 hover:text-white text-sm transition-colors">
                   Dashboard
                 </Link>
@@ -251,6 +253,8 @@ export default async function NavBar() {
           </div>
         </div>
       </div>
+      <VersionDisplay />
     </nav>
+    </>
   );
 }

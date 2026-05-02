@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import CookieBanner from '@/components/CookieBanner';
 import VersionNotice from '@/components/VersionNotice';
+import { VersionCheckProvider } from '@/components/VersionCheckProvider';
 import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration';
 import Link from 'next/link';
 import { APP_VERSION } from '@/lib/version';
@@ -48,7 +49,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen bg-gray-50 text-gray-900">
-        {children}
+        <VersionCheckProvider>
+          {children}
+        </VersionCheckProvider>
         <footer className="bg-[#1a3a5c] text-gray-300 text-xs text-center py-3 px-4">
           <div className="space-x-2">
             <Link href="/help" className="hover:text-white transition-colors underline">

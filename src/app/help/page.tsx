@@ -1,5 +1,6 @@
 import NavBar from '@/components/NavBar';
 import Link from 'next/link';
+import { APP_VERSION } from '@/lib/version';
 
 export const metadata = {
   title: 'User Manual — CNAM VMS',
@@ -156,6 +157,12 @@ export default function HelpPage() {
     <div className="min-h-screen flex flex-col bg-gray-50">
       <NavBar />
       <main className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
+        {/* Version Banner */}
+        <div className="mb-8 p-4 rounded-lg bg-blue-50 border border-blue-200 text-blue-900">
+          <strong>CNAM VMS v{APP_VERSION}</strong>
+          <p className="text-sm mt-1">Check this page regularly for updates. Your browser will automatically refresh when a new version is deployed.</p>
+        </div>
+
         {/* Breadcrumb */}
         <nav className="text-sm text-gray-500 mb-6 flex items-center gap-2">
           <Link href="/dashboard" className="hover:text-gray-700">
