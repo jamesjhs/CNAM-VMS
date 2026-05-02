@@ -152,10 +152,13 @@ export async function submitPassword(formData: FormData) {
 
   // Send OTP email
   try {
-    await sendOtpEmail(email, otp);
+    const mailResult = await sendOtpEmail(email, otp);
+    if (!mailResult.success) {
+      console.error(`[mail] Failed to send OTP email for @${emailDomain(email)}: ${mailResult.error}`);
+      // Still proceed to verify page so user can retry; we'll show a warning there
+    }
   } catch (err) {
-    // Log the SMTP error so it is visible in PM2 logs, but don't surface it to
-    // the user — they can still proceed to the verify page and request a resend.
+    // Log the SMTP error so it is visible in PM2 logs
     console.error('[mail] Failed to send OTP email:', err);
   }
 
@@ -315,7 +318,10 @@ export async function requestPasswordReset(formData: FormData) {
 
     const resetUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
     try {
-      await sendPasswordResetEmail(email, resetUrl);
+      const mailResult = await sendPasswordResetEmail(email, resetUrl);
+      if (!mailResult.success) {
+        console.error(`[mail] Failed to send password reset email for @${emailDomain(email)}: ${mailResult.error}`);
+      }
     } catch (err) {
       // Log the SMTP error so it is visible in PM2 logs, but don't reveal it
       // to the caller — the user always sees the generic "email sent" response.
