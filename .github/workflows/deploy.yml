@@ -47,7 +47,13 @@ jobs:
       - name: Compress files
         run: |
           # Create the deployment archive
-          tar -czf ../deploy.tar.gz --exclude=.git --exclude=node_modules --exclude=.next .
+          # Include .next/standalone (contains built server.js) but exclude local node_modules
+          tar -czf ../deploy.tar.gz \
+            --exclude=.git \
+            --exclude=node_modules \
+            --exclude=.next/cache \
+            --exclude=.next/.turbopack \
+            .
           
           # Move the archive back to current directory
           mv ../deploy.tar.gz .
@@ -59,6 +65,7 @@ jobs:
           fi
           
           # Show archive size for debugging
+          echo "Archive created successfully"
           ls -lh deploy.tar.gz
           
       - name: Install Cloudflared
@@ -108,13 +115,20 @@ jobs:
               exit 1
             fi
             
-            echo "Extracting archive..."
+            echo "Validating archive..."
             tar -tzf deploy.tar.gz > /dev/null || (echo "ERROR: Archive is corrupted"; exit 1)
+            
+            # Check that server.js exists in archive
+            if ! tar -tzf deploy.tar.gz | grep -q "\.next/standalone/server.js"; then
+              echo "ERROR: server.js not found in archive"
+              exit 1
+            fi
             
             # Backup current state
             if [ -d current ]; then
               echo "Backing up current deployment..."
-              mv current current.backup.$(date +%s)
+              BACKUP_TIME=$(date +%s)
+              mv current "current.backup.$BACKUP_TIME"
             fi
             
             # Extract to temporary directory, then move
@@ -122,20 +136,20 @@ jobs:
             mkdir -p current
             tar -xzf deploy.tar.gz -C current
             
-            echo "Installing dependencies..."
-            cd current
-            npm ci --omit=dev --verbose
-            
-            # Verify critical files exist
-            if [ ! -f .next/standalone/server.js ]; then
-              echo "ERROR: server.js missing after extraction. Deployment failed."
-              cd ..
-              rm -rf current
-              if [ -d current.backup.* ]; then
+            # Verify server.js exists after extraction
+            if [ ! -f current/.next/standalone/server.js ]; then
+              echo "ERROR: server.js missing after extraction"
+              if [ -d "current.backup."* ]; then
+                echo "Rolling back to previous deployment..."
+                rm -rf current
                 mv current.backup.* current
               fi
               exit 1
             fi
+            
+            echo "Installing dependencies..."
+            cd current
+            npm ci --omit=dev --verbose
             
             echo "Cleaning up..."
             rm -f $DEPLOY_DIR/deploy.tar.gz
