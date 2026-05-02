@@ -1,12 +1,14 @@
-'use client';
-
 import NavBar from '@/components/NavBar';
 import Link from 'next/link';
-import { useState } from 'react';
+
+export const metadata = {
+  title: 'Help & User Manual — CNAM VMS',
+  description: 'Complete guide for using the CNAM Volunteer Management System',
+};
+
+export const dynamic = 'force-dynamic';
 
 export default function HelpPage() {
-  const [searchTerm, setSearchTerm] = useState('');
-
   const helpSections = [
     {
       id: 'getting-started',
@@ -150,18 +152,6 @@ export default function HelpPage() {
     },
   ];
 
-  const filteredSections = helpSections
-    .map((section) => ({
-      ...section,
-      content: section.content.filter(
-        (item) =>
-          searchTerm === '' ||
-          item.heading.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.text.toLowerCase().includes(searchTerm.toLowerCase())
-      ),
-    }))
-    .filter((section) => section.content.length > 0);
-
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <NavBar />
@@ -182,38 +172,21 @@ export default function HelpPage() {
             <p className="text-gray-600">Complete guide for using the CNAM Volunteer Management System</p>
           </div>
 
-          {/* Search */}
-          <div className="mb-8">
-            <input
-              type="text"
-              placeholder="🔍 Search help topics..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-            />
-          </div>
-
           {/* Help Sections */}
           <div className="space-y-8">
-            {filteredSections.length > 0 ? (
-              filteredSections.map((section) => (
-                <div key={section.id} className="border-b border-gray-200 pb-8 last:border-b-0">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-4">{section.title}</h2>
-                  <div className="space-y-4">
-                    {section.content.map((item, idx) => (
-                      <div key={idx} className="ml-2">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-2">{item.heading}</h3>
-                        <p className="text-gray-700 leading-relaxed">{item.text}</p>
-                      </div>
-                    ))}
-                  </div>
+            {helpSections.map((section) => (
+              <div key={section.id} className="border-b border-gray-200 pb-8 last:border-b-0">
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">{section.title}</h2>
+                <div className="space-y-4">
+                  {section.content.map((item, idx) => (
+                    <div key={idx} className="ml-2">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-2">{item.heading}</h3>
+                      <p className="text-gray-700 leading-relaxed">{item.text}</p>
+                    </div>
+                  ))}
                 </div>
-              ))
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-500">No results found for "{searchTerm}". Try a different search term.</p>
               </div>
-            )}
+            ))}
           </div>
         </div>
 

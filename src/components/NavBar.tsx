@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { auth, signOut } from '@/auth';
+import { auth } from '@/auth';
+import { signOutAction } from '@/lib/signout-action';
 import MobileMenu, { type NavLink } from './MobileMenu';
 
 export default async function NavBar() {
@@ -208,12 +209,7 @@ export default async function NavBar() {
                   <Link href="/profile" className="text-sm text-gray-300 hover:text-white transition-colors">
                     {session.user?.name ?? session.user?.email}
                   </Link>
-                  <form
-                    action={async () => {
-                      'use server';
-                      await signOut({ redirectTo: '/' });
-                    }}
-                  >
+                  <form action={signOutAction}>
                     <button
                       type="submit"
                       className="text-sm bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded transition-colors"
@@ -224,13 +220,7 @@ export default async function NavBar() {
                 </div>
 
                 {/* Mobile sign-out button (always visible alongside hamburger) */}
-                <form
-                  className="md:hidden"
-                  action={async () => {
-                    'use server';
-                    await signOut({ redirectTo: '/' });
-                  }}
-                >
+                <form className="md:hidden" action={signOutAction}>
                   <button
                     type="submit"
                     className="text-sm bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded transition-colors"
