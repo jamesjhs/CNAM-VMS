@@ -23,9 +23,18 @@ export async function guardSubmission<T>(
     return existing;
   }
 
+  // Delete the entry BEFORE executing handler to prevent rejected promise reuse
+  // If handler throws/rejects, we'll not be returning a stale rejected promise on retry
   const promise = handler()
-    .finally(() => {
+    .catch((err) => {
+      // Error case: clean up and re-throw
       activeSubmissions.delete(key);
+      throw err;
+    })
+    .then((result) => {
+      // Success case: clean up and return result
+      activeSubmissions.delete(key);
+      return result;
     });
 
   activeSubmissions.set(key, promise);
