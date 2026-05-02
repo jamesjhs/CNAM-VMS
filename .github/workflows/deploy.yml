@@ -26,7 +26,7 @@ jobs:
           npm run build
 
       - name: Compress files
-        run: tar -czf deploy.tar.gz --exclude=.git --exclude=node_modules .
+        run: tar -czf deploy.tar.gz --exclude=.git --exclude=node_modules --exclude=deploy.tar.gz .
 
       - name: Install Cloudflared
         run: |
