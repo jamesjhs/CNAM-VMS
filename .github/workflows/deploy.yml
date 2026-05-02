@@ -20,26 +20,19 @@ jobs:
         with:
           node-version: '24'
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
       - name: Install Dependencies & Build
         run: |
           npm ci
           npm run build
 
       - name: Compress files
-        run: tar -czf deploy.tar.gz --exclude=.git --exclude=node_modules .
-
+        run: |
+          # 1. Create the zip file one folder level OUTSIDE our current directory
+          tar -czf ../deploy.tar.gz --exclude=.git --exclude=node_modules .
+          
+          # 2. Move the finished zip file back INSIDE our current directory
+          mv ../deploy.tar.gz .
+          
       - name: Install Cloudflared
         run: |
           curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
@@ -54,6 +47,7 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           
+          # Stripped out the broken flags. It just points to your host now.
           cat <<EOF > ~/.ssh/config
           Host $SERVER_HOST
             StrictHostKeyChecking no
@@ -62,20 +56,22 @@ jobs:
 
       - name: Transfer and Deploy over Tunnel
         env:
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          # THE FIX: These are the exact variable names cloudflared actually looks for
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
         run: |
-          # 1. Send the file over the tunnel to your specific directory
-          scp deploy.tar.gz root@$SERVER_HOST:/var/node/cnamvms.jahosi.co.uk-3001/
+          # 1. Send the file over the tunnel
+          scp deploy.tar.gz nodeapp@$SERVER_HOST:/var/node/cnamvms.jahosi.co.uk-3001/
           
-          # 2. Execute the remote commands in that directory
-          ssh root@$SERVER_HOST << 'EOF'
+          # 2. Execute the remote commands
+          ssh nodeapp@$SERVER_HOST << 'EOF'
             cd /var/node/cnamvms.jahosi.co.uk-3001/
             tar -xzf deploy.tar.gz
             rm deploy.tar.gz
-            npm install --omit=dev
             
-            # Restart PM2 (Make sure this matches your actual PM2 process name)
+            npm ci --omit=dev
+            
+            # Restart PM2
             pm2 restart CNAM3001
           EOF
