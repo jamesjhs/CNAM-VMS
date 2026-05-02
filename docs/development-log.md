@@ -17,6 +17,41 @@ Entries are listed in reverse chronological order (newest first). Each entry rec
 
 ---
 
+## 2 May 2026 — Museum Status Capability Fix & Training Policies Bug Fix (v0.5.1)
+
+**Agent session:** GitHub Copilot CLI
+
+**What was done:**
+
+Version bumped from 0.5.0 to 0.5.1. Fixed two critical bugs preventing access to Museum Status & Hours and Training Policies admin pages.
+
+### Bug 1: Museum Status access denied for admin users
+
+**Symptom:** Root and Admin users could not access `/admin/museum` page; received "Access Denied" error despite having admin privileges.
+
+**Root cause:** The `admin:museum.write` capability was defined in the system but was not being assigned to the Admin role during database seeding. The seed script only assigned it to the Root role.
+
+**Fix:** Updated `scripts/seed.ts` to include `'admin:museum.write'` in the `adminCapKeys` array. Re-seeded the database with `npm run db:seed` after deleting the stale database file.
+
+### Bug 2: Training Policies page server component render error
+
+**Symptom:** Navigating to `/admin/training` resulted in a Server Component render error: `0n~dq4kpx9xxx.js:1 Uncaught Error: An error occurred in the Server Components render...`
+
+**Root cause:** Column name mismatch in the database query. The page was querying for `trainingPolicyId` from the `training_policy_roles` table, but the actual column name is `policyId` (lowercase 'p').
+
+**Fix:** Corrected the query in `src/app/admin/training/page.tsx` line 35 from:
+```sql
+SELECT trainingPolicyId, accountType FROM training_policy_roles
+```
+to:
+```sql
+SELECT policyId, accountType FROM training_policy_roles
+```
+
+**Additional fix:** Corrected `DATABASE_URL` in `.env` from PostgreSQL connection string to SQLite file path (`file:./data/cnam-vms.db`).
+
+---
+
 ## 28 April 2026 — Runtime Proxy Error Fix & PM2 CWD Fix (v0.6.2)
 
 **Agent session:** GitHub Copilot Coding Agent

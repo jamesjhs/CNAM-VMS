@@ -1,6 +1,6 @@
 # CNAM-VMS Technical Architecture & Information Flows
 
-**Version 0.5.0 — May 2026**
+**Version 0.5.1 — May 2026**
 
 This document provides a comprehensive technical overview of the CNAM-VMS system, including architecture, information flows, dependencies, database schema, and key functions. It is intended for developers, system architects, and technical administrators.
 
