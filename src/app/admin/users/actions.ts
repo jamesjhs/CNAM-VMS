@@ -8,6 +8,12 @@ import { requireCapability } from '@/lib/auth-helpers';
 import { logAudit } from '@/lib/audit';
 import type { UserStatus, UserAccountType } from '@/lib/db-types';
 
+const PHONE_REGEX = /^[\d\s\-\+\(\)]{7,20}$/;
+
+function isValidPhoneNumber(phone: string): boolean {
+  return PHONE_REGEX.test(phone.trim());
+}
+
 // ---------------------------------------------------------------------------
 // User creation
 // ---------------------------------------------------------------------------
@@ -70,7 +76,12 @@ export async function addUserPhone(userId: string, number: string, label: string
   const actor = await requireCapability('admin:users.write');
 
   const trimmedNumber = number.trim();
-  if (!trimmedNumber) return;
+  if (!trimmedNumber) return redirect(`/admin/users/${userId}?error=EmptyPhone`);
+
+  // Validate phone number format
+  if (!isValidPhoneNumber(trimmedNumber)) {
+    return redirect(`/admin/users/${userId}?error=InvalidPhone`);
+  }
 
   const db = getDb();
   db.prepare('INSERT INTO user_phones (id, userId, number, label, createdAt) VALUES (?,?,?,?,?)').run(

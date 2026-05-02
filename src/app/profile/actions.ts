@@ -9,6 +9,11 @@ import { logAudit } from '@/lib/audit';
 import { verifyPassword, hashPassword } from '@/lib/password';
 
 const MIN_PASSWORD_LENGTH = 8;
+const PHONE_REGEX = /^[\d\s\-\+\(\)]{7,20}$/;
+
+function isValidPhoneNumber(phone: string): boolean {
+  return PHONE_REGEX.test(phone.trim());
+}
 
 export async function updateOwnProfile(name: string) {
   const actor = await requireAuth();
@@ -32,7 +37,12 @@ export async function addOwnPhone(number: string, label: string) {
   const actor = await requireAuth();
 
   const trimmedNumber = number.trim();
-  if (!trimmedNumber) return;
+  if (!trimmedNumber) return redirect('/profile?error=EmptyPhone');
+
+  // Validate phone number format
+  if (!isValidPhoneNumber(trimmedNumber)) {
+    return redirect('/profile?error=InvalidPhone');
+  }
 
   const db = getDb();
   db.prepare('INSERT INTO user_phones (id, userId, number, label, createdAt) VALUES (?,?,?,?,?)').run(

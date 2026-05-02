@@ -18,9 +18,19 @@ const MAX_OTP_ATTEMPTS = 5; // Maximum failed OTP attempts before the code is in
 const MAX_PASSWORD_ATTEMPTS = 10; // Maximum failed password attempts per email within the window
 const PASSWORD_LOCKOUT_MS = 15 * 60 * 1000; // 15-minute sliding window for password attempts
 
+// Password complexity requirements
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/;
+
 const PENDING_UID_COOKIE = '_cnam_pending_uid';
 const CALLBACK_URL_COOKIE = '_cnam_cb';
 const KEEP_SIGNED_IN_COOKIE = '_cnam_keep';
+
+/**
+ * Validate password complexity: min 8 chars, uppercase, lowercase, digit, special char
+ */
+function isStrongPassword(password: string): boolean {
+  return PASSWORD_REGEX.test(password);
+}
 
 /**
  * Extract the domain portion of an email address for log messages.
@@ -335,6 +345,11 @@ export async function completePasswordReset(formData: FormData) {
 
   if (newPassword.length < 8) {
     redirect(`/auth/reset-password?token=${encodeURIComponent(token)}&error=TooShort`);
+  }
+
+  // Check password complexity
+  if (!isStrongPassword(newPassword)) {
+    redirect(`/auth/reset-password?token=${encodeURIComponent(token)}&error=WeakPassword`);
   }
 
   const db = getDb();

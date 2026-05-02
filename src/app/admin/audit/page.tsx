@@ -20,13 +20,19 @@ export default async function AuditLogPage({
   const conditions: string[] = [];
   const params: string[] = [];
 
+  // Helper function to escape LIKE wildcards
+  function escapeLike(str: string): string {
+    return str.replace(/([%_\\])/g, '\\$1');
+  }
+
   if (actionFilter) {
-    conditions.push('al.action LIKE ?');
-    params.push(`%${actionFilter}%`);
+    conditions.push('al.action LIKE ? ESCAPE \'\\\'');
+    params.push(`%${escapeLike(actionFilter)}%`);
   }
   if (userFilter) {
-    conditions.push('(u.email LIKE ? OR u.name LIKE ?)');
-    params.push(`%${userFilter}%`, `%${userFilter}%`);
+    const escaped = escapeLike(userFilter);
+    conditions.push('(u.email LIKE ? ESCAPE \'\\\' OR u.name LIKE ? ESCAPE \'\\\')');
+    params.push(`%${escaped}%`, `%${escaped}%`);
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';

@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
   const mimeType = file.type || 'application/octet-stream';
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  const validationError = validateFile(originalName, mimeType, buffer.length);
+  const validationError = validateFile(originalName, mimeType, buffer.length, buffer);
   if (validationError) {
     return NextResponse.json({ error: validationError }, { status: 400 });
   }

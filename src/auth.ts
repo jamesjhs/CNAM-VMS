@@ -8,10 +8,10 @@ import { createSqliteAdapter } from '@/lib/auth-adapter';
 import type { UserStatus } from '@/lib/db-types';
 
 // How long (in seconds) capability/status data cached in the JWT remains
-// fresh before being re-read from the database.  A short TTL (5 minutes)
+// fresh before being re-read from the database.  A short TTL (1 minute)
 // means capability changes propagate quickly without a DB hit on every
 // request.
-const CAPABILITIES_CACHE_TTL = 5 * 60; // 5 minutes
+const CAPABILITIES_CACHE_TTL = 60; // 1 minute
 
 /**
  * Fetch the current user's status, mustChangePassword flag, and capability
@@ -47,10 +47,16 @@ async function fetchUserClaims(userId: string): Promise<{
  * The Root role is created if it does not already exist, and all capabilities
  * are upserted and assigned to it so the admin can access protected pages
  * without requiring a separate seed step.
- * This is called automatically for the ROOT_USER_EMAIL on sign-in.
+ * Only promotes if the user is not already ACTIVE, ensuring one-time promotion.
  */
 function promoteToRootUser(userId: string): void {
   const db = getDb();
+  
+  // Check if user is already ACTIVE (already promoted)
+  type UserRow = { status: string };
+  const user = db.prepare('SELECT status FROM users WHERE id = ?').get(userId) as UserRow | undefined;
+  if (user?.status === 'ACTIVE') return; // Already promoted, skip
+  
   const ts = now();
 
   // Ensure every capability exists
@@ -81,7 +87,7 @@ function promoteToRootUser(userId: string): void {
     db.prepare('INSERT OR IGNORE INTO role_capabilities (roleId, capabilityId) VALUES (?,?)').run(rootRole.id, cap.id);
   }
 
-  // Promote user to ACTIVE and assign Root role
+  // Promote user to ACTIVE and assign Root role (one-time operation)
   db.prepare('UPDATE users SET status=?, updatedAt=? WHERE id=?').run('ACTIVE', ts, userId);
   db.prepare('INSERT OR IGNORE INTO user_roles (userId, roleId, grantedAt) VALUES (?,?,?)').run(userId, rootRole.id, ts);
 }
