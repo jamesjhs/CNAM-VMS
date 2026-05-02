@@ -2,7 +2,7 @@ import NavBar from '@/components/NavBar';
 import Link from 'next/link';
 
 export const metadata = {
-  title: 'Help & User Manual — CNAM VMS',
+  title: 'User Manual — CNAM VMS',
   description: 'Complete guide for using the CNAM Volunteer Management System',
 };
 
