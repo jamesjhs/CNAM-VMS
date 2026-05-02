@@ -9,7 +9,8 @@ export default async function CoordinationVolunteersPage() {
 
   // Get all volunteers with their info
   const rawVolunteers = db.prepare(`
-    SELECT u.id, u.name, u.email, u.phone, u.accountType, u.status, u.createdAt,
+    SELECT u.id, u.name, u.email, u.accountType, u.status, u.createdAt,
+           (SELECT number FROM user_phones WHERE userId = u.id AND isPrimary = 1 LIMIT 1) as phone,
            COUNT(DISTINCT ut.teamId) as teamCount,
            COUNT(DISTINCT es.eventId) as eventSignups
     FROM users u

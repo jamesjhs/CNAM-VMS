@@ -36,7 +36,7 @@ export default async function CoordinationProjectsPage() {
 
   for (const team of teams) {
     const rawTasks = db.prepare(`
-      SELECT tt.id, tt.title, tt.description, tt.urgency, tt.status, tt.createdAt,
+      SELECT tt.id, tt.title, tt.description, tt.urgency, tt.isActive, tt.createdAt,
              COUNT(DISTINCT twl.id) as logCount
       FROM team_tasks tt
       LEFT JOIN team_work_logs twl ON tt.id = twl.taskId
@@ -48,7 +48,7 @@ export default async function CoordinationProjectsPage() {
       title: string;
       description: string | null;
       urgency: string;
-      status: string;
+      isActive: number;
       createdAt: string;
       logCount: number;
     }[];
@@ -116,7 +116,7 @@ export default async function CoordinationProjectsPage() {
                   <div className="divide-y divide-gray-100">
                     {tasks.map((task) => {
                       const urgencyInfo = urgencyBadges[task.urgency as keyof typeof urgencyBadges] || urgencyBadges.LOW;
-                      const statusInfo = statusBadges[task.status as keyof typeof statusBadges] || statusBadges.PENDING;
+                      const statusInfo = statusBadges[task.isActive ? 'IN_PROGRESS' : 'PENDING'] || statusBadges.PENDING;
 
                       return (
                         <div key={task.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
