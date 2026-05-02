@@ -51,10 +51,13 @@ export default function SignInForm({ callbackUrl, error, reset }: SignInFormProp
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
       console.error('[SignIn] Submission error:', err);
       
-      // Only show generic error if it's not a redirect error
-      if (!errorMessage.includes('NEXT_REDIRECT')) {
-        setSubmitError('Failed to sign in. Please check your email and password and try again.');
+      // Rethrow NEXT_REDIRECT so Next.js can process redirects
+      if (errorMessage.includes('NEXT_REDIRECT')) {
+        throw err;
       }
+      
+      // Show generic error for other failures
+      setSubmitError('Failed to sign in. Please check your email and password and try again.');
     }
   };
 
