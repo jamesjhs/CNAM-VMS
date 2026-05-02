@@ -16,6 +16,12 @@ export default async function NavBar() {
     capabilities.includes('admin:training.write') ||
     capabilities.includes('admin:tasks.write');
 
+  const isStaff =
+    capabilities.includes('staff:volunteer.read') ||
+    capabilities.includes('staff:projects.read') ||
+    capabilities.includes('staff:messaging.write') ||
+    capabilities.includes('staff:schedule.read');
+
   // Build nav link lists to pass to the mobile menu client component
   const mainLinks: NavLink[] = session
     ? [
@@ -24,8 +30,18 @@ export default async function NavBar() {
         { href: '/announcements', label: 'Announcements' },
         { href: '/files', label: 'Files' },
         { href: '/teams', label: 'Teams' },
+        { href: '/help', label: '❓ Help' },
       ]
     : [];
+
+  const staffLinks: NavLink[] = [];
+  if (isStaff) {
+    staffLinks.push({ href: '/staff', label: 'Overview' });
+    if (capabilities.includes('staff:volunteer.read')) staffLinks.push({ href: '/staff/volunteers', label: 'Volunteers' });
+    if (capabilities.includes('staff:schedule.read')) staffLinks.push({ href: '/staff/availability', label: 'Availability' });
+    if (capabilities.includes('staff:projects.read')) staffLinks.push({ href: '/staff/projects', label: 'Projects' });
+    if (capabilities.includes('staff:messaging.write')) staffLinks.push({ href: '/staff/messages', label: 'Messages' });
+  }
 
   const adminLinks: NavLink[] = [];
   if (isAdmin) {
@@ -71,6 +87,44 @@ export default async function NavBar() {
                 <Link href="/teams" className="text-gray-300 hover:text-white text-sm transition-colors">
                   Teams
                 </Link>
+                <Link href="/help" className="text-gray-300 hover:text-white text-sm transition-colors">
+                  ❓ Help
+                </Link>
+                {isStaff && (
+                  <div className="relative group">
+                    <button className="text-amber-300 hover:text-amber-200 text-sm transition-colors flex items-center gap-1 py-5 font-medium">
+                      Staff
+                      <svg className="w-3 h-3 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    <div className="absolute left-0 top-full hidden group-hover:block bg-white rounded-lg shadow-lg border border-gray-100 min-w-48 py-1 z-50">
+                      <Link href="/staff" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                        Overview
+                      </Link>
+                      {capabilities.includes('staff:volunteer.read') && (
+                        <Link href="/staff/volunteers" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          Volunteers
+                        </Link>
+                      )}
+                      {capabilities.includes('staff:schedule.read') && (
+                        <Link href="/staff/availability" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          Availability
+                        </Link>
+                      )}
+                      {capabilities.includes('staff:projects.read') && (
+                        <Link href="/staff/projects" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          Projects
+                        </Link>
+                      )}
+                      {capabilities.includes('staff:messaging.write') && (
+                        <Link href="/staff/messages" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          Messages
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {isAdmin && (
                   <div className="relative group">
                     <button className="text-gray-300 hover:text-white text-sm transition-colors flex items-center gap-1 py-5">
@@ -189,7 +243,9 @@ export default async function NavBar() {
                 <MobileMenu
                   links={mainLinks}
                   adminLinks={adminLinks}
+                  staffLinks={staffLinks}
                   isAdmin={isAdmin}
+                  isStaff={isStaff}
                   userName={session.user?.name}
                   userEmail={session.user?.email}
                 />
