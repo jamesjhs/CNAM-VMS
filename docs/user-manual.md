@@ -2,13 +2,32 @@
 
 **City of Norwich Aviation Museum — Volunteer Management System**
 
-*Version 2.0 — March 2026*
+*Version 0.5.0 — May 2026*
 
 ---
 
-Welcome to the City of Norwich Aviation Museum Volunteer Management System — or "the VMS" for short. This manual explains everything you need to know to use the system, whether you are a volunteer, a team leader, or an administrator. It is written in plain English, without jargon, and you do not need any technical knowledge to follow it.
+## Welcome! 👋
 
-If you have a question that is not answered here, or if something is not working as expected, please contact your administrator.
+Welcome to the City of Norwich Aviation Museum Volunteer Management System — or **the VMS** for short. 
+
+This is your central hub for managing your volunteer activities, coordinating with your team, and staying connected with the museum. Whether you're a volunteer looking to sign up for shifts, a team leader organizing tasks, or an administrator managing the whole operation, this manual will guide you through everything step by step.
+
+**This manual is written for everyone** — no technical knowledge required. Just straightforward explanations and clear instructions.
+
+---
+
+### Quick Navigation
+- ⏱️ **5 minutes?** Start with [Getting Access](#2-getting-access) and [Signing In](#3-signing-in)
+- 📅 **First shift?** Jump to [The Schedule & Calendar](#9-the-schedule--calendar)
+- 👥 **Team lead?** See [Teams](#10-teams) and [Admin Panel](#16-the-admin-panel-administrators)
+- 🔐 **Security questions?** Read [Privacy and Security](#18-privacy-and-security)
+- ❓ **Can't find something?** Check [Frequently Asked Questions](#19-frequently-asked-questions)
+
+---
+
+If you have a question not answered here, or something isn't working as expected, please contact your administrator.
+
+
 
 ---
 
@@ -61,31 +80,96 @@ Once your account has been created, you will receive an email from the administr
 
 ## 3. Signing In
 
-Signing in to the VMS is a two-step process to keep your account secure: you enter your email address and password, and then confirm your identity with a one-time code sent to your email.
+Signing in to the VMS is a **two-step process** to keep your account secure:
 
-### How to sign in, step by step
+```
+┌─────────────────────┐
+│  STEP 1: Password   │
+│  (You → VMS)        │
+│  Email + Password   │
+└────────────┬────────┘
+             │
+             ✓ Verified
+             │
+┌────────────▼────────┐
+│  STEP 2: OTP Code   │
+│  (Email → You)      │
+│  6-digit code       │
+└────────────┬────────┘
+             │
+             ✓ Verified
+             │
+┌────────────▼────────┐
+│   Dashboard 🎉      │
+│  Welcome & Home     │
+└─────────────────────┘
+```
 
-1. Open your web browser (Chrome, Firefox, Edge, or Safari all work fine) and go to the VMS address — your administrator will have given you this.
+### Step-by-step sign-in guide
 
-2. You will see the sign-in page. Enter your **email address** and **password**, then click **Sign in**.
+#### 1️⃣ Start at the sign-in page
 
-   > **Tip:** There is a **"Keep me signed in for 7 days"** checkbox. If you are on your own computer or device, tick this to avoid having to sign in every two hours. Do not tick it on a shared or public computer.
+Open your web browser (Chrome, Firefox, Edge, or Safari all work fine) and go to the VMS address — your administrator will have given you this.
 
-3. The system will send a **6-digit verification code** to your email address. You will be taken to a screen asking you to enter it.
+You will see a form with fields for **Email address** and **Password**.
 
-4. Check your email inbox — you should receive the code within a minute or two. Type it into the box and click **Verify**.
+#### 2️⃣ Enter your credentials
 
-   > **Can't find the email?** Check your junk or spam folder. If it is not there after five minutes, click **Back** and try signing in again.
-   >
-   > **Important:** The verification code expires after **10 minutes**. If it has expired, go back to the sign-in page and start again. After 5 failed attempts the code is cancelled for security — request a new one.
+- Type your **email address** (exactly as it was set up in the system)
+- Type your **password** (case-sensitive)
 
-5. Once verified, you will be taken to your personal Dashboard (see [Section 5](#5-your-dashboard)).
+**Tip:** There is a checkbox **"Keep me signed in for 7 days"**. 
+- ✅ Tick this on **your own computer** to avoid re-signing-in frequently
+- ❌ Do NOT tick this on a **shared or public computer**
 
-   > **First sign-in:** If an administrator has set your account to require a password change, you will be taken to a password-setting page before your dashboard. See [Section 14](#14-managing-your-password) for details.
+#### 3️⃣ Check your email for the verification code
+
+Click **Sign in** and the system will immediately send a **6-digit verification code** to your email address. You will be taken to a code entry screen.
+
+Check your email inbox — the code usually arrives within a minute or two.
+
+> **Can't find the email?** 
+> - Check your Junk or Spam folder
+> - The code is only valid for **10 minutes**
+> - If it expires, go back and click "Request a new code"
+> - After 5 failed attempts, you must start over (for security)
+
+#### 4️⃣ Enter the verification code
+
+Type the 6-digit code into the box on the verification page and click **Verify**.
+
+#### 5️⃣ You're in! 🎉
+
+Once verified, you will be taken to your **Dashboard** (see [Section 5](#5-your-dashboard)).
+
+> **First sign-in?** If an administrator has set your account to require a password change, you will see a password-setting page first. See [Section 14](#14-managing-your-password) for details.
+
+---
 
 ### Forgot your password?
 
-If you have forgotten your password, click **Forgot password?** on the sign-in page and enter your email address. A password reset link will be sent to you by email. Click the link and follow the instructions to set a new password. Reset links expire after **24 hours**.
+If you have forgotten your password, click **Forgot password?** on the sign-in page.
+
+**Password reset process:**
+
+1. Enter your email address
+2. A password reset link is sent to your email (expires in **24 hours**)
+3. Click the link and follow the instructions to set a new password
+4. Sign in with your new password
+
+---
+
+### Troubleshooting sign-in
+
+| Problem | Solution |
+|---------|----------|
+| **"Invalid email or password"** | Check you entered them exactly correctly (passwords are case-sensitive). Try resetting your password. |
+| **"Account suspended"** | Your account has been disabled. Contact your administrator. |
+| **"Account pending"** | Your account is awaiting approval. Contact your team leader or administrator. |
+| **"Verification code invalid"** | The code may have expired. Click **Back** and try signing in again. |
+| **"Too many failed attempts"** | For security, the system has locked the sign-in. Go back and request a new code. |
+
+
 
 ---
 
