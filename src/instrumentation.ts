@@ -8,8 +8,7 @@
  * See: https://nextjs.org/docs/app/building-your-application/optimizing/instrumentation
  */
 
-// Keep in sync with the "version" field in package.json.
-const APP_VERSION = '0.6.3';
+import { APP_VERSION } from '@/lib/version';
 
 export async function register() {
   // Only emit logs from the Node.js server runtime.  The edge / middleware
