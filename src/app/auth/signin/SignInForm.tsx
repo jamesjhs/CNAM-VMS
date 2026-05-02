@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { submitPassword } from '../actions';
 import TurnstileWidget from '@/components/TurnstileWidget';
@@ -15,6 +15,7 @@ interface SignInFormProps {
 export default function SignInForm({ callbackUrl, error, reset }: SignInFormProps) {
   const [turnstileToken, setTurnstileToken] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string>('');
 
   const errorMessages: Record<string, string> = {
     InvalidCredentials: 'Incorrect email address or password. Please try again.',
@@ -22,23 +23,56 @@ export default function SignInForm({ callbackUrl, error, reset }: SignInFormProp
     SessionExpired: 'Your sign-in session expired. Please try again.',
     OAuthAccountNotLinked: 'This email is already associated with another account.',
     TooManyAttempts: 'Too many failed sign-in attempts. Please try again.',
+    TurnstileVerificationFailed: 'Security verification failed. Please try the CAPTCHA again.',
+    SubmissionError: 'Something went wrong submitting the form. Please try again.',
   };
-  const errorMsg = error ? (errorMessages[error] ?? 'Something went wrong. Please try again.') : null;
+  const errorMsg = submitError || (error ? (errorMessages[error] ?? 'Something went wrong. Please try again.') : null);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    if (isTurnstileEnabled && !turnstileToken) {
-      e.preventDefault();
-      alert('Please complete the CAPTCHA');
-      return;
+    setSubmitError('');
+    
+    // Check Turnstile if enabled
+    if (isTurnstileEnabled) {
+      if (!turnstileToken) {
+        e.preventDefault();
+        setSubmitError('Please complete the security verification below.');
+        return;
+      }
     }
 
     setIsSubmitting(true);
+
+    // Wrap the server action in error handling
+    try {
+      const formData = new FormData(e.currentTarget);
+      await submitPassword(formData);
+    } catch (err) {
+      setIsSubmitting(false);
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+      console.error('[SignIn] Submission error:', err);
+      
+      // Only show generic error if it's not a redirect error
+      if (!errorMessage.includes('NEXT_REDIRECT')) {
+        setSubmitError('Failed to sign in. Please check your email and password and try again.');
+      }
+    }
   };
+
+  useEffect(() => {
+    // Reset submit error when component updates
+    setIsSubmitting(false);
+  }, [error]);
 
   return (
     <form action={submitPassword} className="space-y-4" onSubmit={handleSubmit}>
       <input type="hidden" name="callbackUrl" value={callbackUrl ?? '/dashboard'} />
       {isTurnstileEnabled && <input type="hidden" name="turnstileToken" value={turnstileToken} />}
+
+      {errorMsg && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          ⚠️ {errorMsg}
+        </div>
+      )}
 
       <div>
         <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">

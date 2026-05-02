@@ -69,7 +69,7 @@ export async function submitPassword(formData: FormData) {
     const isValidToken = await verifyTurnstileToken(turnstileToken);
     if (!isValidToken) {
       console.warn('[auth] submitPassword: Turnstile verification failed');
-      redirect('/auth/signin?error=InvalidCredentials');
+      redirect('/auth/signin?error=TurnstileVerificationFailed');
     }
   }
 
