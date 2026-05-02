@@ -3,7 +3,7 @@
   "version": "0.7.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p ${PORT:-3001}",
+    "dev": "cross-env PORT=3001 next dev -p 3001",
     "build": "cross-env NODE_OPTIONS=--max-old-space-size=512 next build",
     "postbuild": "node scripts/postbuild.js",
     "start": "node scripts/start.js",
