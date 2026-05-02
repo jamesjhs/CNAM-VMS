@@ -1,6 +1,6 @@
 {
   "name": "cnam-vms",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "scripts": {
     "dev": "cross-env PORT=3001 next dev -p 3001",
