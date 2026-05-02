@@ -22,11 +22,22 @@ export default async function ForgotPasswordPage({
             <p className="text-blue-200 text-sm mt-1">City of Norwich Aviation Museum</p>
           </div>
           <div className="px-8 py-8 text-center">
-            <div className="text-4xl mb-4">📧</div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Check your email</h2>
-            <p className="text-gray-500 text-sm mb-6">
+            <div className="text-6xl mb-4 inline-block">✓</div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Check your email</h2>
+            <p className="text-gray-600 text-sm mb-6 leading-relaxed">
               If an account exists for that email address, we&apos;ve sent a password reset link.
-              The link will expire in 24 hours.
+            </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left mb-6">
+              <p className="text-sm text-blue-900"><strong>What happens next:</strong></p>
+              <ul className="text-sm text-blue-800 mt-2 space-y-1">
+                <li>• Check your email (including spam folder)</li>
+                <li>• Click the reset link in the email</li>
+                <li>• Set a new password</li>
+                <li>• Sign in with your new password</li>
+              </ul>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">
+              The reset link will expire in <strong>24 hours</strong>.
             </p>
             <Link
               href="/auth/signin"

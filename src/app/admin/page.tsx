@@ -106,6 +106,12 @@ export default async function AdminPage() {
             title="System Settings"
             description="Configure site-wide settings including SMTP email delivery."
           />
+          <AdminCard
+            href="/admin/museum"
+            icon="🏛️"
+            title="Museum Status &amp; Hours"
+            description="Manage museum announcements, opening hours, special closures, and bank holidays."
+          />
         </div>
 
         {/* Current user info */}

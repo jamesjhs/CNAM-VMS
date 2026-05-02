@@ -46,14 +46,14 @@ export default async function SchedulePage({
   const currentMonthStr = fmtMonth(year, month);
   const selectedDate = dayParam ? parseDate(dayParam) : null;
 
-  // Admin acting-as: allow admins to view/manage the schedule on behalf of another user
-  const isAdmin = hasCapability(user, 'admin:calendar.write');
-  const isActingAs = isAdmin && !!userIdParam && userIdParam !== user.id;
+  // Check if user has permission to act as others
+  const canActAsOthers = hasCapability(user, 'admin:act-as.write');
+  const isActingAs = canActAsOthers && !!userIdParam && userIdParam !== user.id;
 
-  // Load all users for admin picker (only if admin)
+  // Load all users for admin picker (only if they have permission)
   const db = getDb();
 
-  const allUsers = isAdmin
+  const allUsers = canActAsOthers
     ? (db.prepare(`SELECT id, name, email FROM users WHERE status = 'ACTIVE' ORDER BY name ASC`).all() as {
         id: string; name: string | null; email: string;
       }[])
@@ -152,6 +152,22 @@ export default async function SchedulePage({
     weekDays: unpackArr<number>(j.weekDays, []),
     monthDays: unpackArr<number>(j.monthDays, []),
   }));
+
+  // Fetch museum status, opening hours, and bank holidays
+  type MuseumStatusRow = { date: string; title: string; description: string | null };
+  const museumStatuses = db.prepare(
+    `SELECT date, title, description FROM museum_status WHERE date >= ? AND date < ? ORDER BY date ASC`,
+  ).all(startDateStr, endDateStr) as MuseumStatusRow[];
+
+  type OpeningHoursRow = { startDate: string; endDate: string; status: string; notes: string | null };
+  const openingHours = db.prepare(
+    `SELECT startDate, endDate, status, notes FROM museum_opening_hours WHERE startDate < ? AND endDate >= ? ORDER BY startDate ASC`,
+  ).all(endDateStr, startDateStr) as OpeningHoursRow[];
+
+  type BankHolidayRow = { date: string; name: string };
+  const bankHolidays = db.prepare(
+    `SELECT date, name FROM bank_holidays WHERE date >= ? AND date < ? ORDER BY date ASC`,
+  ).all(startDateStr, endDateStr) as BankHolidayRow[];
 
   const rawUpcomingSignups = db.prepare(`
     SELECT es.id, ce.id as eventId, ce.title, ce.date, ce.startTime, ce.endTime,
@@ -263,14 +279,14 @@ export default async function SchedulePage({
       <main className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
 
         {/* Admin: acting-as banner and user picker */}
-        {isAdmin && (
+        {canActAsOthers && (
           <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
             <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm font-semibold text-amber-800">🛡️ Admin view:</span>
+              <span className="text-sm font-semibold text-amber-800">🛡️ Manage on behalf of:</span>
               <form method="GET" action="/schedule" className="flex items-center gap-2 flex-1 min-w-0">
                 <input type="hidden" name="month" value={currentMonthStr} />
                 <label htmlFor="act-as-user" className="text-sm text-amber-700 shrink-0">
-                  Acting as:
+                  Select:
                 </label>
                 <select
                   id="act-as-user"
@@ -495,6 +511,60 @@ export default async function SchedulePage({
                 </svg>
               </Link>
             </div>
+
+            {/* ── Museum Status, Opening Hours, & Bank Holidays ────────────────── */}
+            {(() => {
+              const selectedDateKey = selectedDate.toISOString().slice(0, 10);
+              const status = museumStatuses.find((s) => s.date === selectedDateKey);
+              const hours = openingHours.find(
+                (h) => selectedDateKey >= h.startDate && selectedDateKey <= h.endDate,
+              );
+              const holiday = bankHolidays.find((b) => b.date === selectedDateKey);
+
+              if (!status && !hours && !holiday) return null;
+
+              return (
+                <div className="px-6 py-4 bg-blue-50 border-b border-blue-200">
+                  {holiday && (
+                    <div className="mb-3 p-3 rounded-lg bg-yellow-50 border border-yellow-200">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🏖️</span>
+                        <div>
+                          <div className="font-medium text-yellow-900">Bank Holiday</div>
+                          <div className="text-sm text-yellow-800">{holiday.name}</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {status && (
+                    <div className="mb-3 p-3 rounded-lg bg-orange-50 border border-orange-200">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">📢</span>
+                        <div>
+                          <div className="font-medium text-orange-900">{status.title}</div>
+                          {status.description && (
+                            <div className="text-sm text-orange-800">{status.description}</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {hours && (
+                    <div className="p-3 rounded-lg bg-purple-50 border border-purple-200">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🕐</span>
+                        <div>
+                          <div className="font-medium text-purple-900">{hours.status}</div>
+                          {hours.notes && <div className="text-sm text-purple-800">{hours.notes}</div>}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* ── Section 1: Scheduled events ──────────────────────────────── */}
             <div className="px-6 py-5 border-b border-gray-100">

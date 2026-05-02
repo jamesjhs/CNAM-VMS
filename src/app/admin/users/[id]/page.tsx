@@ -32,12 +32,15 @@ const ACCOUNT_TYPE_LABELS: Record<UserAccountType, string> = {
 
 export default async function UserDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ success?: string; error?: string }>;
 }) {
   await requireCapability('admin:users.read');
 
   const { id } = await params;
+  const sp = await searchParams;
   const db = getDb();
 
   const rawUser = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as {
@@ -107,6 +110,17 @@ export default async function UserDetailPage({
           <span>/</span>
           <span className="text-gray-900 font-medium">{user.name ?? user.email}</span>
         </nav>
+
+        {/* Success/Error messages */}
+        {sp.success === 'PasswordResetSent' && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 flex items-start gap-3">
+            <span className="text-green-600 text-xl flex-shrink-0">✓</span>
+            <div>
+              <p className="font-medium text-green-900">Password reset email sent</p>
+              <p className="text-sm text-green-800 mt-0.5">An email with password reset instructions has been sent to <strong>{user.email}</strong>. The link will expire in 24 hours.</p>
+            </div>
+          </div>
+        )}
 
         {/* User header */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">

@@ -84,7 +84,7 @@ async function main() {
 
   // --- Admin role ---
   const adminRoleId = upsertRole(db, 'Admin', 'Administrator with user management rights', true);
-  const adminCapKeys = ['admin:users.read','admin:users.write','admin:roles.read','admin:teams.read','admin:teams.write','admin:audit.read','admin:training.write'];
+  const adminCapKeys = ['admin:users.read','admin:users.write','admin:roles.read','admin:teams.read','admin:teams.write','admin:audit.read','admin:training.write','admin:museum.write'];
   for (const key of adminCapKeys) {
     const capId = capMap.get(key);
     if (capId) db.prepare('INSERT OR IGNORE INTO role_capabilities (roleId, capabilityId) VALUES (?,?)').run(adminRoleId, capId);

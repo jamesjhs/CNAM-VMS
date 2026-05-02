@@ -50,13 +50,19 @@ export default function RootLayout({
       <body className="min-h-screen bg-gray-50 text-gray-900">
         {children}
         <footer className="bg-[#1a3a5c] text-gray-300 text-xs text-center py-3 px-4">
-          <Link href="/privacy" className="hover:text-white transition-colors underline">
-            Privacy &amp; Cookie Policy
-          </Link>
-          {' · '}
-          <span>© {new Date().getFullYear()} City of Norwich Aviation Museum</span>
-          {' · '}
-          <span className="opacity-60">v{APP_VERSION}</span>
+          <div className="space-x-2">
+            <Link href="/help" className="hover:text-white transition-colors underline">
+              Help
+            </Link>
+            {' · '}
+            <Link href="/privacy" className="hover:text-white transition-colors underline">
+              Privacy &amp; Cookie Policy
+            </Link>
+            {' · '}
+            <span>© {new Date().getFullYear()} City of Norwich Aviation Museum</span>
+            {' · '}
+            <span className="opacity-60">v{APP_VERSION}</span>
+          </div>
         </footer>
         <CookieBanner />
         <VersionNotice />

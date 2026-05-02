@@ -176,7 +176,7 @@ async function resolveTargetUser(targetUserId: string) {
 }
 
 export async function adminSignupForEventAs(eventId: string, targetUserId: string) {
-  const actor = await requireCapability('admin:calendar.write');
+  const actor = await requireCapability('admin:act-as.write');
 
   const db = getDb();
   const target = await resolveTargetUser(targetUserId);
@@ -204,7 +204,7 @@ export async function adminSignupForEventAs(eventId: string, targetUserId: strin
 }
 
 export async function adminWithdrawFromEventAs(eventId: string, targetUserId: string) {
-  const actor = await requireCapability('admin:calendar.write');
+  const actor = await requireCapability('admin:act-as.write');
 
   const db = getDb();
   const target = await resolveTargetUser(targetUserId);
@@ -228,7 +228,7 @@ export async function adminSignupForJobOccurrenceAs(
   dateStr: string,
   targetUserId: string,
 ) {
-  const actor = await requireCapability('admin:calendar.write');
+  const actor = await requireCapability('admin:act-as.write');
 
   const db = getDb();
   const target = await resolveTargetUser(targetUserId);
@@ -277,7 +277,7 @@ export async function adminWithdrawFromJobOccurrenceAs(
   dateStr: string,
   targetUserId: string,
 ) {
-  const actor = await requireCapability('admin:calendar.write');
+  const actor = await requireCapability('admin:act-as.write');
 
   const db = getDb();
   const target = await resolveTargetUser(targetUserId);
@@ -311,7 +311,7 @@ export async function adminSaveVolunteerDateSlotAs(
   jobIds: string[],
   notes: string,
 ) {
-  const actor = await requireCapability('admin:calendar.write');
+  const actor = await requireCapability('admin:act-as.write');
 
   const db = getDb();
   const target = await resolveTargetUser(targetUserId);
@@ -346,7 +346,7 @@ export async function adminSaveVolunteerDateSlotAs(
 }
 
 export async function adminDeleteVolunteerDateSlotAs(targetUserId: string, dateStr: string) {
-  const actor = await requireCapability('admin:calendar.write');
+  const actor = await requireCapability('admin:act-as.write');
 
   const db = getDb();
   const target = await resolveTargetUser(targetUserId);

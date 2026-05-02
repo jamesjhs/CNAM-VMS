@@ -120,6 +120,7 @@ export default async function DashboardPage() {
           <DashCard title="Files &amp; Documents" icon="📁" href="/files" description="Browse and download files and documents shared by the museum team." />
           <DashCard title="My Profile" icon="👤" href="/profile" description="Update your name, contact details, and general activity preferences." />
           <DashCard title="My Teams" icon="👥" href="/teams" description="View your team memberships, submit work logs or feedback." />
+          <DashCard title="Help &amp; Manual" icon="❓" href="/help" description="Learn how to use the system with our complete user guide and FAQs." />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

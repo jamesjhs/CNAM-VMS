@@ -7,6 +7,8 @@ export const metadata = {
   title: 'Privacy & Cookie Policy — CNAM VMS',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function PrivacyPolicyPage() {
   const db = getDb();
   const record = db.prepare("SELECT content FROM site_content WHERE key = 'privacy-policy'").get() as { content: string } | undefined;

@@ -17,6 +17,111 @@ Entries are listed in reverse chronological order (newest first). Each entry rec
 
 ---
 
+## 2 May 2026 — Staff Section Renamed to Coordination & SQL Fixes (v0.6.0)
+
+**Agent session:** GitHub Copilot CLI
+
+**What was done:**
+
+Version bumped from 0.5.1 to 0.6.0. Completed Staff→Coordination section rename and fixed critical SQL column reference errors in coordination pages.
+
+### Feature: Staff Section Renamed to "Coordination"
+
+**Rationale:** The Staff section functions as a coordination hub rather than traditional staff management. Renaming clarifies its purpose for scheduling, volunteer management, and team coordination.
+
+**Changes:**
+- Renamed navigation button from "Staff" to "Coordination"
+- Updated all navigation links from `/staff/*` to `/coordination/*`
+- Renamed directory: `src/app/staff/` → `src/app/coordination/`
+- Updated page component names (StaffPage → CoordinationPage, etc.)
+- Updated sidebar labels and metadata titles
+
+**Files changed:**
+- `src/components/NavBar.tsx` — Button label, links, variable names
+- `src/components/MobileMenu.tsx` — Mobile navigation section
+- `src/app/coordination/layout.tsx` — Layout wrapper and sidebar
+- `src/app/coordination/page.tsx` — Dashboard page
+- `src/app/coordination/volunteers/page.tsx` — Volunteers list
+- `src/app/coordination/availability/page.tsx` — Availability calendar
+- `src/app/coordination/projects/page.tsx` — Projects list
+- `src/app/coordination/messages/page.tsx` — Messaging interface
+
+### Bug Fix 1: `no such column: u.phone` in Coordination Volunteers page
+
+**Symptom:** Server error when loading `/coordination/volunteers` page.
+
+**Root cause:** Query incorrectly referenced `u.phone` column that doesn't exist on the `users` table. Phone numbers are stored in the separate `user_phones` table.
+
+**Fix:** Added subquery to fetch primary phone number:
+```sql
+(SELECT number FROM user_phones WHERE userId = u.id AND isPrimary = 1 LIMIT 1) as phone
+```
+
+### Bug Fix 2: `no such column: tt.status` in Coordination Projects page
+
+**Symptom:** Server error when loading `/coordination/projects` page.
+
+**Root cause:** Query incorrectly referenced `tt.status` column that doesn't exist on the `team_tasks` table. Task status is tracked via `isActive` (INTEGER: 0/1).
+
+**Fix:** 
+- Changed query to select `isActive` instead of `status`
+- Updated UI badge logic to display:
+  - **Active** (green) when `isActive = 1`
+  - **Inactive** (gray) when `isActive = 0`
+
+**Decisions:**
+
+- Directory renamed rather than reverting links to maintain clearer navigation semantics
+- Chose `isActive` status display (Active/Inactive) over attempting to track full task workflow states, as schema only supports boolean active flag
+- Subquery for phone number allows fallback to null if no primary phone set (better UX than JOIN with potential missing rows)
+
+**Testing:**
+- Full build test passed with no compilation errors
+- All coordination routes now accessible and loading without SQL errors
+
+**Documentation updates:**
+- Updated `docs/user-manual.md` version to 0.6.0
+- Updated `docs/technical-architecture.md` version to 0.6.0
+- Updated `src/app/help/page.tsx` to reference "Coordination" section instead of "Staff"
+- Added this entry to development log
+
+---
+
+## 2 May 2026 — Museum Status Capability Fix & Training Policies Bug Fix (v0.5.1)
+
+**Agent session:** GitHub Copilot CLI
+
+**What was done:**
+
+Version bumped from 0.5.0 to 0.5.1. Fixed two critical bugs preventing access to Museum Status & Hours and Training Policies admin pages.
+
+### Bug 1: Museum Status access denied for admin users
+
+**Symptom:** Root and Admin users could not access `/admin/museum` page; received "Access Denied" error despite having admin privileges.
+
+**Root cause:** The `admin:museum.write` capability was defined in the system but was not being assigned to the Admin role during database seeding. The seed script only assigned it to the Root role.
+
+**Fix:** Updated `scripts/seed.ts` to include `'admin:museum.write'` in the `adminCapKeys` array. Re-seeded the database with `npm run db:seed` after deleting the stale database file.
+
+### Bug 2: Training Policies page server component render error
+
+**Symptom:** Navigating to `/admin/training` resulted in a Server Component render error: `0n~dq4kpx9xxx.js:1 Uncaught Error: An error occurred in the Server Components render...`
+
+**Root cause:** Column name mismatch in the database query. The page was querying for `trainingPolicyId` from the `training_policy_roles` table, but the actual column name is `policyId` (lowercase 'p').
+
+**Fix:** Corrected the query in `src/app/admin/training/page.tsx` line 35 from:
+```sql
+SELECT trainingPolicyId, accountType FROM training_policy_roles
+```
+to:
+```sql
+SELECT policyId, accountType FROM training_policy_roles
+```
+
+**Additional fix:** Corrected `DATABASE_URL` in `.env` from PostgreSQL connection string to SQLite file path (`file:./data/cnam-vms.db`).
+
+---
+
 ## 28 April 2026 — Runtime Proxy Error Fix & PM2 CWD Fix (v0.6.2)
 
 **Agent session:** GitHub Copilot Coding Agent
