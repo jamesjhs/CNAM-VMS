@@ -12,6 +12,8 @@ export const CAPABILITIES = [
   { key: 'admin:files.write', description: 'Upload and manage files' },
   { key: 'admin:announcements.write', description: 'Create and manage announcements' },
   { key: 'admin:calendar.write', description: 'Create and manage calendar events and jobs' },
+  { key: 'admin:act-as.write', description: 'Manage schedules and availability on behalf of others' },
+  { key: 'admin:museum.write', description: 'Edit museum status, opening hours, and bank holidays' },
   { key: 'admin:settings.write', description: 'Manage system settings (SMTP, etc.) — root only' },
   { key: 'admin:theme.write', description: 'Manage site theme and settings' },
   { key: 'admin:training.write', description: 'Create and manage training policies' },

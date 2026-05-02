@@ -309,6 +309,39 @@ function initSchema(db: BetterSqlite3.Database): void {
       createdAt TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_team_feedback_teamId ON team_feedback(teamId);
+
+    CREATE TABLE IF NOT EXISTS museum_status (
+      id TEXT PRIMARY KEY NOT NULL,
+      date TEXT NOT NULL UNIQUE,
+      title TEXT NOT NULL,
+      description TEXT,
+      createdById TEXT NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_museum_status_date ON museum_status(date);
+
+    CREATE TABLE IF NOT EXISTS museum_opening_hours (
+      id TEXT PRIMARY KEY NOT NULL,
+      startDate TEXT NOT NULL,
+      endDate TEXT NOT NULL,
+      status TEXT NOT NULL,
+      notes TEXT,
+      createdById TEXT NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_opening_hours_dates ON museum_opening_hours(startDate, endDate);
+
+    CREATE TABLE IF NOT EXISTS bank_holidays (
+      id TEXT PRIMARY KEY NOT NULL,
+      date TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      createdById TEXT NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_bank_holidays_date ON bank_holidays(date);
   `);
 }
 
