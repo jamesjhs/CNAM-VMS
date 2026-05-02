@@ -20,23 +20,44 @@ export default async function ProfilePage({
 
   const db = getDb();
   type UserRow = { id: string; email: string; name: string | null; status: string; accountType: string; createdAt: string };
-  const rawUser = db.prepare('SELECT id, email, name, status, accountType, createdAt FROM users WHERE id = ?').get(sessionUser.id) as UserRow | undefined;
-  if (!rawUser) return null;
-
   type PhoneRow = { id: string; number: string; label: string | null };
-  const phones = db.prepare('SELECT id, number, label FROM user_phones WHERE userId = ? ORDER BY createdAt ASC').all(sessionUser.id) as PhoneRow[];
-
   type RoleRow = { roleId: string; roleName: string; roleDescription: string | null };
-  const userRoles = (db.prepare(
-    `SELECT ur.roleId, r.name as roleName, r.description as roleDescription
-     FROM user_roles ur JOIN roles r ON r.id = ur.roleId WHERE ur.userId = ?`
-  ).all(sessionUser.id) as RoleRow[]).map(r => ({ roleId: r.roleId, role: { name: r.roleName, description: r.roleDescription } }));
-
   type TeamRow = { teamId: string; teamName: string; teamDescription: string | null };
-  const userTeams = (db.prepare(
-    `SELECT ut.teamId, t.name as teamName, t.description as teamDescription
-     FROM user_teams ut JOIN teams t ON t.id = ut.teamId WHERE ut.userId = ?`
-  ).all(sessionUser.id) as TeamRow[]).map(t => ({ teamId: t.teamId, team: { name: t.teamName, description: t.teamDescription } }));
+
+  let rawUser: UserRow | undefined;
+  let phones: PhoneRow[] = [];
+  let userRoles: any[] = [];
+  let userTeams: any[] = [];
+
+  try {
+    rawUser = db.prepare('SELECT id, email, name, status, accountType, createdAt FROM users WHERE id = ?').get(sessionUser.id) as UserRow | undefined;
+    if (!rawUser) return null;
+
+    phones = db.prepare('SELECT id, number, label FROM user_phones WHERE userId = ? ORDER BY createdAt ASC').all(sessionUser.id) as PhoneRow[];
+
+    userRoles = (db.prepare(
+      `SELECT ur.roleId, r.name as roleName, r.description as roleDescription
+       FROM user_roles ur JOIN roles r ON r.id = ur.roleId WHERE ur.userId = ?`
+    ).all(sessionUser.id) as RoleRow[]).map(r => ({ roleId: r.roleId, role: { name: r.roleName, description: r.roleDescription } }));
+
+    userTeams = (db.prepare(
+      `SELECT ut.teamId, t.name as teamName, t.description as teamDescription
+       FROM user_teams ut JOIN teams t ON t.id = ut.teamId WHERE ut.userId = ?`
+    ).all(sessionUser.id) as TeamRow[]).map(t => ({ teamId: t.teamId, team: { name: t.teamName, description: t.teamDescription } }));
+  } catch (error) {
+    console.error('Database error in profile page:', error);
+    return (
+      <div className="min-h-screen flex flex-col">
+        <NavBar />
+        <main className="flex-1 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
+          <div className="p-6 bg-red-50 border border-red-200 rounded-lg">
+            <h2 className="text-lg font-bold text-red-800 mb-2">Database Error</h2>
+            <p className="text-red-700">Unable to load your profile. Please try again later.</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   const user = {
     ...rawUser,
@@ -123,6 +144,7 @@ export default async function ProfilePage({
             <input
               name="name"
               type="text"
+              maxLength={100}
               defaultValue={user.name ?? ''}
               placeholder="Your full name"
               className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -168,6 +190,7 @@ export default async function ProfilePage({
             <input
               name="number"
               type="tel"
+              maxLength={20}
               required
               placeholder="Telephone number"
               className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -175,6 +198,7 @@ export default async function ProfilePage({
             <input
               name="label"
               type="text"
+              maxLength={50}
               placeholder="Label (e.g. Mobile, Home)"
               className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />

@@ -1,0 +1,85 @@
+# QUICK DEPLOYMENT CHECKLIST
+
+**Server:** cnamvms.jahosi.co.uk (Node.js v24.15.0)
+**Branch:** `security-update`
+**Time:** ~8 minutes
+
+---
+
+## ⚡ Copy-Paste Commands (Run in Order)
+
+```bash
+# 1. SSH to server
+ssh root@cnamvms.jahosi.co.uk
+
+# 2. Navigate to app directory
+cd /var/node/cnamvms.jahosi.co.uk-3001
+
+# 3. Backup database
+cp data/cnam.db data/cnam.db.backup.$(date +%Y-%m-%d)
+
+# 4. Pull code
+git fetch origin && git checkout security-update && git pull origin security-update
+
+# 5. Install deps
+npm ci
+
+# 6. Build
+npm run build
+
+# 7. Restart
+pm2 restart cnam-vms --update-env
+
+# 8. Verify
+pm2 logs cnam-vms --lines 50
+```
+
+---
+
+## ✅ Post-Deployment Verification
+
+```bash
+# Check status
+pm2 status cnam-vms
+
+# Test endpoint
+curl http://localhost:3001/
+
+# Check logs for errors
+pm2 logs cnam-vms | head -50
+```
+
+---
+
+## 📊 What's New
+
+- ✅ Critical bug fixes (form submission, password validation)
+- ✅ Security hardening (MIME validation, phone validation)
+- ✅ Email error reporting
+- ✅ Performance optimization (permission cache)
+
+---
+
+## 🔙 Rollback (If Needed)
+
+```bash
+pm2 stop cnam-vms
+git checkout main
+git pull origin main
+npm ci && npm run build
+pm2 restart cnam-vms --update-env
+```
+
+---
+
+## 📝 Notes
+
+- **No database migration required** ✅
+- **Backwards compatible** ✅
+- **All build tests passing** ✅
+- **Build time:** ~3-5 minutes
+- **Restart time:** ~30 seconds
+
+---
+
+For detailed deployment guide, see: `DEPLOYMENT-COMMANDS.md`

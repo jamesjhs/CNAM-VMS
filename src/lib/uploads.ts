@@ -23,6 +23,17 @@ const ALLOWED_EXTENSIONS: Set<string> = new Set([
   '.pdf', '.txt', '.csv', '.docx', '.xlsx',
 ]);
 
+// Magic numbers (file signatures) for validation
+const MAGIC_NUMBERS: Record<string, Buffer[]> = {
+  'image/jpeg': [Buffer.from([0xff, 0xd8, 0xff])],
+  'image/png': [Buffer.from([0x89, 0x50, 0x4e, 0x47])],
+  'image/gif': [Buffer.from([0x47, 0x49, 0x46, 0x38])], // GIF87a or GIF89a
+  'image/webp': [Buffer.from([0x52, 0x49, 0x46, 0x46])], // RIFF (WebP check done by extension)
+  'application/pdf': [Buffer.from([0x25, 0x50, 0x44, 0x46])], // %PDF
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': [Buffer.from([0x50, 0x4b, 0x03, 0x04])], // ZIP
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': [Buffer.from([0x50, 0x4b, 0x03, 0x04])], // ZIP
+};
+
 export interface UploadResult {
   filename: string;
   originalName: string;
@@ -33,6 +44,20 @@ export interface UploadResult {
 
 export interface UploadError {
   error: string;
+}
+
+/**
+ * Check if file buffer matches expected magic numbers for the MIME type.
+ */
+function validateFileMagicNumber(mimeType: string, buffer: Buffer): boolean {
+  const magicNumbers = MAGIC_NUMBERS[mimeType];
+  if (!magicNumbers) {
+    // For text/plain and text/csv, no magic number validation needed (can be any text)
+    return mimeType === 'text/plain' || mimeType === 'text/csv';
+  }
+
+  // Check if buffer starts with any of the expected magic numbers
+  return magicNumbers.some((magic) => buffer.subarray(0, magic.length).equals(magic));
 }
 
 /**
@@ -70,6 +95,7 @@ export function validateFile(
   originalName: string,
   mimeType: string,
   size: number,
+  buffer: Buffer,
 ): string | null {
   if (size > MAX_SIZE_BYTES) {
     return `File too large. Maximum size is ${MAX_SIZE_MB}MB.`;
@@ -82,6 +108,11 @@ export function validateFile(
 
   if (!ALLOWED_MIME_TYPES.has(mimeType)) {
     return `MIME type not allowed: ${mimeType}`;
+  }
+
+  // Validate file magic numbers (file signatures)
+  if (!validateFileMagicNumber(mimeType, buffer)) {
+    return 'File content does not match declared MIME type. Possible file corruption or spoofing attempt.';
   }
 
   return null;

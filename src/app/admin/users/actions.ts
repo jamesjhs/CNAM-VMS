@@ -8,6 +8,13 @@ import { requireCapability } from '@/lib/auth-helpers';
 import { logAudit } from '@/lib/audit';
 import type { UserStatus, UserAccountType } from '@/lib/db-types';
 
+const PHONE_REGEX = /^[\d\s\-\+\(\)]{7,20}$/;
+const MAX_LABEL_LENGTH = 50;
+
+function isValidPhoneNumber(phone: string): boolean {
+  return PHONE_REGEX.test(phone.trim());
+}
+
 // ---------------------------------------------------------------------------
 // User creation
 // ---------------------------------------------------------------------------
@@ -70,11 +77,22 @@ export async function addUserPhone(userId: string, number: string, label: string
   const actor = await requireCapability('admin:users.write');
 
   const trimmedNumber = number.trim();
-  if (!trimmedNumber) return;
+  if (!trimmedNumber) return redirect(`/admin/users/${userId}?error=EmptyPhone`);
+
+  // Validate phone number format
+  if (!isValidPhoneNumber(trimmedNumber)) {
+    return redirect(`/admin/users/${userId}?error=InvalidPhone`);
+  }
+
+  // Validate label length
+  const trimmedLabel = label.trim();
+  if (trimmedLabel && trimmedLabel.length > MAX_LABEL_LENGTH) {
+    return redirect(`/admin/users/${userId}?error=LabelTooLong`);
+  }
 
   const db = getDb();
   db.prepare('INSERT INTO user_phones (id, userId, number, label, createdAt) VALUES (?,?,?,?,?)').run(
-    createId(), userId, trimmedNumber, label.trim() || null, now(),
+    createId(), userId, trimmedNumber, trimmedLabel || null, now(),
   );
 
   await logAudit({

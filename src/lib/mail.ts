@@ -97,7 +97,7 @@ export async function sendMail(opts: {
   subject: string;
   text: string;
   html: string;
-}): Promise<void> {
+}): Promise<{ success: boolean; error?: string }> {
   // Read effective config at call time so that settings changes take effect
   // without a full process restart.
   const cfg = getSmtpConfig();
@@ -128,22 +128,29 @@ export async function sendMail(opts: {
         '',
       ].join('\n'),
     );
-    return;
+    return { success: true }; // In dev/test mode, consider it successful
   }
 
   console.log(`[mail] Sending "${opts.subject}" to ${opts.to} via SMTP (${cfg.host})`);
-  await getTransport().sendMail({
-    from: cfg.from || 'noreply@example.com',
-    to: opts.to,
-    subject: opts.subject,
-    text: opts.text,
-    html: opts.html,
-  });
+  try {
+    await getTransport().sendMail({
+      from: cfg.from || 'noreply@example.com',
+      to: opts.to,
+      subject: opts.subject,
+      text: opts.text,
+      html: opts.html,
+    });
+    return { success: true };
+  } catch (err) {
+    const error = err instanceof Error ? err.message : 'Unknown error';
+    console.error(`[mail] Failed to send email to ${opts.to}: ${error}`);
+    return { success: false, error };
+  }
 }
 
 /** Send a 6-digit OTP code to the given email address. */
-export async function sendOtpEmail(to: string, code: string): Promise<void> {
-  await sendMail({
+export async function sendOtpEmail(to: string, code: string): Promise<{ success: boolean; error?: string }> {
+  return sendMail({
     to,
     subject: 'Your CNAM VMS sign-in code',
     text: `Your verification code is: ${code}\n\nThis code expires in 10 minutes. Do not share it with anyone.`,
@@ -160,8 +167,8 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
 }
 
 /** Send a password reset link to the given email address. */
-export async function sendPasswordResetEmail(to: string, resetUrl: string): Promise<void> {
-  await sendMail({
+export async function sendPasswordResetEmail(to: string, resetUrl: string): Promise<{ success: boolean; error?: string }> {
+  return sendMail({
     to,
     subject: 'Reset your CNAM VMS password',
     text: `You have been sent a password reset link.\n\nClick the link below to set a new password (valid for 24 hours):\n${resetUrl}\n\nIf you did not request this, please ignore this email.`,

@@ -5,8 +5,7 @@ import { getDb, now } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { verifyPassword, hashPassword } from '@/lib/password';
 import { logAudit } from '@/lib/audit';
-
-const MIN_PASSWORD_LENGTH = 8;
+import { validatePasswordComplexity } from '@/lib/password-validation';
 
 export async function changePassword(formData: FormData) {
   const actor = await requireAuth();
@@ -23,8 +22,9 @@ export async function changePassword(formData: FormData) {
     redirect('/auth/change-password?error=PasswordMismatch');
   }
 
-  if (newPassword.length < MIN_PASSWORD_LENGTH) {
-    redirect('/auth/change-password?error=TooShort');
+  const complexityError = validatePasswordComplexity(newPassword);
+  if (complexityError) {
+    redirect(`/auth/change-password?error=${complexityError}`);
   }
 
   const db = getDb();

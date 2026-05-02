@@ -8,6 +8,7 @@ import { getDb, now, packTs, unpackBool } from '@/lib/db';
 import { signIn } from '@/auth';
 import { verifyPassword } from '@/lib/password';
 import { sendOtpEmail, sendPasswordResetEmail } from '@/lib/mail';
+import { validatePasswordComplexity } from '@/lib/password-validation';
 
 const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
 const COMPLETION_TOKEN_EXPIRY_MS = 2 * 60 * 1000; // 2 minutes
@@ -25,9 +26,10 @@ const KEEP_SIGNED_IN_COOKIE = '_cnam_keep';
 /**
  * Extract the domain portion of an email address for log messages.
  * Only the domain is logged to limit PII exposure.
+ * Uses lastIndexOf to handle emails with multiple @ signs correctly.
  */
 function emailDomain(email: string): string {
-  const at = email.indexOf('@');
+  const at = email.lastIndexOf('@');
   return at >= 0 ? email.slice(at + 1) : '(unknown domain)';
 }
 
@@ -142,10 +144,13 @@ export async function submitPassword(formData: FormData) {
 
   // Send OTP email
   try {
-    await sendOtpEmail(email, otp);
+    const mailResult = await sendOtpEmail(email, otp);
+    if (!mailResult.success) {
+      console.error(`[mail] Failed to send OTP email for @${emailDomain(email)}: ${mailResult.error}`);
+      // Still proceed to verify page so user can retry; we'll show a warning there
+    }
   } catch (err) {
-    // Log the SMTP error so it is visible in PM2 logs, but don't surface it to
-    // the user — they can still proceed to the verify page and request a resend.
+    // Log the SMTP error so it is visible in PM2 logs
     console.error('[mail] Failed to send OTP email:', err);
   }
 
@@ -305,7 +310,10 @@ export async function requestPasswordReset(formData: FormData) {
 
     const resetUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
     try {
-      await sendPasswordResetEmail(email, resetUrl);
+      const mailResult = await sendPasswordResetEmail(email, resetUrl);
+      if (!mailResult.success) {
+        console.error(`[mail] Failed to send password reset email for @${emailDomain(email)}: ${mailResult.error}`);
+      }
     } catch (err) {
       // Log the SMTP error so it is visible in PM2 logs, but don't reveal it
       // to the caller — the user always sees the generic "email sent" response.
@@ -333,8 +341,9 @@ export async function completePasswordReset(formData: FormData) {
     redirect(`/auth/reset-password?token=${encodeURIComponent(token)}&error=PasswordMismatch`);
   }
 
-  if (newPassword.length < 8) {
-    redirect(`/auth/reset-password?token=${encodeURIComponent(token)}&error=TooShort`);
+  const complexityError = validatePasswordComplexity(newPassword);
+  if (complexityError) {
+    redirect(`/auth/reset-password?token=${encodeURIComponent(token)}&error=${complexityError}`);
   }
 
   const db = getDb();

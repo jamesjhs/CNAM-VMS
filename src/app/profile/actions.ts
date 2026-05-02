@@ -7,8 +7,14 @@ import { getDb, now } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { logAudit } from '@/lib/audit';
 import { verifyPassword, hashPassword } from '@/lib/password';
+import { validatePasswordComplexity } from '@/lib/password-validation';
 
-const MIN_PASSWORD_LENGTH = 8;
+const PHONE_REGEX = /^[\d\s\-\+\(\)]{7,20}$/;
+const MAX_LABEL_LENGTH = 50;
+
+function isValidPhoneNumber(phone: string): boolean {
+  return PHONE_REGEX.test(phone.trim());
+}
 
 export async function updateOwnProfile(name: string) {
   const actor = await requireAuth();
@@ -32,11 +38,22 @@ export async function addOwnPhone(number: string, label: string) {
   const actor = await requireAuth();
 
   const trimmedNumber = number.trim();
-  if (!trimmedNumber) return;
+  if (!trimmedNumber) return redirect('/profile?error=EmptyPhone');
+
+  // Validate phone number format
+  if (!isValidPhoneNumber(trimmedNumber)) {
+    return redirect('/profile?error=InvalidPhone');
+  }
+
+  // Validate label length
+  const trimmedLabel = label.trim();
+  if (trimmedLabel && trimmedLabel.length > MAX_LABEL_LENGTH) {
+    return redirect('/profile?error=LabelTooLong');
+  }
 
   const db = getDb();
   db.prepare('INSERT INTO user_phones (id, userId, number, label, createdAt) VALUES (?,?,?,?,?)').run(
-    createId(), actor.id, trimmedNumber, label.trim() || null, now(),
+    createId(), actor.id, trimmedNumber, trimmedLabel || null, now(),
   );
 
   await logAudit({
@@ -86,8 +103,9 @@ export async function changePasswordFromProfile(formData: FormData) {
     redirect('/profile?error=PasswordMismatch');
   }
 
-  if (newPassword.length < MIN_PASSWORD_LENGTH) {
-    redirect('/profile?error=TooShort');
+  const complexityError = validatePasswordComplexity(newPassword);
+  if (complexityError) {
+    redirect(`/profile?error=${complexityError}`);
   }
 
   const db = getDb();

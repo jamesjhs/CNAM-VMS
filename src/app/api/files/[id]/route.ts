@@ -17,6 +17,11 @@ export async function GET(
 
   const user = session.user as SessionUser;
 
+  // Check if user has permission to download files
+  if (!user.capabilities?.includes('admin:files.read')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const { id } = await params;
 
   const db = getDb();
