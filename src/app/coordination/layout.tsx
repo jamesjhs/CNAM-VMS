@@ -1,10 +1,14 @@
-'use client';
-
 import { requireAuth, hasAnyCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { ReactNode, useState, useEffect } from 'react';
+import { ReactNode } from 'react';
+import CoordinationNav from './coordination-nav';
+
+export const metadata = {
+  title: 'Coordination Dashboard — CNAM VMS',
+  description: 'Coordination interface for the CNAM Volunteer Management System',
+};
 
 export default async function CoordinationLayout({ children }: { children: ReactNode }) {
   // Require at least one staff capability
@@ -29,27 +33,6 @@ export default async function CoordinationLayout({ children }: { children: React
   ];
 
   return (
-    <CoordinationLayoutClient links={coordinationLinks}>
-      {children}
-    </CoordinationLayoutClient>
-  );
-}
-
-function CoordinationLayoutClient({ links, children }: { links: Array<{ href: string; label: string; icon: string }>; children: ReactNode }) {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  useEffect(() => {
-    // Close menu when resizing to desktop
-    const handleResize = () => {
-      if (window.innerWidth >= 768) {
-        setIsMobileMenuOpen(false);
-      }
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  return (
     <div className="min-h-screen flex flex-col">
       <NavBar />
       <div className="flex flex-1">
@@ -59,7 +42,7 @@ function CoordinationLayoutClient({ links, children }: { links: Array<{ href: st
             <div className="mb-6 px-3">
               <h2 className="text-xs font-semibold text-amber-300 uppercase tracking-wider">Coordination</h2>
             </div>
-            {links.map((link) => (
+            {coordinationLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
@@ -74,23 +57,7 @@ function CoordinationLayoutClient({ links, children }: { links: Array<{ href: st
         {/* Main content */}
         <main className="flex-1 bg-gray-50 flex flex-col">
           {/* Mobile Navigation Tabs */}
-          <div className="md:hidden bg-white border-b border-gray-200">
-            <div className="overflow-x-auto">
-              <div className="flex gap-1 p-2 min-w-max">
-                {links.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors whitespace-nowrap"
-                  >
-                    <span>{link.icon}</span>
-                    <span>{link.label}</span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </div>
+          <CoordinationNav links={coordinationLinks} />
 
           {/* Main Content Area */}
           <div className="flex-1 overflow-auto">
