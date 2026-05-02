@@ -32,15 +32,15 @@ export default async function TrainingAdminPage({
   }[];
 
   const rawAssignments = db.prepare(
-    'SELECT trainingPolicyId, accountType FROM training_policy_roles',
-  ).all() as { trainingPolicyId: string; accountType: string }[];
+    'SELECT policyId, accountType FROM training_policy_roles',
+  ).all() as { policyId: string; accountType: string }[];
 
   const assignmentsByPolicy = new Map<string, Set<string>>();
   for (const a of rawAssignments) {
-    if (!assignmentsByPolicy.has(a.trainingPolicyId)) {
-      assignmentsByPolicy.set(a.trainingPolicyId, new Set());
+    if (!assignmentsByPolicy.has(a.policyId)) {
+      assignmentsByPolicy.set(a.policyId, new Set());
     }
-    assignmentsByPolicy.get(a.trainingPolicyId)!.add(a.accountType);
+    assignmentsByPolicy.get(a.policyId)!.add(a.accountType);
   }
 
   const policies = rawPolicies.map((p) => ({
