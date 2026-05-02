@@ -26,8 +26,13 @@ jobs:
           npm run build
 
       - name: Compress files
-        run: tar -czf deploy.tar.gz --exclude=.git --exclude=node_modules --exclude=deploy.tar.gz .
-
+        run: |
+          # 1. Create the zip file one folder level OUTSIDE our current directory
+          tar -czf ../deploy.tar.gz --exclude=.git --exclude=node_modules .
+          
+          # 2. Move the finished zip file back INSIDE our current directory
+          mv ../deploy.tar.gz .
+          
       - name: Install Cloudflared
         run: |
           curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
