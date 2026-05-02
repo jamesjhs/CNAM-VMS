@@ -2,7 +2,7 @@ import { requireAuth } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
 import { getDb, unpackTs } from '@/lib/db';
 import Link from 'next/link';
-import { updateOwnProfile, addOwnPhone, removeOwnPhone } from './actions';
+import { updateOwnProfile, addOwnPhone, removeOwnPhone, changePasswordFromProfile } from './actions';
 
 const STATUS_STYLES: Record<string, string> = {
   ACTIVE: 'bg-green-100 text-green-800',
@@ -10,7 +10,12 @@ const STATUS_STYLES: Record<string, string> = {
   PENDING: 'bg-yellow-100 text-yellow-800',
 };
 
-export default async function ProfilePage() {
+export default async function ProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; success?: string }>;
+}) {
+  const { error, success } = await searchParams;
   const sessionUser = await requireAuth();
 
   const db = getDb();
@@ -49,6 +54,38 @@ export default async function ProfilePage() {
           <h1 className="text-2xl font-bold text-gray-900 mb-1">My Profile</h1>
           <p className="text-gray-500">Update your name, contact details, and general activity preferences.</p>
         </div>
+
+        {/* Success Messages */}
+        {success === 'PasswordChanged' && (
+          <div className="mb-6 p-4 rounded-lg bg-green-50 border border-green-200 text-green-800">
+            <div className="flex items-start gap-3">
+              <span className="text-lg">✓</span>
+              <div>
+                <strong className="block">Password changed successfully!</strong>
+                <p className="text-sm mt-1">Your password has been updated. Please remember your new password for future logins.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Error Messages */}
+        {error && (
+          <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800">
+            <div className="flex items-start gap-3">
+              <span className="text-lg">⚠</span>
+              <div>
+                <strong className="block">
+                  {error === 'MissingFields' && 'Please fill in all fields'}
+                  {error === 'PasswordMismatch' && 'New passwords do not match'}
+                  {error === 'TooShort' && 'New password must be at least 8 characters'}
+                  {error === 'WrongCurrentPassword' && 'Your current password is incorrect'}
+                  {error === 'NoPassword' && 'No password is set for this account. Contact your administrator'}
+                  {!['MissingFields', 'PasswordMismatch', 'TooShort', 'WrongCurrentPassword', 'NoPassword'].includes(error) && 'Something went wrong. Please try again'}
+                </strong>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Account info */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
@@ -150,7 +187,69 @@ export default async function ProfilePage() {
           </form>
         </div>
 
-        {/* Roles */}
+        {/* Security - Change Password */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+          <h2 className="font-semibold text-gray-900 mb-4">Security</h2>
+          <p className="text-sm text-gray-600 mb-4">Change your password to keep your account secure. Use a strong password of at least 8 characters.</p>
+
+          <form action={changePasswordFromProfile} className="space-y-4">
+            <div>
+              <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                Current password
+              </label>
+              <input
+                id="currentPassword"
+                name="currentPassword"
+                type="password"
+                required
+                autoComplete="current-password"
+                placeholder="••••••••"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                  New password
+                </label>
+                <input
+                  id="newPassword"
+                  name="newPassword"
+                  type="password"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  placeholder="At least 8 characters"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                  Confirm new password
+                </label>
+                <input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              Change Password
+            </button>
+          </form>
+        </div>
         {user.userRoles.length > 0 && (
           <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
             <h2 className="font-semibold text-gray-900 mb-3">My Roles</h2>

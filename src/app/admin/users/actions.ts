@@ -358,7 +358,7 @@ export async function adminSendPasswordReset(userId: string) {
 
   const db = getDb();
   const user = db.prepare('SELECT email FROM users WHERE id = ?').get(userId) as { email: string } | undefined;
-  if (!user?.email) return;
+  if (!user?.email) redirect('/admin/users');
 
   const { randomBytes, createHash } = await import('crypto');
   const { sendPasswordResetEmail } = await import('@/lib/mail');
@@ -381,8 +381,9 @@ export async function adminSendPasswordReset(userId: string) {
   const resetUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
   try {
     await sendPasswordResetEmail(user.email, resetUrl);
-  } catch {
+  } catch (err) {
     // Email failure — token still created; admin can retry
+    console.error('[mail] Failed to send password reset email:', err);
   }
 
   await logAudit({
@@ -392,6 +393,8 @@ export async function adminSendPasswordReset(userId: string) {
     resourceId: userId,
     detail: { email: user.email },
   });
+
+  redirect(`/admin/users/${userId}?success=PasswordResetSent`);
 
   revalidatePath(`/admin/users/${userId}`);
 }

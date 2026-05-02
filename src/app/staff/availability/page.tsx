@@ -105,7 +105,7 @@ export default async function StaffAvailabilityPage() {
       <div className="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-6">
         <h3 className="font-semibold text-blue-900 mb-2">📅 How This Works</h3>
         <p className="text-sm text-blue-800 mb-3">
-          This page shows volunteers' availability for the next 30 days based on their personal availability settings. Each date shows:
+          This page shows volunteers&apos; availability for the next 30 days based on their personal availability settings. Each date shows:
         </p>
         <ul className="text-sm text-blue-800 space-y-1 ml-4">
           <li>• The number of volunteers available on that date</li>
