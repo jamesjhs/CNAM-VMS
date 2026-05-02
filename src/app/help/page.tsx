@@ -51,24 +51,24 @@ export default function HelpPage() {
       ],
     },
     {
-      id: 'staff',
-      title: '👨‍💼 Staff Features',
+      id: 'coordination',
+      title: '👥 Coordination Features',
       content: [
         {
-          heading: 'Staff Dashboard',
-          text: 'The Staff section provides a complete view of the timetabling system. You have access to volunteers, their availability, upcoming projects, and messaging.',
+          heading: 'Coordination Dashboard',
+          text: 'The Coordination section provides a complete view of the timetabling system. You have access to all volunteers, their availability, upcoming projects, and team messaging.',
         },
         {
           heading: 'View All Volunteers',
-          text: 'See a complete list of all volunteers. Filter by availability, team assignment, or volunteer status to find the right people for upcoming events.',
+          text: 'See a complete list of all volunteers with their contact information and status. View which volunteers are available on upcoming dates.',
         },
         {
           heading: 'Volunteer Availability',
-          text: 'View a calendar showing which volunteers are available on specific dates. This helps with scheduling and event coordination.',
+          text: 'View a calendar showing which volunteers are available on specific dates. This helps with scheduling and event coordination. Check upcoming availability at a glance.',
         },
         {
           heading: 'Upcoming Projects',
-          text: 'See all upcoming projects and team assignments. Track project progress, assign volunteers, and manage team tasks.',
+          text: 'See all upcoming projects and team assignments. Track task progress, urgency levels, and team member contributions through work logs.',
         },
         {
           heading: 'Messaging',
