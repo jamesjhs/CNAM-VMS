@@ -13,11 +13,11 @@ export default async function StaffAvailabilityPage() {
   const endDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 30));
 
   const rawAvailability = db.prepare(`
-    SELECT va.date, u.id, u.name, u.email
-    FROM volunteer_availability va
-    JOIN users u ON va.userId = u.id
-    WHERE va.date >= ? AND va.date < ?
-    ORDER BY va.date ASC, u.name ASC
+    SELECT vds.date, u.id, u.name, u.email
+    FROM volunteer_date_slots vds
+    JOIN users u ON vds.userId = u.id
+    WHERE vds.date >= ? AND vds.date < ?
+    ORDER BY vds.date ASC, u.name ASC
   `).all(startDate.toISOString().slice(0, 10), endDate.toISOString().slice(0, 10)) as {
     date: string;
     id: string;

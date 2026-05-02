@@ -43,7 +43,7 @@ export default async function StaffVolunteersPage() {
 
   const availabilityMap = new Map<string, boolean>();
   const rawAvailability = db.prepare(`
-    SELECT DISTINCT userId FROM volunteer_availability WHERE date >= ?
+    SELECT DISTINCT userId FROM volunteer_date_slots WHERE date >= ?
   `).all(todayStr) as { userId: string }[];
 
   rawAvailability.forEach((a) => availabilityMap.set(a.userId, true));

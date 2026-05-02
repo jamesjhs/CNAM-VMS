@@ -27,7 +27,7 @@ export default async function StaffPage() {
 
   const rawAvailability = db.prepare(`
     SELECT COUNT(DISTINCT userId) as count
-    FROM volunteer_availability
+    FROM volunteer_date_slots
     WHERE date >= ?
   `).get(todayStr) as { count: number };
 

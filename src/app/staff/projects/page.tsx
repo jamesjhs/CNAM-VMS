@@ -37,9 +37,9 @@ export default async function StaffProjectsPage() {
   for (const team of teams) {
     const rawTasks = db.prepare(`
       SELECT tt.id, tt.title, tt.description, tt.urgency, tt.status, tt.createdAt,
-             COUNT(DISTINCT tl.id) as logCount
+             COUNT(DISTINCT twl.id) as logCount
       FROM team_tasks tt
-      LEFT JOIN task_logs tl ON tt.id = tl.taskId
+      LEFT JOIN team_work_logs twl ON tt.id = twl.taskId
       WHERE tt.teamId = ?
       GROUP BY tt.id
       ORDER BY tt.urgency DESC, tt.createdAt ASC
