@@ -9,6 +9,7 @@ import { signIn } from '@/auth';
 import { verifyPassword } from '@/lib/password';
 import { sendOtpEmail, sendPasswordResetEmail } from '@/lib/mail';
 import { validatePasswordComplexity } from '@/lib/password-validation';
+import { verifyTurnstileToken, isTurnstileEnabled } from '@/lib/turnstile';
 
 const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
 const COMPLETION_TOKEN_EXPIRY_MS = 2 * 60 * 1000; // 2 minutes
@@ -61,6 +62,16 @@ export async function submitPassword(formData: FormData) {
   const password = (formData.get('password') as string | null) ?? '';
   const callbackUrl = safeCallbackUrl(formData.get('callbackUrl') as string | null);
   const keepSignedIn = formData.get('keepSignedIn') === '1';
+  const turnstileToken = (formData.get('turnstileToken') as string | null) ?? '';
+
+  // Verify Turnstile token if enabled
+  if (isTurnstileEnabled) {
+    const isValidToken = await verifyTurnstileToken(turnstileToken);
+    if (!isValidToken) {
+      console.warn('[auth] submitPassword: Turnstile verification failed');
+      redirect('/auth/signin?error=InvalidCredentials');
+    }
+  }
 
   if (!email || !password) {
     redirect('/auth/signin?error=MissingFields');
