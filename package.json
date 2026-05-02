@@ -1,12 +1,12 @@
 {
   "name": "cnam-vms",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "scripts": {
     "dev": "next dev -p ${PORT:-3001}",
     "build": "cross-env NODE_OPTIONS=--max-old-space-size=512 next build",
     "postbuild": "node scripts/postbuild.js",
-    "start": "cross-env PORT=${PORT:-3001} node .next/standalone/server.js",
+    "start": "node scripts/start.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "db:seed": "ts-node --project tsconfig.seed.json scripts/seed.ts",

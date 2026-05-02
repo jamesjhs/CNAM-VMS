@@ -1,0 +1,22 @@
+# Database
+DATABASE_URL="file:./data/cnam-vms.db"
+
+# Auth.js / NextAuth
+AUTH_SECRET="JDZfIGMleFQpcz1EIShYIkVNRnZeIQ=="
+AUTH_URL="http://localhost:3000"
+
+# SMTP (for passwordless email login)
+EMAIL_SERVER_HOST="smtp.livemail.co.uk"
+EMAIL_SERVER_PORT="587"
+EMAIL_SERVER_USER="noreply@jameshovercraft.co.uk"
+EMAIL_SERVER_PASSWORD="123TTlshiwwya!"
+EMAIL_FROM="VMS DEMO <james@jameshovercraft.co.uk>"
+
+# Bootstrap / Seeding
+ROOT_USER_EMAIL="jrowson@gmail.com"
+ROOT_USER_NAME="James Rowson"
+ROOT_USER_PASSWORD="123TTlshiwwya!"
+
+# File Uploads
+UPLOAD_DIR="/var/uploads/cnam-vms"
+UPLOAD_MAX_SIZE_MB="10"

@@ -38,89 +38,39 @@ export default async function CoordinationPage() {
     'staff:schedule.read',
   ];
 
+  const coordinationLinks = [
+    { href: '/coordination/volunteers', label: 'Volunteers', icon: '👥', description: 'Browse, filter, and manage volunteer information' },
+    { href: '/coordination/availability', label: 'Availability', icon: '📅', description: 'See which volunteers are available on specific dates' },
+    { href: '/coordination/projects', label: 'Projects', icon: '📋', description: 'Track projects, teams, and task assignments' },
+    { href: '/coordination/messages', label: 'Messages', icon: '💬', description: 'Communicate with individuals or groups of volunteers' },
+  ];
+
   return (
-    <div>
+    <div className="min-h-screen flex flex-col">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Coordination Dashboard</h1>
         <p className="text-gray-600">Complete view of the CNAM timetabling system</p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Link href="/coordination/volunteers" className="block">
-          <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
-            <div className="text-sm text-gray-500 font-medium mb-1">Total Volunteers</div>
-            <div className="text-3xl font-bold text-gray-900">{volunteersCount.count}</div>
-            <div className="text-xs text-gray-400 mt-2">Click to manage</div>
-          </div>
-        </Link>
-
-        <Link href="/coordination/availability" className="block">
-          <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
-            <div className="text-sm text-gray-500 font-medium mb-1">Available Today</div>
-            <div className="text-3xl font-bold text-gray-900">{rawAvailability.count}</div>
-            <div className="text-xs text-gray-400 mt-2">Volunteers with availability set</div>
-          </div>
-        </Link>
-
-        <Link href="/coordination/projects" className="block">
-          <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
-            <div className="text-sm text-gray-500 font-medium mb-1">Active Projects</div>
-            <div className="text-3xl font-bold text-gray-900">{activeTeams.count}</div>
-            <div className="text-xs text-gray-400 mt-2">Teams and projects</div>
-          </div>
-        </Link>
-
-        <Link href="/coordination/availability" className="block">
-          <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
-            <div className="text-sm text-gray-500 font-medium mb-1">Upcoming Events</div>
-            <div className="text-3xl font-bold text-gray-900">{upcomingEvents.count}</div>
-            <div className="text-xs text-gray-400 mt-2">Next 30 days</div>
-          </div>
-        </Link>
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <StatCard label="Volunteers" value={volunteersCount.count} icon="👥" />
+        <StatCard label="Staff" value={staffCount.count} icon="👨‍💼" />
+        <StatCard label="Projects" value={activeTeams.count} icon="📋" />
+        <StatCard label="Upcoming Events" value={upcomingEvents.count} icon="📅" />
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        {hasAnyCapability(user, ['staff:volunteer.read']) && (
-          <Link href="/staff/volunteers" className="block">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200 p-6 hover:shadow-lg transition-shadow">
-              <div className="text-2xl mb-2">👥</div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">View All Volunteers</h3>
-              <p className="text-sm text-gray-600">Browse, filter, and manage volunteer information and assignments</p>
-            </div>
-          </Link>
-        )}
-
-        {hasAnyCapability(user, ['staff:schedule.read']) && (
-          <Link href="/staff/availability" className="block">
-            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200 p-6 hover:shadow-lg transition-shadow">
-              <div className="text-2xl mb-2">📅</div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">Availability Calendar</h3>
-              <p className="text-sm text-gray-600">See which volunteers are available on specific dates</p>
-            </div>
-          </Link>
-        )}
-
-        {hasAnyCapability(user, ['staff:projects.read']) && (
-          <Link href="/staff/projects" className="block">
-            <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl border border-amber-200 p-6 hover:shadow-lg transition-shadow">
-              <div className="text-2xl mb-2">📋</div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">Upcoming Projects</h3>
-              <p className="text-sm text-gray-600">Track projects, teams, and task assignments</p>
-            </div>
-          </Link>
-        )}
-
-        {hasAnyCapability(user, ['staff:messaging.write']) && (
-          <Link href="/staff/messages" className="block">
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200 p-6 hover:shadow-lg transition-shadow">
-              <div className="text-2xl mb-2">💬</div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">Send Messages</h3>
-              <p className="text-sm text-gray-600">Communicate with individuals or groups of volunteers</p>
-            </div>
-          </Link>
-        )}
+      {/* Quick Access Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {coordinationLinks.map((link) => (
+          <CoordinationCard
+            key={link.href}
+            href={link.href}
+            icon={link.icon}
+            title={link.label}
+            description={link.description}
+          />
+        ))}
       </div>
 
       {/* Info Box */}
@@ -133,6 +83,42 @@ export default async function CoordinationPage() {
           {hasAnyCapability(user, ['staff:messaging.write']) && <li>✓ Send messages to volunteers</li>}
         </ul>
       </div>
+    </div>
+  );
+}
+
+function CoordinationCard({
+  href,
+  icon,
+  title,
+  description,
+}: {
+  href: string;
+  icon: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <Link href={href}>
+      <div className="bg-white rounded-xl border border-gray-200 p-6 h-full hover:shadow-md transition-shadow">
+        <div className="mb-3">
+          <span className="text-3xl">{icon}</span>
+        </div>
+        <h3 className="font-semibold text-gray-900 mb-2">{title}</h3>
+        <p className="text-gray-600 text-sm">{description}</p>
+      </div>
+    </Link>
+  );
+}
+
+function StatCard({ label, value, icon }: { label: string; value: number; icon: string }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-2xl">{icon}</span>
+        <span className="text-gray-500 text-xs sm:text-sm">{label}</span>
+      </div>
+      <div className="text-2xl sm:text-3xl font-bold text-gray-900">{value.toLocaleString()}</div>
     </div>
   );
 }

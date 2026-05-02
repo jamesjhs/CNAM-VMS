@@ -21,12 +21,23 @@ function copyDirSync(src, dest) {
   }
 }
 
+function copyFileSync(src, dest) {
+  const dir = path.dirname(dest);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.copyFileSync(src, dest);
+}
+
 try {
   console.log('Copying .next/static to .next/standalone...');
   copyDirSync('.next/static', '.next/standalone/.next/static');
 
   console.log('Copying public to .next/standalone...');
   copyDirSync('public', '.next/standalone/public');
+
+  console.log('Copying database file...');
+  copyFileSync('data/cnam-vms.db', '.next/standalone/data/cnam-vms.db');
 
   console.log('✓ Postbuild completed successfully');
 } catch (error) {
