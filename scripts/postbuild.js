@@ -22,11 +22,17 @@ function copyDirSync(src, dest) {
 }
 
 function copyFileSync(src, dest) {
+  if (!fs.existsSync(src)) {
+    console.log(`⊘ Skipping (not found): ${src}`);
+    return false;
+  }
+
   const dir = path.dirname(dest);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
   fs.copyFileSync(src, dest);
+  return true;
 }
 
 try {
@@ -36,8 +42,10 @@ try {
   console.log('Copying public to .next/standalone...');
   copyDirSync('public', '.next/standalone/public');
 
-  console.log('Copying database file...');
-  copyFileSync('data/cnam-vms.db', '.next/standalone/data/cnam-vms.db');
+  console.log('Copying database file (if it exists)...');
+  if (copyFileSync('data/cnam-vms.db', '.next/standalone/data/cnam-vms.db')) {
+    console.log('✓ Database file copied');
+  }
 
   console.log('✓ Postbuild completed successfully');
 } catch (error) {
