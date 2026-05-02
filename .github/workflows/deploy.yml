@@ -55,17 +55,16 @@ jobs:
           EOF
 
       - name: Transfer and Deploy over Tunnel
-        # This is where the magic happens. By putting CF_ACCESS variables here, 
-        # cloudflared automatically detects them and logs in silently.
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
+          # THE FIX: These are the exact variable names cloudflared actually looks for
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
         run: |
-          # 1. Send the file over the tunnel (Updated to nodeapp)
+          # 1. Send the file over the tunnel
           scp deploy.tar.gz nodeapp@$SERVER_HOST:/var/node/cnamvms.jahosi.co.uk-3001/
           
-          # 2. Execute the remote commands (Updated to nodeapp)
+          # 2. Execute the remote commands
           ssh nodeapp@$SERVER_HOST << 'EOF'
             cd /var/node/cnamvms.jahosi.co.uk-3001/
             tar -xzf deploy.tar.gz
