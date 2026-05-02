@@ -28,23 +28,37 @@ const env = {
   // PORT is now read from process.env (loaded from .env above)
 };
 
-// Spawn the standalone server
-const server = spawn('node', ['.next/standalone/server.js'], {
-  env,
+// Rebuild native modules if needed for the current Node.js version
+console.log('[start.js] Rebuilding native modules for current Node.js version...');
+const rebuild = spawn('npm', ['rebuild'], {
   cwd: projectRoot,
   stdio: 'inherit',
 });
 
-// Exit with the same code as the server
-server.on('exit', (code) => {
-  process.exit(code);
-});
+rebuild.on('exit', (code) => {
+  if (code !== 0) {
+    console.error('[start.js] WARNING: npm rebuild failed with code', code);
+    console.error('[start.js] Database connectivity may fail if native modules are incompatible');
+  }
+  
+  // Spawn the standalone server after rebuild completes
+  const server = spawn('node', ['.next/standalone/server.js'], {
+    env,
+    cwd: projectRoot,
+    stdio: 'inherit',
+  });
 
-// Handle termination signals
-process.on('SIGINT', () => {
-  server.kill('SIGINT');
-});
+  // Exit with the same code as the server
+  server.on('exit', (code) => {
+    process.exit(code);
+  });
 
-process.on('SIGTERM', () => {
-  server.kill('SIGTERM');
+  // Handle termination signals
+  process.on('SIGINT', () => {
+    server.kill('SIGINT');
+  });
+
+  process.on('SIGTERM', () => {
+    server.kill('SIGTERM');
+  });
 });
