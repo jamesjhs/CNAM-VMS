@@ -35,13 +35,13 @@ export default async function NavBar() {
       ]
     : [];
 
-  const staffLinks: NavLink[] = [];
+  const coordinationLinks: NavLink[] = [];
   if (isStaff) {
-    staffLinks.push({ href: '/staff', label: 'Overview' });
-    if (capabilities.includes('staff:volunteer.read')) staffLinks.push({ href: '/staff/volunteers', label: 'Volunteers' });
-    if (capabilities.includes('staff:schedule.read')) staffLinks.push({ href: '/staff/availability', label: 'Availability' });
-    if (capabilities.includes('staff:projects.read')) staffLinks.push({ href: '/staff/projects', label: 'Projects' });
-    if (capabilities.includes('staff:messaging.write')) staffLinks.push({ href: '/staff/messages', label: 'Messages' });
+    coordinationLinks.push({ href: '/coordination', label: 'Overview' });
+    if (capabilities.includes('staff:volunteer.read')) coordinationLinks.push({ href: '/coordination/volunteers', label: 'Volunteers' });
+    if (capabilities.includes('staff:schedule.read')) coordinationLinks.push({ href: '/coordination/availability', label: 'Availability' });
+    if (capabilities.includes('staff:projects.read')) coordinationLinks.push({ href: '/coordination/projects', label: 'Projects' });
+    if (capabilities.includes('staff:messaging.write')) coordinationLinks.push({ href: '/coordination/messages', label: 'Messages' });
   }
 
   const adminLinks: NavLink[] = [];
@@ -94,32 +94,32 @@ export default async function NavBar() {
                 {isStaff && (
                   <div className="relative group">
                     <button className="text-amber-300 hover:text-amber-200 text-sm transition-colors flex items-center gap-1 py-5 font-medium">
-                      Staff
+                      Coordination
                       <svg className="w-3 h-3 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                       </svg>
                     </button>
                     <div className="absolute left-0 top-full hidden group-hover:block bg-white rounded-lg shadow-lg border border-gray-100 min-w-48 py-1 z-50">
-                      <Link href="/staff" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                      <Link href="/coordination" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                         Overview
                       </Link>
                       {capabilities.includes('staff:volunteer.read') && (
-                        <Link href="/staff/volunteers" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                        <Link href="/coordination/volunteers" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                           Volunteers
                         </Link>
                       )}
                       {capabilities.includes('staff:schedule.read') && (
-                        <Link href="/staff/availability" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                        <Link href="/coordination/availability" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                           Availability
                         </Link>
                       )}
                       {capabilities.includes('staff:projects.read') && (
-                        <Link href="/staff/projects" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                        <Link href="/coordination/projects" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                           Projects
                         </Link>
                       )}
                       {capabilities.includes('staff:messaging.write') && (
-                        <Link href="/staff/messages" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                        <Link href="/coordination/messages" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                           Messages
                         </Link>
                       )}
@@ -233,7 +233,7 @@ export default async function NavBar() {
                 <MobileMenu
                   links={mainLinks}
                   adminLinks={adminLinks}
-                  staffLinks={staffLinks}
+                  coordinationLinks={coordinationLinks}
                   isAdmin={isAdmin}
                   isStaff={isStaff}
                   userName={session.user?.name}

@@ -2,7 +2,7 @@ import { requireCapability } from '@/lib/auth-helpers';
 import { getDb, unpackDate } from '@/lib/db';
 import Link from 'next/link';
 
-export default async function StaffAvailabilityPage() {
+export default async function CoordinationAvailabilityPage() {
   await requireCapability('staff:schedule.read');
 
   const db = getDb();

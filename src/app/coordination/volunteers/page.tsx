@@ -2,7 +2,7 @@ import { requireCapability } from '@/lib/auth-helpers';
 import { getDb, unpackDate, unpackBool } from '@/lib/db';
 import Link from 'next/link';
 
-export default async function StaffVolunteersPage() {
+export default async function CoordinationVolunteersPage() {
   await requireCapability('staff:volunteer.read');
 
   const db = getDb();

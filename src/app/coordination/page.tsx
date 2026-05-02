@@ -2,7 +2,7 @@ import { requireAuth, hasAnyCapability } from '@/lib/auth-helpers';
 import { getDb, unpackDate, unpackBool } from '@/lib/db';
 import Link from 'next/link';
 
-export default async function StaffPage() {
+export default async function CoordinationPage() {
   const user = await requireAuth();
   const db = getDb();
 
@@ -41,13 +41,13 @@ export default async function StaffPage() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Staff Dashboard</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Coordination Dashboard</h1>
         <p className="text-gray-600">Complete view of the CNAM timetabling system</p>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Link href="/staff/volunteers" className="block">
+        <Link href="/coordination/volunteers" className="block">
           <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
             <div className="text-sm text-gray-500 font-medium mb-1">Total Volunteers</div>
             <div className="text-3xl font-bold text-gray-900">{volunteersCount.count}</div>
@@ -55,7 +55,7 @@ export default async function StaffPage() {
           </div>
         </Link>
 
-        <Link href="/staff/availability" className="block">
+        <Link href="/coordination/availability" className="block">
           <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
             <div className="text-sm text-gray-500 font-medium mb-1">Available Today</div>
             <div className="text-3xl font-bold text-gray-900">{rawAvailability.count}</div>
@@ -63,7 +63,7 @@ export default async function StaffPage() {
           </div>
         </Link>
 
-        <Link href="/staff/projects" className="block">
+        <Link href="/coordination/projects" className="block">
           <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
             <div className="text-sm text-gray-500 font-medium mb-1">Active Projects</div>
             <div className="text-3xl font-bold text-gray-900">{activeTeams.count}</div>
@@ -71,7 +71,7 @@ export default async function StaffPage() {
           </div>
         </Link>
 
-        <Link href="/staff/availability" className="block">
+        <Link href="/coordination/availability" className="block">
           <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
             <div className="text-sm text-gray-500 font-medium mb-1">Upcoming Events</div>
             <div className="text-3xl font-bold text-gray-900">{upcomingEvents.count}</div>
