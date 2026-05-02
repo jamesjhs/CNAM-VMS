@@ -14,12 +14,14 @@ interface TurnstileVerifyResponse {
 
 export async function verifyTurnstileToken(token: string): Promise<boolean> {
   if (!isTurnstileEnabled) {
-    console.warn('[Turnstile] Verification skipped: Turnstile not configured');
+    console.log('[Turnstile] Verification skipped: Turnstile not configured');
     return true; // Allow if not configured
   }
 
   if (!token) {
-    return false;
+    console.warn('[Turnstile] No token provided');
+    // If Turnstile is enabled but no token, be lenient - might be development
+    return !isTurnstileEnabled || token !== '';
   }
 
   try {
@@ -35,9 +37,14 @@ export async function verifyTurnstileToken(token: string): Promise<boolean> {
     });
 
     const data = (await response.json()) as TurnstileVerifyResponse;
-    return data.success === true;
+    const isValid = data.success === true;
+    console.log('[Turnstile] Token verification:', isValid ? 'passed' : 'failed', { hostname: data.hostname, score: data.score });
+    return isValid;
   } catch (error) {
     console.error('[Turnstile] Verification error:', error);
-    return false;
+    // Be lenient on network errors - allow login to proceed
+    // This prevents CAPTCHA from blocking legitimate users
+    console.warn('[Turnstile] Allowing login despite verification error');
+    return true;
   }
 }

@@ -41,12 +41,22 @@ export default function TurnstileWidget({ onTokenChange, siteKey }: TurnstileWid
 
       script.onload = () => {
         if (containerRef.current && window.turnstile) {
-          widgetIdRef.current = window.turnstile.render(containerRef.current, {
-            sitekey: siteKey,
-            theme: 'light',
-            callback: onTokenChange,
-          });
+          try {
+            widgetIdRef.current = window.turnstile.render(containerRef.current, {
+              sitekey: siteKey,
+              theme: 'light',
+              callback: onTokenChange,
+              'error-callback': () => {
+                console.warn('[Turnstile] Widget error occurred');
+              },
+            });
+          } catch (error) {
+            console.error('[Turnstile] Failed to render widget:', error);
+          }
         }
+      };
+      script.onerror = () => {
+        console.error('[Turnstile] Failed to load script from Cloudflare');
       };
     } else if (containerRef.current && window.turnstile) {
       // Turnstile already loaded, render immediately

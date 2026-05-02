@@ -57,6 +57,7 @@ export default function SignInForm({ callbackUrl, error, reset }: SignInFormProp
       }
       
       // Show generic error for other failures
+      console.error('[SignIn] Login failed:', errorMessage);
       setSubmitError('Failed to sign in. Please check your email and password and try again.');
     }
   };

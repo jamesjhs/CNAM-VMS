@@ -13,6 +13,11 @@ export function useVersionCheck(pollIntervalMs = 30000) {
     const checkVersion = async () => {
       try {
         const response = await fetch('/api/version');
+        if (!response.ok) {
+          // Silently skip if API is down (502, etc)
+          console.debug(`[Version] API returned ${response.status}, skipping check`);
+          return;
+        }
         const data = (await response.json()) as { version: string };
         const remoteVersion = data.version;
 
@@ -25,7 +30,8 @@ export function useVersionCheck(pollIntervalMs = 30000) {
           }, 2000);
         }
       } catch (error) {
-        console.error('Failed to check version:', error);
+        // Silently ignore version check failures - not critical to operation
+        console.debug('Failed to check version (non-critical):', error instanceof Error ? error.message : error);
       }
     };
 
