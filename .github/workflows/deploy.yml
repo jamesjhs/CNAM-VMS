@@ -19,24 +19,53 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
+          cache: 'npm'
+
+      - name: Verify package-lock.json
+        run: |
+          if [ ! -f package-lock.json ]; then
+            echo "ERROR: package-lock.json not found! This is required for reproducible builds."
+            exit 1
+          fi
 
       - name: Install Dependencies & Build
         run: |
           npm ci
           npm run build
 
+      - name: Verify build output
+        run: |
+          if [ ! -d .next/standalone ]; then
+            echo "ERROR: Build failed - .next/standalone directory not created"
+            exit 1
+          fi
+          if [ ! -f .next/standalone/server.js ]; then
+            echo "ERROR: Build failed - server.js not created"
+            exit 1
+          fi
+
       - name: Compress files
         run: |
-          # 1. Create the zip file one folder level OUTSIDE our current directory
-          tar -czf ../deploy.tar.gz --exclude=.git --exclude=node_modules .
+          # Create the deployment archive
+          tar -czf ../deploy.tar.gz --exclude=.git --exclude=node_modules --exclude=.next .
           
-          # 2. Move the finished zip file back INSIDE our current directory
+          # Move the archive back to current directory
           mv ../deploy.tar.gz .
+          
+          # Verify archive was created and isn't empty
+          if [ ! -f deploy.tar.gz ] || [ ! -s deploy.tar.gz ]; then
+            echo "ERROR: Failed to create deployment archive"
+            exit 1
+          fi
+          
+          # Show archive size for debugging
+          ls -lh deploy.tar.gz
           
       - name: Install Cloudflared
         run: |
           curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
           sudo dpkg -i cloudflared.deb
+          cloudflared version
 
       - name: Setup SSH Context
         env:
@@ -47,7 +76,6 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           
-          # Stripped out the broken flags. It just points to your host now.
           cat <<EOF > ~/.ssh/config
           Host $SERVER_HOST
             StrictHostKeyChecking no
@@ -57,21 +85,77 @@ jobs:
       - name: Transfer and Deploy over Tunnel
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          # THE FIX: These are the exact variable names cloudflared actually looks for
           TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_CLIENT_ID }}
           TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
         run: |
-          # 1. Send the file over the tunnel
-          scp deploy.tar.gz nodeapp@$SERVER_HOST:/var/node/cnamvms.jahosi.co.uk-3001/
+          set -e  # Exit on first error
           
-          # 2. Execute the remote commands
-          ssh nodeapp@$SERVER_HOST << 'EOF'
-            cd /var/node/cnamvms.jahosi.co.uk-3001/
-            tar -xzf deploy.tar.gz
-            rm deploy.tar.gz
+          DEPLOY_DIR="/var/node/cnamvms.jahosi.co.uk-3001"
+          
+          echo "Transferring deployment archive..."
+          scp -o ConnectTimeout=30 -o StrictHostKeyChecking=no deploy.tar.gz nodeapp@$SERVER_HOST:$DEPLOY_DIR/
+          
+          echo "Executing remote deployment steps..."
+          ssh -o ConnectTimeout=30 -o StrictHostKeyChecking=no nodeapp@$SERVER_HOST << 'EOF'
+            set -e
             
-            npm ci --omit=dev
+            DEPLOY_DIR="/var/node/cnamvms.jahosi.co.uk-3001"
+            cd "$DEPLOY_DIR"
             
-            # Restart PM2
-            pm2 restart CNAM3001
+            # Verify archive exists and is not corrupted
+            if [ ! -f deploy.tar.gz ]; then
+              echo "ERROR: deploy.tar.gz not found on remote server"
+              exit 1
+            fi
+            
+            echo "Extracting archive..."
+            tar -tzf deploy.tar.gz > /dev/null || (echo "ERROR: Archive is corrupted"; exit 1)
+            
+            # Backup current state
+            if [ -d current ]; then
+              echo "Backing up current deployment..."
+              mv current current.backup.$(date +%s)
+            fi
+            
+            # Extract to temporary directory, then move
+            echo "Extracting deployment..."
+            mkdir -p current
+            tar -xzf deploy.tar.gz -C current
+            
+            echo "Installing dependencies..."
+            cd current
+            npm ci --omit=dev --verbose
+            
+            # Verify critical files exist
+            if [ ! -f .next/standalone/server.js ]; then
+              echo "ERROR: server.js missing after extraction. Deployment failed."
+              cd ..
+              rm -rf current
+              if [ -d current.backup.* ]; then
+                mv current.backup.* current
+              fi
+              exit 1
+            fi
+            
+            echo "Cleaning up..."
+            rm -f $DEPLOY_DIR/deploy.tar.gz
+            
+            echo "Restarting application..."
+            pm2 restart CNAM3001 || (echo "ERROR: PM2 restart failed"; exit 1)
+            
+            # Wait for app to be ready
+            sleep 3
+            
+            if pm2 info CNAM3001 | grep -q "online"; then
+              echo "✓ Deployment successful - application is online"
+            else
+              echo "ERROR: Application failed to start after deployment"
+              exit 1
+            fi
           EOF
+          
+      - name: Deployment Failed Notification
+        if: failure()
+        run: |
+          echo "❌ Deployment failed! Check logs above for details."
+          exit 1
