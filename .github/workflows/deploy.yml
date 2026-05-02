@@ -61,10 +61,10 @@ jobs:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
         run: |
           # 1. Send the file over the tunnel
-          scp deploy.tar.gz root@$SERVER_HOST:/var/node/cnamvms.jahosi.co.uk-3001/
+          scp deploy.tar.gz nodeapp@$SERVER_HOST:/var/node/cnamvms.jahosi.co.uk-3001/
           
           # 2. Execute the remote commands
-          ssh root@$SERVER_HOST << 'EOF'
+          ssh nodeapp@$SERVER_HOST << 'EOF'
             cd /var/node/cnamvms.jahosi.co.uk-3001/
             tar -xzf deploy.tar.gz
             rm deploy.tar.gz
