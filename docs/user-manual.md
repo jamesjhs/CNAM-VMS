@@ -2,7 +2,7 @@
 
 **City of Norwich Aviation Museum — Volunteer Management System**
 
-*Version 0.6.0 — May 2026*
+**Version 0.8.0 — May 2026**
 
 ---
 
@@ -374,6 +374,22 @@ Your profile also shows the **roles** and **teams** you have been assigned to. T
 
 At the bottom of your profile page is a list of your **capabilities** — the specific actions you are permitted to perform in the system. These are granted via your roles and are for information only.
 
+### Danger Zone — Deleting Your Account
+
+> ⚠️ **This action is permanent and cannot be reversed.**
+
+At the very bottom of your profile page, you will find the **Danger Zone** section. From here you can permanently delete your own account.
+
+Clicking **Delete my account** expands a confirmation form. You must enter your current password to proceed. Once confirmed:
+
+- Your account and **all associated data** (availability records, event sign-ups, team memberships, phone numbers) will be permanently removed.
+- You will be signed out immediately.
+- Your information will not be recoverable.
+
+If you are unsure, click **Cancel** to dismiss the form without taking any action.
+
+> **Note for administrators:** You cannot delete your own account from the admin panel. The self-deletion option in your own Profile page is the only way to do this. The root administrator account cannot be self-deleted either — contact your system manager if the root account needs to be removed.
+
 ---
 
 ## 13. File Library
@@ -495,7 +511,7 @@ The new account is created with **Pending** status. You will need to manage the 
 
 #### Managing an individual user
 
-Click **Manage** next to any user to open their detail page. Here you can:
+Click **Manage** next to any user to open their detail page. Here you can (with `admin:users.write`):
 
 - Change their **name**, **account type**, and **status** (Active, Pending, or Suspended)
 - Assign or remove **roles**
@@ -503,6 +519,10 @@ Click **Manage** next to any user to open their detail page. Here you can:
 - Add or remove **telephone numbers** on their behalf
 - Send a **password reset link** to their email
 - **Delete** the account (this cannot be undone)
+
+> **Note:** Administrators cannot delete their own account from the admin panel, and the root account cannot be deleted at all. To delete your own account, use the [Danger Zone](#danger-zone--deleting-your-account) on your Profile page.
+
+> **Note:** Users with `admin:users.read` but not `admin:users.write` can view user details but cannot make any changes.
 
 ---
 
@@ -744,7 +764,8 @@ The VMS is designed with privacy and security in mind:
 - **Two-step sign-in.** As well as your password, a one-time code is sent to your email each time you sign in. This means even if someone else obtained your password, they could not sign in without also having access to your email.
 - **Your email address is kept private.** It is only visible to administrators and is stored securely.
 - **Everything is logged.** Every sign-in and every significant action is recorded in the audit log, so any unusual activity can be spotted quickly.
-- **Access is controlled.** Each person can only see and do what they have been given permission for. Trying to access a page you do not have permission for will show an "Access Denied" message rather than any sensitive information.
+- **Access is controlled and hidden.** Each person can only see and do what they have been given permission for. Pages you do not have access to are not shown — they redirect silently to your dashboard rather than displaying an "Access Denied" message that would confirm the page exists.
+- **Suspended accounts are blocked immediately.** If your account is suspended, you are redirected to an error page on your very next page load.
 - **File uploads are checked.** Only certain types of file can be uploaded, and the system checks both the file's extension and its actual content type to prevent unsafe files from being stored.
 - **The system is kept up to date.** Security updates to the underlying software are applied regularly.
 

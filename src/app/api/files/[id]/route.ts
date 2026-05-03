@@ -17,10 +17,9 @@ export async function GET(
 
   const user = session.user as SessionUser;
 
-  // Check if user has permission to download files
-  if (!user.capabilities?.includes('admin:files.read')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  // Any authenticated user may download files (the /files page is accessible to all signed-in users).
+  // Uploads and deletion still require admin:files.write / admin:files.read respectively.
+  void user; // user object retained for future per-file ACL checks if needed
 
   const { id } = await params;
 

@@ -6,9 +6,9 @@ import SignInForm from './SignInForm';
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ callbackUrl?: string; error?: string; reset?: string }>;
+  searchParams: Promise<{ callbackUrl?: string; error?: string; reset?: string; deleted?: string }>;
 }) {
-  const { callbackUrl, error, reset } = await searchParams;
+  const { callbackUrl, error, reset, deleted } = await searchParams;
   const session = await auth();
   if (session) redirect(callbackUrl ?? '/dashboard');
 
@@ -27,6 +27,12 @@ export default async function SignInPage({
           <p className="text-gray-500 text-sm mb-6">
             Enter your email and password. A one-time verification code will be sent to your inbox.
           </p>
+
+          {deleted && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm">
+              ✓ Your account has been permanently deleted.
+            </div>
+          )}
 
           {reset && (
             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">

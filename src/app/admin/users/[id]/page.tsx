@@ -123,6 +123,20 @@ export default async function UserDetailPage({
           </div>
         )}
 
+        {sp.error === 'CannotDeleteSelf' && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-start gap-3">
+            <span className="text-red-600 text-xl flex-shrink-0">✕</span>
+            <p className="text-sm text-red-800 font-medium">You cannot delete your own account from the admin panel. Use your profile settings instead.</p>
+          </div>
+        )}
+
+        {sp.error === 'CannotDeleteRoot' && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-start gap-3">
+            <span className="text-red-600 text-xl flex-shrink-0">✕</span>
+            <p className="text-sm text-red-800 font-medium">The root administrator account cannot be deleted.</p>
+          </div>
+        )}
+
         {/* User header */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <div className="flex items-start justify-between">
@@ -296,7 +310,8 @@ export default async function UserDetailPage({
           )}
         </div>
 
-        {/* Password & Security */}
+        {/* Password & Security — write access only */}
+        {canWrite && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <h2 className="font-semibold text-gray-900 mb-1">Password &amp; Security</h2>
 
@@ -347,12 +362,13 @@ export default async function UserDetailPage({
             </button>
           </form>
         </div>
+        )}
 
         {/* Roles */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <h2 className="font-semibold text-gray-900 mb-4">Roles</h2>
           {allRoles.length === 0 ? (
-            <p className="text-gray-400 text-sm">No roles defined yet. <Link href="/admin/roles" className="text-blue-600 hover:underline">Create roles →</Link></p>
+            <p className="text-gray-400 text-sm">No roles defined yet. {canWrite && <Link href="/admin/roles" className="text-blue-600 hover:underline">Create roles →</Link>}</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {allRoles.map((role) => {
@@ -363,7 +379,7 @@ export default async function UserDetailPage({
                       <div className="font-medium text-sm text-gray-900">{role.name}</div>
                       {role.description && <div className="text-xs text-gray-500 mt-0.5">{role.description}</div>}
                     </div>
-                    {hasRole ? (
+                    {canWrite && (hasRole ? (
                       <form action={removeRole.bind(null, user.id, role.id)}>
                         <button type="submit" className="text-xs text-red-600 hover:text-red-800 font-medium ml-3 whitespace-nowrap">
                           Remove
@@ -375,7 +391,7 @@ export default async function UserDetailPage({
                           Assign
                         </button>
                       </form>
-                    )}
+                    ))}
                   </div>
                 );
               })}
@@ -398,7 +414,7 @@ export default async function UserDetailPage({
                       <div className="font-medium text-sm text-gray-900">{team.name}</div>
                       {team.description && <div className="text-xs text-gray-500 mt-0.5">{team.description}</div>}
                     </div>
-                    {hasTeam ? (
+                    {canWrite && (hasTeam ? (
                       <form action={removeTeam.bind(null, user.id, team.id)}>
                         <button type="submit" className="text-xs text-red-600 hover:text-red-800 font-medium ml-3 whitespace-nowrap">
                           Remove
@@ -410,7 +426,7 @@ export default async function UserDetailPage({
                           Assign
                         </button>
                       </form>
-                    )}
+                    ))}
                   </div>
                 );
               })}

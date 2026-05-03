@@ -17,6 +17,101 @@ Entries are listed in reverse chronological order (newest first). Each entry rec
 
 ---
 
+## 3 May 2026 — Security Hardening, Access Control & Self-Service Account Deletion (v0.8.0)
+
+**Agent session:** GitHub Copilot CLI
+
+**What was done:**
+
+Version bumped from 0.7.1 to 0.8.0. Comprehensive security audit and hardening from the perspective of a penetration tester, iterating from least-privileged (volunteer) to most-privileged (root) user. All identified vulnerabilities have been patched.
+
+### Feature: Self-Service Account Deletion
+
+Users can now permanently delete their own accounts from the **My Profile** page.
+
+- A new **Danger Zone** section appears at the bottom of every user's profile page.
+- Deletion requires the user to enter their current password as a confirmation step (prevents accidental clicks and CSRF-style attacks).
+- On success, the user is signed out immediately and redirected to the sign-in page with a confirmation message.
+- The deletion cascades through all related tables (phones, event sign-ups, availability slots, team memberships, etc.) via existing `ON DELETE CASCADE` foreign keys.
+- The action is logged to the audit trail (`USER_SELF_DELETED`).
+
+**Files changed:**
+- `src/app/profile/actions.ts` — Added `deleteOwnAccount` server action
+- `src/app/profile/DeleteOwnAccountButton.tsx` — New client component with confirmation form
+- `src/app/profile/page.tsx` — Added Danger Zone section
+- `src/app/auth/signin/page.tsx` — Added `deleted=1` confirmation message
+
+### Security Fix: Restricted Pages No Longer Visible to Unauthorised Users
+
+Previously, accessing a restricted page (e.g., `/admin/users`) showed an explicit "Access Denied" page, confirming to an attacker that the resource exists.
+
+**Fix:** `requireCapability` and `requireAnyCapability` now redirect to `/dashboard` (rather than `/unauthorized`) for missing permissions. The coordination layout redirect was also updated. Restricted pages are effectively invisible to users who lack the capability.
+
+### Security Fix: Admin Overview Page Incorrect Capability Gate
+
+The admin overview page (`/admin`) previously required `admin:users.read`. Users with other admin capabilities (e.g. `admin:announcements.write`) would see the Admin link in the navigation but be redirected on click.
+
+**Fix:** The page now accepts any admin capability via `requireAnyCapability`. It also filters the displayed cards and statistics to only show sections the current user can access — users with partial admin permissions see only the sections relevant to them.
+
+### Security Fix: Admin User Detail Page — Separation of Read vs Write
+
+Previously, any user with `admin:users.read` could see all edit forms on the user detail page. Submitting them would fail at the server action level, but the forms were still visible and confusing.
+
+**Fix:** All mutating UI elements (edit profile form, phone management, status management, password reset, role assignment, team assignment, delete button) are now hidden unless the user also has `admin:users.write`. Read-only users see the user's data and audit log without any mutation controls.
+
+### Security Fix: IDOR — Phone Number Deletion Not Scoped to User
+
+`removeUserPhone(userId, phoneId)` previously deleted by `phoneId` alone, meaning an admin with `admin:users.write` viewing user A's page could delete a phone record belonging to user B by supplying user B's phone ID.
+
+**Fix:** The DELETE query now includes `AND userId = ?`, scoping deletion to the correct user.
+
+### Security Fix: Suspended Users Not Blocked on Every Request
+
+Suspended users with an active session could continue to browse the site for up to 60 seconds (the JWT capabilities cache TTL) after being suspended.
+
+**Fix:** `requireAuth()` now checks `user.status === 'SUSPENDED'` and immediately redirects to `/auth/error?error=AccountSuspended`. This check runs on every page load, not just at JWT refresh time.
+
+### Security Fix: OTP Logged in Plain Text
+
+The server action `submitPassword` logged the raw OTP code to stdout: `OTP code is: 123456`. Anyone with access to the application logs (e.g. via PM2, server SSH) could intercept an OTP and bypass two-factor authentication.
+
+**Fix:** The OTP value is no longer logged. Only a generic "sending verification code to user" message is emitted.
+
+### Security Fix: No Validation of `status` and `accountType` Enum Parameters
+
+The `updateUserStatus` and `updateUserProfile`/`createUser` server actions accepted arbitrary string values for the `status` and `accountType` parameters. A spoofed form POST could set a user's status or account type to any value (e.g. `"ADMIN"`).
+
+**Fix:** Both parameters are now validated against their allowed enum values (`ACTIVE`/`PENDING`/`SUSPENDED` and `VOLUNTEER`/`STAFF`/`MEMBER`) before any database write. Invalid values are silently rejected.
+
+### Security Fix: No Protection Against Deleting the Root User or Self
+
+An admin with `admin:users.write` could:
+1. Delete their own account via the admin panel, leaving an orphaned session.
+2. Delete the root/superadmin account, permanently breaking system access.
+
+**Fix:**
+- `deleteUser` now rejects deletion of the actor's own account with an error redirecting back to the admin page.
+- `deleteUser` now rejects deletion of the account whose email matches `ROOT_USER_EMAIL`, protecting the root account.
+- The "Delete user" Danger Zone card on the admin user detail page is hidden entirely when viewing one's own profile.
+
+### Security Fix: File Download API Permission Mismatch
+
+The file download API (`/api/files/[id]`) required `admin:files.read`, but the files list page (`/files`) showed download links to all authenticated users. Regular volunteers would see the "Download" button but receive a 403 error when clicking it.
+
+**Fix:** The download API now allows any authenticated user to download files, which matches the intent of the public files page. File upload and the admin file listing still require the appropriate write/read capabilities.
+
+### Security Fix: Input Length Validation
+
+Added maximum length constraints on all user-supplied text fields in server actions to prevent oversized inputs from filling the database or causing unexpected behaviour:
+
+- User names: 150 characters
+- Email addresses: 254 characters (RFC 5321 maximum)
+- Role/team names and descriptions: 100 / 500 characters
+- Announcement titles/bodies: 200 / 10,000 characters
+- Phone labels: 50 characters (already existed in profile actions; now also in admin)
+
+---
+
 ## 2 May 2026 — Staff Section Renamed to Coordination & SQL Fixes (v0.6.0)
 
 **Agent session:** GitHub Copilot CLI

@@ -23,10 +23,12 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
 
 /**
  * Require authentication. Redirects to sign-in if not authenticated.
+ * Also redirects suspended users immediately to the error page.
  */
 export async function requireAuth(): Promise<SessionUser> {
   const user = await getCurrentUser();
   if (!user) redirect('/auth/signin');
+  if (user.status === 'SUSPENDED') redirect('/auth/error?error=AccountSuspended');
   return user;
 }
 
