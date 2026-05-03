@@ -37,7 +37,8 @@ export default async function UserDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ success?: string; error?: string }>;
 }) {
-  await requireCapability('admin:users.read');
+  const actor = await requireCapability('admin:users.read');
+  const canWrite = actor.capabilities.includes('admin:users.write');
 
   const { id } = await params;
   const sp = await searchParams;
@@ -142,6 +143,7 @@ export default async function UserDetailPage({
         </div>
 
         {/* Edit Profile */}
+        {canWrite && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <h2 className="font-semibold text-gray-900 mb-4">Edit Profile</h2>
           <form
@@ -196,6 +198,7 @@ export default async function UserDetailPage({
             </button>
           </form>
         </div>
+        )}
 
         {/* Phone Numbers */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
@@ -208,15 +211,18 @@ export default async function UserDetailPage({
                     <span className="font-medium text-sm text-gray-900">{phone.number}</span>
                     {phone.label && <span className="ml-2 text-xs text-gray-500">({phone.label})</span>}
                   </div>
+                  {canWrite && (
                   <form action={removeUserPhone.bind(null, user.id, phone.id)}>
                     <button type="submit" className="text-xs text-red-600 hover:text-red-800 font-medium whitespace-nowrap">
                       Remove
                     </button>
                   </form>
+                  )}
                 </li>
               ))}
             </ul>
           )}
+          {canWrite && (
           <form
             action={async (formData: FormData) => {
               'use server';
@@ -246,10 +252,12 @@ export default async function UserDetailPage({
               Add Number
             </button>
           </form>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Status management */}
+          {canWrite && (
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h2 className="font-semibold text-gray-900 mb-4">Account Status</h2>
             <div className="flex flex-col gap-2">
@@ -274,8 +282,10 @@ export default async function UserDetailPage({
               ))}
             </div>
           </div>
+          )}
 
-          {/* Delete user */}
+          {/* Delete user — only available to write-capable admins; not for own account */}
+          {canWrite && actor.id !== user.id && (
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h2 className="font-semibold text-gray-900 mb-2">Danger Zone</h2>
             <p className="text-gray-500 text-sm mb-4">
@@ -283,6 +293,7 @@ export default async function UserDetailPage({
             </p>
             <DeleteUserButton userId={user.id} userEmail={user.email ?? ''} />
           </div>
+          )}
         </div>
 
         {/* Password & Security */}

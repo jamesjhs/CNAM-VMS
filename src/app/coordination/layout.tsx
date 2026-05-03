@@ -19,7 +19,7 @@ export default async function CoordinationLayout({ children }: { children: React
   ];
   
   if (!hasAnyCapability(user, staffCapabilities)) {
-    redirect('/unauthorized');
+    redirect('/dashboard');
   }
 
   return (

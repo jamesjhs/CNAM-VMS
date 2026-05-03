@@ -1,32 +1,50 @@
-import { requireCapability } from '@/lib/auth-helpers';
+import { requireAnyCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
 import { getDb, unpackTs } from '@/lib/db';
 import Link from 'next/link';
 
 export default async function AdminPage() {
-  const user = await requireCapability('admin:users.read');
+  const ALL_ADMIN_CAPS = [
+    'admin:users.read', 'admin:roles.read', 'admin:teams.read',
+    'admin:audit.read', 'admin:files.read', 'admin:announcements.write',
+    'admin:calendar.write', 'admin:theme.write', 'admin:training.write',
+    'admin:tasks.write', 'admin:settings.write', 'admin:museum.write',
+    'admin:act-as.write',
+  ];
+  const user = await requireAnyCapability(ALL_ADMIN_CAPS);
+
+  const canViewUsers = user.capabilities.includes('admin:users.read');
+  const canViewRoles = user.capabilities.includes('admin:roles.read');
+  const canViewTeams = user.capabilities.includes('admin:teams.read');
+  const canViewAudit = user.capabilities.includes('admin:audit.read');
+  const canViewFiles = user.capabilities.includes('admin:files.read');
+  const canManageAnnouncements = user.capabilities.includes('admin:announcements.write');
+  const canManageCalendar = user.capabilities.includes('admin:calendar.write');
+  const canManageSettings = user.capabilities.includes('admin:settings.write');
+  const canManageMuseum = user.capabilities.includes('admin:museum.write');
+  const canManageTheme = user.capabilities.includes('admin:theme.write');
+  const canManageTasks = user.capabilities.includes('admin:tasks.write');
+  const canManageTraining = user.capabilities.includes('admin:training.write');
 
   const db = getDb();
 
-  const { n: userCount } = db.prepare('SELECT COUNT(*) as n FROM users').get() as { n: number };
-  const { n: roleCount } = db.prepare('SELECT COUNT(*) as n FROM roles').get() as { n: number };
-  const { n: teamCount } = db.prepare('SELECT COUNT(*) as n FROM teams').get() as { n: number };
-  const { n: auditCount } = db.prepare('SELECT COUNT(*) as n FROM audit_logs').get() as { n: number };
-  const { n: fileCount } = db.prepare('SELECT COUNT(*) as n FROM file_assets').get() as { n: number };
-  const { n: announcementCount } = db.prepare('SELECT COUNT(*) as n FROM announcements').get() as { n: number };
-  const { n: eventCount } = db.prepare('SELECT COUNT(*) as n FROM calendar_events').get() as { n: number };
+  const userCount = canViewUsers ? (db.prepare('SELECT COUNT(*) as n FROM users').get() as { n: number }).n : 0;
+  const roleCount = canViewRoles ? (db.prepare('SELECT COUNT(*) as n FROM roles').get() as { n: number }).n : 0;
+  const teamCount = canViewTeams ? (db.prepare('SELECT COUNT(*) as n FROM teams').get() as { n: number }).n : 0;
+  const auditCount = canViewAudit ? (db.prepare('SELECT COUNT(*) as n FROM audit_logs').get() as { n: number }).n : 0;
+  const fileCount = canViewFiles ? (db.prepare('SELECT COUNT(*) as n FROM file_assets').get() as { n: number }).n : 0;
+  const announcementCount = canManageAnnouncements ? (db.prepare('SELECT COUNT(*) as n FROM announcements').get() as { n: number }).n : 0;
+  const eventCount = canManageCalendar ? (db.prepare('SELECT COUNT(*) as n FROM calendar_events').get() as { n: number }).n : 0;
 
-  const rawRecentLogs = db.prepare(`
+  type RawAuditLog = { id: string; action: string; resource: string | null; resourceId: string | null; createdAt: string; user_email: string | null };
+  const rawRecentLogs: RawAuditLog[] = canViewAudit ? (db.prepare(`
     SELECT al.id, al.action, al.resource, al.resourceId, al.createdAt,
            u.email as user_email
     FROM audit_logs al
     LEFT JOIN users u ON al.userId = u.id
     ORDER BY al.createdAt DESC
     LIMIT 10
-  `).all() as {
-    id: string; action: string; resource: string | null; resourceId: string | null;
-    createdAt: string; user_email: string | null;
-  }[];
+  `).all() as RawAuditLog[]) : [];
 
   const recentAuditLogs = rawRecentLogs.map((l) => ({
     ...l,
@@ -45,73 +63,109 @@ export default async function AdminPage() {
 
         {/* Quick-access admin sections */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <AdminCard
-            href="/admin/users"
-            icon="👥"
-            title="User Management"
-            description="Add, remove and manage volunteer accounts. Assign roles, teams and administration rights."
-            badge={`${userCount} users`}
-          />
-          <AdminCard
-            href="/admin/roles"
-            icon="🎭"
-            title="Roles & Permissions"
-            description="Define roles and assign capabilities to control what each role can access."
-            badge={`${roleCount} roles`}
-          />
-          <AdminCard
-            href="/admin/teams"
-            icon="🏷️"
-            title="Teams"
-            description="Manage volunteer teams, assign team leaders and group assignments."
-            badge={`${teamCount} teams`}
-          />
-          <AdminCard
-            href="/admin/teams/tasks"
-            icon="📋"
-            title="Task Forms"
-            description="Create and manage structured task forms for teams, including equipment, consumables and safety information."
-          />
-          <AdminCard
-            href="/admin/audit"
-            icon="📊"
-            title="Audit Logs"
-            description="View a full audit trail of all actions taken in the system."
-            badge={`${auditCount} events`}
-          />
-          <AdminCard
-            href="/admin/files"
-            icon="📁"
-            title="File Assets"
-            description="View and manage uploaded files and documents."
-            badge={`${fileCount} file${fileCount !== 1 ? 's' : ''}`}
-          />
-          <AdminCard
-            href="/admin/announcements"
-            icon="📣"
-            title="Announcements"
-            description="Create and manage announcements for volunteers."
-            badge={`${announcementCount} announcement${announcementCount !== 1 ? 's' : ''}`}
-          />
-          <AdminCard
-            href="/admin/schedule"
-            icon="📅"
-            title="Schedule"
-            description="Create events, roster slots and help requests on the volunteer calendar."
-            badge={`${eventCount} event${eventCount !== 1 ? 's' : ''}`}
-          />
-          <AdminCard
-            href="/admin/settings"
-            icon="⚙️"
-            title="System Settings"
-            description="Configure site-wide settings including SMTP email delivery."
-          />
-          <AdminCard
-            href="/admin/museum"
-            icon="🏛️"
-            title="Museum Status &amp; Hours"
-            description="Manage museum announcements, opening hours, special closures, and bank holidays."
-          />
+          {canViewUsers && (
+            <AdminCard
+              href="/admin/users"
+              icon="👥"
+              title="User Management"
+              description="Add, remove and manage volunteer accounts. Assign roles, teams and administration rights."
+              badge={`${userCount} users`}
+            />
+          )}
+          {canViewRoles && (
+            <AdminCard
+              href="/admin/roles"
+              icon="🎭"
+              title="Roles & Permissions"
+              description="Define roles and assign capabilities to control what each role can access."
+              badge={`${roleCount} roles`}
+            />
+          )}
+          {canViewTeams && (
+            <AdminCard
+              href="/admin/teams"
+              icon="🏷️"
+              title="Teams"
+              description="Manage volunteer teams, assign team leaders and group assignments."
+              badge={`${teamCount} teams`}
+            />
+          )}
+          {canManageTasks && (
+            <AdminCard
+              href="/admin/teams/tasks"
+              icon="📋"
+              title="Task Forms"
+              description="Create and manage structured task forms for teams, including equipment, consumables and safety information."
+            />
+          )}
+          {canViewAudit && (
+            <AdminCard
+              href="/admin/audit"
+              icon="📊"
+              title="Audit Logs"
+              description="View a full audit trail of all actions taken in the system."
+              badge={`${auditCount} events`}
+            />
+          )}
+          {canViewFiles && (
+            <AdminCard
+              href="/admin/files"
+              icon="📁"
+              title="File Assets"
+              description="View and manage uploaded files and documents."
+              badge={`${fileCount} file${fileCount !== 1 ? 's' : ''}`}
+            />
+          )}
+          {canManageAnnouncements && (
+            <AdminCard
+              href="/admin/announcements"
+              icon="📣"
+              title="Announcements"
+              description="Create and manage announcements for volunteers."
+              badge={`${announcementCount} announcement${announcementCount !== 1 ? 's' : ''}`}
+            />
+          )}
+          {canManageCalendar && (
+            <AdminCard
+              href="/admin/schedule"
+              icon="📅"
+              title="Schedule"
+              description="Create events, roster slots and help requests on the volunteer calendar."
+              badge={`${eventCount} event${eventCount !== 1 ? 's' : ''}`}
+            />
+          )}
+          {canManageSettings && (
+            <AdminCard
+              href="/admin/settings"
+              icon="⚙️"
+              title="System Settings"
+              description="Configure site-wide settings including SMTP email delivery."
+            />
+          )}
+          {canManageMuseum && (
+            <AdminCard
+              href="/admin/museum"
+              icon="🏛️"
+              title="Museum Status &amp; Hours"
+              description="Manage museum announcements, opening hours, special closures, and bank holidays."
+            />
+          )}
+          {canManageTheme && (
+            <AdminCard
+              href="/admin/content"
+              icon="🎨"
+              title="Site Content"
+              description="Manage site theme and content."
+            />
+          )}
+          {canManageTraining && (
+            <AdminCard
+              href="/admin/training"
+              icon="📚"
+              title="Training Policies"
+              description="Create and manage training policies and compliance requirements."
+            />
+          )}
         </div>
 
         {/* Current user info */}
@@ -158,16 +212,17 @@ export default async function AdminPage() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4 mb-8">
-          <StatCard label="Users" value={userCount} icon="👥" />
-          <StatCard label="Roles" value={roleCount} icon="🎭" />
-          <StatCard label="Teams" value={teamCount} icon="🏷️" />
-          <StatCard label="Audit Events" value={auditCount} icon="📊" />
-          <StatCard label="Files" value={fileCount} icon="📁" />
-          <StatCard label="Announcements" value={announcementCount} icon="📣" />
-          <StatCard label="Events" value={eventCount} icon="📅" />
+          {canViewUsers && <StatCard label="Users" value={userCount} icon="👥" />}
+          {canViewRoles && <StatCard label="Roles" value={roleCount} icon="🎭" />}
+          {canViewTeams && <StatCard label="Teams" value={teamCount} icon="🏷️" />}
+          {canViewAudit && <StatCard label="Audit Events" value={auditCount} icon="📊" />}
+          {canViewFiles && <StatCard label="Files" value={fileCount} icon="📁" />}
+          {canManageAnnouncements && <StatCard label="Announcements" value={announcementCount} icon="📣" />}
+          {canManageCalendar && <StatCard label="Events" value={eventCount} icon="📅" />}
         </div>
 
-        {/* Recent audit logs */}
+        {/* Recent audit logs — only visible to users with audit access */}
+        {canViewAudit && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="font-semibold text-gray-900 mb-4">Recent Audit Log</h2>
           {recentAuditLogs.length === 0 ? (
@@ -201,6 +256,7 @@ export default async function AdminPage() {
             </div>
           )}
         </div>
+        )}
       </main>
     </div>
   );
