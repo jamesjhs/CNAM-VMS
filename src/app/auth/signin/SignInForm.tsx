@@ -134,10 +134,10 @@ export default function SignInForm({ callbackUrl, error, reset }: SignInFormProp
 
       <button
         type="submit"
-        disabled={isSubmitting}
+        disabled={isSubmitting || (isTurnstileEnabled && !turnstileToken)}
         className="w-full bg-[#1a3a5c] hover:bg-[#2d5986] disabled:opacity-50 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors"
       >
-        {isSubmitting ? 'Signing in...' : 'Continue →'}
+        {isSubmitting ? 'Signing in...' : isTurnstileEnabled && !turnstileToken ? 'Complete verification →' : 'Continue →'}
       </button>
     </form>
   );
