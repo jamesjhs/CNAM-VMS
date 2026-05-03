@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'cnam-vms',
+      name: 'cnam3001',
       script: 'node',
       // Load the project-root .env file before the server module runs so that
       // DB_ENCRYPTION_KEY, AUTH_SECRET, and all other runtime secrets are
