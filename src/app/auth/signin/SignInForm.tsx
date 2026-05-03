@@ -34,17 +34,21 @@ export default function SignInForm({ callbackUrl, error, reset }: SignInFormProp
     // Check Turnstile if enabled
     if (isTurnstileEnabled) {
       if (!turnstileToken) {
+        console.log('[SignIn] Form submitted but Turnstile not completed');
         e.preventDefault();
         setSubmitError('Please complete the security verification below.');
         return;
       }
     }
 
+    console.log('[SignIn] Form submitted, starting authentication...');
     setIsSubmitting(true);
 
     // Wrap the server action in error handling
     try {
       const formData = new FormData(e.currentTarget);
+      const email = formData.get('email');
+      console.log(`[SignIn] Submitting password for @${String(email).split('@')[1] || 'unknown'}...`);
       await submitPassword(formData);
     } catch (err) {
       setIsSubmitting(false);
@@ -53,6 +57,7 @@ export default function SignInForm({ callbackUrl, error, reset }: SignInFormProp
       
       // Rethrow NEXT_REDIRECT so Next.js can process redirects
       if (errorMessage.includes('NEXT_REDIRECT')) {
+        console.log('[SignIn] NEXT_REDIRECT caught — authentication successful, processing redirect');
         throw err;
       }
       

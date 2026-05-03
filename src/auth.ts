@@ -118,7 +118,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const completionToken = credentials?.completionToken as string | undefined;
         const keepSignedIn = credentials?.keepSignedIn === '1';
 
-        if (!userId || !completionToken) return null;
+        console.log(`[auth] Credentials.authorize: validating completion token for user ${userId}...`);
+        if (!userId || !completionToken) {
+          console.warn('[auth] Credentials.authorize: missing userId or completionToken');
+          return null;
+        }
 
         const db = getDb();
         const identifier = `auth:complete:${userId}`;
@@ -129,6 +133,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           'SELECT * FROM verification_tokens WHERE identifier = ? AND expires > ?',
         ).get(identifier, cutoff) as { identifier: string; token: string; expires: string } | undefined;
 
+        if (!tokenRecord) {
+          console.warn(`[auth] Credentials.authorize: no completion token found for user ${userId} — may have expired`);
+        }
+
         // Hash the incoming token and compare timing-safely against the stored hash
         const incomingHash = createHash('sha256').update(completionToken).digest('hex');
         const storedHash = tokenRecord?.token ?? '';
@@ -136,17 +144,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           storedHash.length > 0 &&
           timingSafeEqual(Buffer.from(incomingHash, 'hex'), Buffer.from(storedHash, 'hex'));
 
-        if (!tokenRecord || !tokenValid) return null;
+        if (!tokenRecord || !tokenValid) {
+          console.warn(`[auth] Credentials.authorize: completion token INVALID for user ${userId}`);
+          return null;
+        }
 
+        console.log(`[auth] Credentials.authorize: completion token VALID, deleting one-time token...`);
         // Delete immediately — single-use token
         db.prepare('DELETE FROM verification_tokens WHERE identifier = ?').run(identifier);
 
         // Fetch the user
         type UserRow = { id: string; email: string; name: string | null; image: string | null; status: string };
         const user = db.prepare('SELECT id, email, name, image, status FROM users WHERE id = ?').get(userId) as UserRow | undefined;
-        if (!user) return null;
-        if (user.status === 'SUSPENDED') return null;
+        if (!user) {
+          console.warn(`[auth] Credentials.authorize: user ${userId} not found in database`);
+          return null;
+        }
+        if (user.status === 'SUSPENDED') {
+          console.warn(`[auth] Credentials.authorize: user ${userId} is SUSPENDED`);
+          return null;
+        }
 
+        console.log(`[auth] Credentials.authorize: SUCCESS — user ${user.email} authorized, creating JWT session...`);
         return {
           id: user.id,
           email: user.email,
@@ -161,23 +180,35 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async signIn({ user, account }) {
       // Only run for credentials provider (other providers skip this)
       if (account?.provider !== 'credentials') return true;
-      if (!user.email) return false;
+      if (!user.email) {
+        console.warn('[auth] signIn callback: no email in user object');
+        return false;
+      }
 
+      console.log(`[auth] signIn callback: processing sign-in for ${user.email}...`);
       const db = getDb();
       const email = user.email.toLowerCase().trim();
       type UserRow = { id: string; status: string };
       const dbUser = db.prepare('SELECT id, status FROM users WHERE email = ?').get(email) as UserRow | undefined;
-      if (!dbUser) return false;
+      if (!dbUser) {
+        console.warn(`[auth] signIn callback: user ${email} not found in database`);
+        return false;
+      }
 
       const status: UserStatus = dbUser.status as UserStatus;
-      if (status === 'SUSPENDED') return '/auth/error?error=AccountSuspended';
+      if (status === 'SUSPENDED') {
+        console.warn(`[auth] signIn callback: user ${email} is SUSPENDED`);
+        return '/auth/error?error=AccountSuspended';
+      }
 
       // Ensure the root user always has the Root role and all capabilities assigned.
       const rootEmail = getRootEmail();
       if (rootEmail && email === rootEmail) {
+        console.log(`[auth] signIn callback: promoting root user ${email} to Root role...`);
         promoteToRootUser(dbUser.id);
       }
 
+      console.log(`[auth] signIn callback: sign-in authorized for ${email}`);
       return true;
     },
     async jwt({ token, user }) {
