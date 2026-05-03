@@ -20,9 +20,12 @@ export async function verifyTurnstileToken(token: string): Promise<boolean> {
 
   if (!token) {
     console.warn('[Turnstile] No token provided');
-    // If Turnstile is enabled but no token, be lenient - might be development
-    return !isTurnstileEnabled || token !== '';
+    console.warn('[Turnstile] Keys configured: SITE_KEY=' + (!!TURNSTILE_SITE_KEY), 'SECRET_KEY=' + (!!TURNSTILE_SECRET_KEY));
+    // If Turnstile is enabled but no token, reject
+    return false;
   }
+
+  console.log(`[Turnstile] Verifying token (length: ${token.length}, first 20 chars: ${token.substring(0, 20)}...)`);
 
   try {
     const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
@@ -38,7 +41,14 @@ export async function verifyTurnstileToken(token: string): Promise<boolean> {
 
     const data = (await response.json()) as TurnstileVerifyResponse;
     const isValid = data.success === true;
-    console.log('[Turnstile] Token verification:', isValid ? 'passed' : 'failed', { hostname: data.hostname, score: data.score });
+    console.log('[Turnstile] Token verification:', isValid ? 'PASSED' : 'FAILED', { 
+      hostname: data.hostname, 
+      score: data.score,
+      error_codes: data.error_codes?.join(','),
+    });
+    if (!isValid) {
+      console.warn('[Turnstile] Verification failed with errors:', data.error_codes?.join(', '));
+    }
     return isValid;
   } catch (error) {
     console.error('[Turnstile] Verification error:', error);

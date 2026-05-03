@@ -29,13 +29,13 @@ export default function SignInForm({ callbackUrl, error, reset }: SignInFormProp
   const errorMsg = submitError || (error ? (errorMessages[error] ?? 'Something went wrong. Please try again.') : null);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setSubmitError('');
     
     // Check Turnstile if enabled
     if (isTurnstileEnabled) {
       if (!turnstileToken) {
         console.log('[SignIn] Form submitted but Turnstile not completed');
-        e.preventDefault();
         setSubmitError('Please complete the security verification below.');
         return;
       }
@@ -47,8 +47,14 @@ export default function SignInForm({ callbackUrl, error, reset }: SignInFormProp
     // Wrap the server action in error handling
     try {
       const formData = new FormData(e.currentTarget);
+      // Manually add Turnstile token to FormData
+      if (isTurnstileEnabled) {
+        formData.set('turnstileToken', turnstileToken);
+        console.log('[SignIn] Added Turnstile token to FormData');
+      }
       const email = formData.get('email');
       console.log(`[SignIn] Submitting password for @${String(email).split('@')[1] || 'unknown'}...`);
+      console.log(`[SignIn] Turnstile token included: ${turnstileToken ? 'yes' : 'no'}`);
       await submitPassword(formData);
     } catch (err) {
       setIsSubmitting(false);
@@ -73,9 +79,8 @@ export default function SignInForm({ callbackUrl, error, reset }: SignInFormProp
   }, [error]);
 
   return (
-    <form action={submitPassword} className="space-y-4" onSubmit={handleSubmit}>
+    <form className="space-y-4" onSubmit={handleSubmit}>
       <input type="hidden" name="callbackUrl" value={callbackUrl ?? '/dashboard'} />
-      {isTurnstileEnabled && <input type="hidden" name="turnstileToken" value={turnstileToken} />}
 
       {errorMsg && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
