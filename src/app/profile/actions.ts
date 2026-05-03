@@ -21,7 +21,7 @@ function isValidPhoneNumber(phone: string): boolean {
 export async function updateOwnProfile(name: string) {
   const actor = await requireAuth();
 
-  const trimmedName = (name.trim() || null);
+  const trimmedName = name.trim() || null;
   if (trimmedName && trimmedName.length > MAX_NAME_LENGTH) {
     redirect('/profile?error=NameTooLong');
   }
