@@ -1,7 +1,7 @@
-import { requireCapability } from '@/lib/auth-helpers';
+import { requireAuth } from '@/lib/auth-helpers';
 
 export default async function CoordinationMessagesPage() {
-  await requireCapability('staff:messaging.write');
+  await requireAuth();
 
   return (
     <div>

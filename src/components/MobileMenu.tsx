@@ -107,7 +107,7 @@ export default function MobileMenu({
             )}
 
             {/* Coordination section */}
-            {isStaff && coordinationLinks.length > 0 && (
+            {coordinationLinks.length > 0 && (
               <div>
                 <button
                   type="button"
