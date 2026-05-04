@@ -2,8 +2,9 @@ import { requireAuth, hasCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
 import { getDb, unpackBool, unpackArr, unpackTs } from '@/lib/db';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { addWorkLogEntry, addTeamFeedback } from '../../admin/teams/actions';
+import { approveJoinRequest, denyJoinRequest, addTeamMemberByLeader } from '../actions';
 import type { TaskType, TaskUrgency } from '@/lib/db-types';
 
 const TASK_TYPE_LABELS: Record<TaskType, string> = {
@@ -47,6 +48,14 @@ export default async function TeamPage({
   } | undefined;
 
   if (!team) notFound();
+
+  const isMember = !!(db.prepare(
+    'SELECT 1 FROM user_teams WHERE userId = ? AND teamId = ?',
+  ).get(currentUser.id, id));
+  const isAdmin = hasCapability(currentUser, 'admin:teams.read');
+
+  // Non-members (who are also not admins) cannot view team detail pages
+  if (!isMember && !isAdmin) redirect('/teams');
 
   const rawMembers = db.prepare(`
     SELECT ut.userId, ut.isLeader, u.id as uid, u.name as uname, u.email as uemail
@@ -143,8 +152,25 @@ export default async function TeamPage({
 
   const leaders = members.filter((m) => m.isLeader);
   const isLeader = members.some((m) => m.userId === currentUser.id && m.isLeader);
-  const isAdmin = hasCapability(currentUser, 'admin:teams.read');
   const canViewLogs = isLeader || isAdmin;
+
+  // Pending join requests — visible to leaders and admins
+  const pendingRequests = (isLeader || isAdmin)
+    ? (db.prepare(`
+        SELECT tjr.id, tjr.userId, tjr.requestedAt, u.name as uname, u.email as uemail
+        FROM team_join_requests tjr
+        JOIN users u ON tjr.userId = u.id
+        WHERE tjr.teamId = ? AND tjr.status = 'PENDING'
+        ORDER BY tjr.requestedAt ASC
+      `).all(id) as {
+        id: string; userId: string; requestedAt: string;
+        uname: string | null; uemail: string;
+      }[]).map((r) => ({
+        ...r,
+        requestedAt: unpackTs(r.requestedAt),
+        user: { name: r.uname, email: r.uemail },
+      }))
+    : [];
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -404,6 +430,111 @@ export default async function TeamPage({
             )}
           </div>
         </section>
+
+        {/* ── Join Request Management (leaders and admins only) ────────── */}
+        {(isLeader || isAdmin) && (
+          <section className="mt-8">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Member Management</h2>
+            <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+
+              {/* Pending join requests */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-3">
+                  Pending Join Requests
+                  {pendingRequests.length > 0 && (
+                    <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-xs font-bold">
+                      {pendingRequests.length}
+                    </span>
+                  )}
+                </h3>
+                {pendingRequests.length === 0 ? (
+                  <p className="text-sm text-gray-400">No pending join requests.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {pendingRequests.map((req) => (
+                      <li key={req.id} className="flex items-center justify-between gap-4 py-2 border-b border-gray-50 last:border-0">
+                        <div>
+                          <span className="text-sm font-medium text-gray-900">
+                            {req.user.name ?? req.user.email}
+                          </span>
+                          {req.user.name && (
+                            <span className="text-xs text-gray-400 ml-2">{req.user.email}</span>
+                          )}
+                          <span className="text-xs text-gray-400 ml-2">
+                            — requested {req.requestedAt.toLocaleString('en-GB')}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <form action={approveJoinRequest.bind(null, req.id)}>
+                            <button
+                              type="submit"
+                              className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors"
+                            >
+                              ✓ Approve
+                            </button>
+                          </form>
+                          <form action={denyJoinRequest.bind(null, req.id)}>
+                            <button
+                              type="submit"
+                              className="text-xs bg-white hover:bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg font-medium transition-colors"
+                            >
+                              ✕ Deny
+                            </button>
+                          </form>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* Add member directly */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-3">Add Member Directly</h3>
+                <form
+                  action={async (fd: FormData) => {
+                    'use server';
+                    const email = fd.get('email') as string;
+                    await addTeamMemberByLeader(id, email);
+                  }}
+                  className="flex gap-2"
+                >
+                  <input
+                    name="email"
+                    type="email"
+                    required
+                    placeholder="Member's email address…"
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    type="submit"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+                  >
+                    Add Member
+                  </button>
+                </form>
+                {success === 'added' && (
+                  <p className="mt-2 text-xs text-green-600">✓ Member added successfully.</p>
+                )}
+                {success === 'approved' && (
+                  <p className="mt-2 text-xs text-green-600">✓ Join request approved.</p>
+                )}
+                {success === 'denied' && (
+                  <p className="mt-2 text-xs text-gray-500">Request denied.</p>
+                )}
+                {error === 'UserNotFound' && (
+                  <p className="mt-2 text-xs text-red-600">No active user found with that email address.</p>
+                )}
+                {error === 'AlreadyMember' && (
+                  <p className="mt-2 text-xs text-amber-600">That user is already a member of this team.</p>
+                )}
+                {error === 'MissingEmail' && (
+                  <p className="mt-2 text-xs text-red-600">Please enter an email address.</p>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
       </main>
     </div>
   );

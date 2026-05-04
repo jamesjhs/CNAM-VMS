@@ -143,6 +143,19 @@ function initSchema(db: BetterSqlite3.Database): void {
     CREATE INDEX IF NOT EXISTS idx_user_teams_userId ON user_teams(userId);
     CREATE INDEX IF NOT EXISTS idx_user_teams_teamId ON user_teams(teamId);
 
+    CREATE TABLE IF NOT EXISTS team_join_requests (
+      id TEXT PRIMARY KEY NOT NULL,
+      teamId TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      requestedAt TEXT NOT NULL,
+      resolvedAt TEXT,
+      resolvedById TEXT REFERENCES users(id) ON DELETE SET NULL,
+      UNIQUE(teamId, userId)
+    );
+    CREATE INDEX IF NOT EXISTS idx_team_join_requests_teamId ON team_join_requests(teamId);
+    CREATE INDEX IF NOT EXISTS idx_team_join_requests_userId ON team_join_requests(userId);
+
     CREATE TABLE IF NOT EXISTS announcements (
       id TEXT PRIMARY KEY NOT NULL,
       title TEXT NOT NULL,
