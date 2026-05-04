@@ -276,12 +276,7 @@ export default async function TeamPage({
                     )}
                   </div>
                   {(isLeader || isAdmin) && (
-                    <form
-                      action={async () => {
-                        'use server';
-                        await setTeamLeaderStatus(id, member.userId, !member.isLeader);
-                      }}
-                    >
+                    <form action={setTeamLeaderStatus.bind(null, id, member.userId, !member.isLeader)}>
                       <button
                         type="submit"
                         className={`shrink-0 text-xs px-3 py-1 rounded-lg border font-medium transition-colors ${

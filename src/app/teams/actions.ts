@@ -155,6 +155,9 @@ export async function setTeamLeaderStatus(teamId: string, userId: string, makeLe
 
   assertLeaderOrAdmin(actor.id, teamId, actor.capabilities, db);
 
+  const userExists = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
+  if (!userExists) redirect(`/teams/${teamId}?error=NotMember`);
+
   const membership = db.prepare(
     'SELECT isLeader FROM user_teams WHERE userId = ? AND teamId = ?',
   ).get(userId, teamId) as { isLeader: number } | undefined;
