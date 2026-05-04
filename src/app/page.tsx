@@ -1,16 +1,13 @@
 import Link from 'next/link';
 import NavBar from '@/components/NavBar';
 import { auth } from '@/auth';
+import { redirect } from 'next/navigation';
 
 export default async function Home() {
   const session = await auth();
-  const capabilities: string[] = (session?.user as { capabilities?: string[] })?.capabilities ?? [];
-  const isAdmin =
-    capabilities.includes('admin:users.read') ||
-    capabilities.includes('admin:roles.read') ||
-    capabilities.includes('admin:audit.read') ||
-    capabilities.includes('admin:announcements.write') ||
-    capabilities.includes('admin:calendar.write');
+
+  // Signed-in users go straight to their dashboard
+  if (session) redirect('/dashboard');
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -30,31 +27,12 @@ export default async function Home() {
             <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
               Volunteer Management System — coordinate schedules, manage tasks, and keep the museum running smoothly.
             </p>
-            {session ? (
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link
-                  href="/dashboard"
-                  className="bg-amber-500 hover:bg-amber-400 text-white font-semibold px-8 py-3 rounded-lg transition-colors"
-                >
-                  Go to Dashboard
-                </Link>
-                {isAdmin && (
-                  <Link
-                    href="/admin"
-                    className="bg-white/10 hover:bg-white/20 text-white font-semibold px-8 py-3 rounded-lg transition-colors"
-                  >
-                    Admin Panel
-                  </Link>
-                )}
-              </div>
-            ) : (
-              <Link
-                href="/auth/signin"
-                className="inline-block bg-amber-500 hover:bg-amber-400 text-white font-semibold px-8 py-3 rounded-lg transition-colors"
-              >
-                Sign in with Email
-              </Link>
-            )}
+            <Link
+              href="/auth/signin"
+              className="inline-block bg-amber-500 hover:bg-amber-400 text-white font-semibold px-8 py-3 rounded-lg transition-colors"
+            >
+              Sign in with Email
+            </Link>
           </div>
         </section>
 
@@ -82,9 +60,9 @@ export default async function Home() {
                   description: 'Organise volunteers into teams and roles.',
                 },
                 {
-                  icon: '🔒',
-                  title: 'Secure Access',
-                  description: 'Passwordless login with capability-based permissions.',
+                  icon: '💬',
+                  title: 'Messaging',
+                  description: 'Send messages to individual volunteers or groups.',
                 },
                 {
                   icon: '📁',
@@ -92,9 +70,9 @@ export default async function Home() {
                   description: 'Upload and manage policies and resources.',
                 },
                 {
-                  icon: '📊',
-                  title: 'Audit Logs',
-                  description: 'Full audit trail of all system actions.',
+                  icon: '🔒',
+                  title: 'Secure Access',
+                  description: 'Two-factor login with capability-based permissions.',
                 },
               ].map((feature) => (
                 <div key={feature.title} className="bg-gray-50 rounded-xl p-6 border border-gray-100">

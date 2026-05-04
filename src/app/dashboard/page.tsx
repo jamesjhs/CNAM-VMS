@@ -118,6 +118,8 @@ export default async function DashboardPage() {
           <DashCard title="Schedule &amp; Availability" icon="📅" href="/schedule" description="Browse events, sign up for shifts, record your availability, and choose what you can help with." />
           <DashCard title="Team Tasks" icon="✅" href="/teams" description="View active tasks across all teams, urgency levels, and requirements." />
           <DashCard title="Files &amp; Documents" icon="📁" href="/files" description="Browse and download files and documents shared by the museum team." />
+          <DashCard title="Messages" icon="💬" href="/messages" description="Send messages to individual volunteers or groups and keep everyone in the loop." />
+          <DashCard title="Projects" icon="📋" href="/projects" description="Track active projects across teams, see task priorities and team member contributions." />
           <DashCard title="My Profile" icon="👤" href="/profile" description="Update your name, contact details, and general activity preferences." />
           <DashCard title="My Teams" icon="👥" href="/teams" description="View your team memberships, submit work logs or feedback." />
           <DashCard title="Help &amp; Manual" icon="❓" href="/help" description="Learn how to use the system with our complete user guide and FAQs." />

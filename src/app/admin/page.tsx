@@ -10,6 +10,8 @@ export default async function AdminPage() {
     'admin:calendar.write', 'admin:theme.write', 'admin:training.write',
     'admin:tasks.write', 'admin:settings.write', 'admin:museum.write',
     'admin:act-as.write',
+    // Staff caps — coordination overview now lives under Admin
+    'staff:volunteer.read', 'staff:projects.read', 'staff:messaging.write', 'staff:schedule.read',
   ];
   const user = await requireAnyCapability(ALL_ADMIN_CAPS);
 
@@ -25,6 +27,11 @@ export default async function AdminPage() {
   const canManageTheme = user.capabilities.includes('admin:theme.write');
   const canManageTasks = user.capabilities.includes('admin:tasks.write');
   const canManageTraining = user.capabilities.includes('admin:training.write');
+  const canViewVolunteers = user.capabilities.includes('staff:volunteer.read');
+  const canViewStaffAvailability = user.capabilities.includes('staff:schedule.read');
+  const isStaff = canViewVolunteers || canViewStaffAvailability ||
+    user.capabilities.includes('staff:projects.read') ||
+    user.capabilities.includes('staff:messaging.write');
 
   const db = getDb();
 
@@ -164,6 +171,31 @@ export default async function AdminPage() {
               icon="📚"
               title="Training Policies"
               description="Create and manage training policies and compliance requirements."
+            />
+          )}
+          {/* Coordination tools (staff access) */}
+          {isStaff && (
+            <AdminCard
+              href="/coordination"
+              icon="🗂️"
+              title="Coordination Overview"
+              description="View coordination statistics, team capacity, and quick access to all coordination tools."
+            />
+          )}
+          {canViewVolunteers && (
+            <AdminCard
+              href="/coordination/volunteers"
+              icon="🙋"
+              title="Volunteers"
+              description="Browse, filter, and manage volunteer information and contact details."
+            />
+          )}
+          {canViewStaffAvailability && (
+            <AdminCard
+              href="/coordination/availability"
+              icon="📆"
+              title="Volunteer Availability"
+              description="See which volunteers are available on specific dates to help with scheduling."
             />
           )}
         </div>
