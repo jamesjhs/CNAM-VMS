@@ -6,7 +6,7 @@ import { createId } from '@paralleldrive/cuid2';
 import { getDb, now } from '@/lib/db';
 import { requireCapability } from '@/lib/auth-helpers';
 import { logAudit } from '@/lib/audit';
-import type { UserStatus, UserAccountType } from '@/lib/db-types';
+import type { UserStatus } from '@/lib/db-types';
 
 const PHONE_REGEX = /^[\d\s\-\+\(\)]{7,20}$/;
 const MAX_LABEL_LENGTH = 50;
@@ -15,7 +15,6 @@ const MAX_EMAIL_LENGTH = 254;
 const MAX_DESCRIPTION_LENGTH = 500;
 
 const VALID_STATUSES: readonly UserStatus[] = ['ACTIVE', 'PENDING', 'SUSPENDED'];
-const VALID_ACCOUNT_TYPES: readonly UserAccountType[] = ['VOLUNTEER', 'STAFF', 'MEMBER'];
 
 function isValidPhoneNumber(phone: string): boolean {
   return PHONE_REGEX.test(phone.trim());
@@ -23,10 +22,6 @@ function isValidPhoneNumber(phone: string): boolean {
 
 function isValidStatus(status: string): status is UserStatus {
   return VALID_STATUSES.includes(status as UserStatus);
-}
-
-function isValidAccountType(accountType: string): accountType is UserAccountType {
-  return VALID_ACCOUNT_TYPES.includes(accountType as UserAccountType);
 }
 
 /** Resolve the email of the root user from the environment. */
@@ -38,7 +33,7 @@ function getRootEmail(): string | undefined {
 // User creation
 // ---------------------------------------------------------------------------
 
-export async function createUser(email: string, name: string, accountType: UserAccountType) {
+export async function createUser(email: string, name: string) {
   const actor = await requireCapability('admin:users.write');
 
   const trimmedEmail = email.trim().toLowerCase();
@@ -46,21 +41,20 @@ export async function createUser(email: string, name: string, accountType: UserA
 
   if (!trimmedEmail || trimmedEmail.length > MAX_EMAIL_LENGTH) return;
   if (trimmedName.length > MAX_NAME_LENGTH) return;
-  if (!isValidAccountType(accountType)) return;
 
   const db = getDb();
   const id = createId();
   const ts = now();
   db.prepare(
-    'INSERT INTO users (id, email, name, accountType, status, createdAt, updatedAt) VALUES (?,?,?,?,?,?,?)',
-  ).run(id, trimmedEmail, trimmedName || null, accountType, 'PENDING', ts, ts);
+    'INSERT INTO users (id, email, name, status, createdAt, updatedAt) VALUES (?,?,?,?,?,?)',
+  ).run(id, trimmedEmail, trimmedName || null, 'PENDING', ts, ts);
 
   await logAudit({
     userId: actor.id,
     action: 'USER_CREATED',
     resource: 'User',
     resourceId: id,
-    detail: { email: trimmedEmail, accountType },
+    detail: { email: trimmedEmail },
   });
 
   revalidatePath('/admin/users');
@@ -70,7 +64,7 @@ export async function createUser(email: string, name: string, accountType: UserA
 // User profile actions
 // ---------------------------------------------------------------------------
 
-export async function updateUserProfile(userId: string, name: string, email: string, accountType: UserAccountType) {
+export async function updateUserProfile(userId: string, name: string, email: string) {
   const actor = await requireCapability('admin:users.write');
 
   const trimmedName = name.trim() || null;
@@ -78,17 +72,16 @@ export async function updateUserProfile(userId: string, name: string, email: str
 
   if (!trimmedEmail || trimmedEmail.length > MAX_EMAIL_LENGTH) return;
   if (trimmedName && trimmedName.length > MAX_NAME_LENGTH) return;
-  if (!isValidAccountType(accountType)) return;
 
   const db = getDb();
-  db.prepare('UPDATE users SET name=?, email=?, accountType=?, updatedAt=? WHERE id=?').run(trimmedName, trimmedEmail, accountType, now(), userId);
+  db.prepare('UPDATE users SET name=?, email=?, updatedAt=? WHERE id=?').run(trimmedName, trimmedEmail, now(), userId);
 
   await logAudit({
     userId: actor.id,
     action: 'USER_PROFILE_UPDATED',
     resource: 'User',
     resourceId: userId,
-    detail: { name: trimmedName, email: trimmedEmail, accountType },
+    detail: { name: trimmedName, email: trimmedEmail },
   });
 
   revalidatePath('/admin/users');

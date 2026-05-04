@@ -100,6 +100,15 @@ async function main() {
   }
   console.log('✅ Volunteer role');
 
+  // --- Staff role ---
+  const staffRoleId = upsertRole(db, 'Staff', 'Staff member with coordination access', true);
+  const staffCapKeys = ['staff:volunteer.read', 'staff:projects.read', 'staff:messaging.write', 'staff:schedule.read'];
+  for (const key of staffCapKeys) {
+    const capId = capMap.get(key);
+    if (capId) db.prepare('INSERT OR IGNORE INTO role_capabilities (roleId, capabilityId) VALUES (?,?)').run(staffRoleId, capId);
+  }
+  console.log('✅ Staff role');
+
   // --- Default teams ---
   const defaultTeams = [
     { name: 'Aircraft Restoration', description: 'Restoring and maintaining the museum aircraft collection' },

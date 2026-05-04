@@ -3,15 +3,6 @@ import NavBar from '@/components/NavBar';
 import { getDb, unpackBool } from '@/lib/db';
 import Link from 'next/link';
 import { createTrainingPolicy, updateTrainingPolicy, deleteTrainingPolicy } from './actions';
-import type { UserAccountType } from '@/lib/db-types';
-
-const ACCOUNT_TYPE_LABELS: Record<UserAccountType, string> = {
-  VOLUNTEER: 'Volunteer',
-  STAFF: 'Staff',
-  MEMBER: 'Member',
-};
-
-const ALL_ACCOUNT_TYPES: UserAccountType[] = ['VOLUNTEER', 'STAFF', 'MEMBER'];
 
 export default async function TrainingAdminPage({
   searchParams,
@@ -31,22 +22,26 @@ export default async function TrainingAdminPage({
     id: string; title: string; description: string | null; frequency: string | null; isActive: number;
   }[];
 
+  const allRoles = db.prepare('SELECT id, name FROM roles ORDER BY name ASC').all() as {
+    id: string; name: string;
+  }[];
+
   const rawAssignments = db.prepare(
-    'SELECT policyId, accountType FROM training_policy_roles',
-  ).all() as { policyId: string; accountType: string }[];
+    'SELECT policyId, roleId FROM training_policy_roles',
+  ).all() as { policyId: string; roleId: string }[];
 
   const assignmentsByPolicy = new Map<string, Set<string>>();
   for (const a of rawAssignments) {
     if (!assignmentsByPolicy.has(a.policyId)) {
       assignmentsByPolicy.set(a.policyId, new Set());
     }
-    assignmentsByPolicy.get(a.policyId)!.add(a.accountType);
+    assignmentsByPolicy.get(a.policyId)!.add(a.roleId);
   }
 
   const policies = rawPolicies.map((p) => ({
     ...p,
     isActive: unpackBool(p.isActive),
-    roleAssignments: Array.from(assignmentsByPolicy.get(p.id) ?? []).map((accountType) => ({ accountType })),
+    assignedRoleIds: assignmentsByPolicy.get(p.id) ?? new Set<string>(),
   }));
 
   const editPolicy = editId ? policies.find((p) => p.id === editId) ?? null : null;
@@ -66,7 +61,7 @@ export default async function TrainingAdminPage({
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Training Policy Matrix</h1>
             <p className="text-gray-500">
-              Define training and compliance requirements. Assign each policy to one or more account types (Volunteer, Staff, Member).
+              Define training and compliance requirements. Assign each policy to one or more roles.
             </p>
           </div>
           <span className="text-sm text-gray-400">{policies.length} polic{policies.length !== 1 ? 'ies' : 'y'}</span>
@@ -83,14 +78,14 @@ export default async function TrainingAdminPage({
               const title = formData.get('title') as string;
               const description = formData.get('description') as string;
               const frequency = formData.get('frequency') as string;
-              const accountTypes = ALL_ACCOUNT_TYPES.filter(
-                (t) => formData.get(`type_${t}`) === 'on',
-              );
+              const db2 = getDb();
+              const roles = db2.prepare('SELECT id FROM roles ORDER BY name ASC').all() as { id: string }[];
+              const roleIds = roles.map((r) => r.id).filter((id) => formData.get(`role_${id}`) === 'on');
               if (editPolicy) {
                 const isActive = formData.get('isActive') === 'on';
-                await updateTrainingPolicy(editPolicy.id, title, description, frequency, isActive, accountTypes);
+                await updateTrainingPolicy(editPolicy.id, title, description, frequency, isActive, roleIds);
               } else {
-                await createTrainingPolicy(title, description, frequency, accountTypes);
+                await createTrainingPolicy(title, description, frequency, roleIds);
               }
             }}
             className="space-y-4"
@@ -131,21 +126,19 @@ export default async function TrainingAdminPage({
             </div>
 
             <div>
-              <p className="text-xs font-medium text-gray-500 mb-2">Applies to account types</p>
+              <p className="text-xs font-medium text-gray-500 mb-2">Applies to roles</p>
               <div className="flex flex-wrap gap-4">
-                {ALL_ACCOUNT_TYPES.map((t) => {
-                  const checked = editPolicy
-                    ? editPolicy.roleAssignments.some((r) => r.accountType === t)
-                    : false;
+                {allRoles.map((role) => {
+                  const checked = editPolicy ? editPolicy.assignedRoleIds.has(role.id) : false;
                   return (
-                    <label key={t} className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                    <label key={role.id} className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
                       <input
                         type="checkbox"
-                        name={`type_${t}`}
+                        name={`role_${role.id}`}
                         defaultChecked={checked}
                         className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
-                      {ACCOUNT_TYPE_LABELS[t]}
+                      {role.name}
                     </label>
                   );
                 })}
@@ -199,62 +192,59 @@ export default async function TrainingAdminPage({
                   <tr>
                     <th className="text-left py-3 px-4 text-gray-500 font-medium">Policy</th>
                     <th className="text-left py-3 px-4 text-gray-500 font-medium">Frequency</th>
-                    <th className="text-center py-3 px-4 text-gray-500 font-medium">Volunteer</th>
-                    <th className="text-center py-3 px-4 text-gray-500 font-medium">Staff</th>
-                    <th className="text-center py-3 px-4 text-gray-500 font-medium">Member</th>
+                    {allRoles.map((role) => (
+                      <th key={role.id} className="text-center py-3 px-4 text-gray-500 font-medium">{role.name}</th>
+                    ))}
                     <th className="text-left py-3 px-4 text-gray-500 font-medium">Status</th>
                     <th className="text-right py-3 px-4 text-gray-500 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {policies.map((policy) => {
-                    const assignedTypes = new Set(policy.roleAssignments.map((r) => r.accountType));
-                    return (
-                      <tr key={policy.id} className={`hover:bg-gray-50 transition-colors ${!policy.isActive ? 'opacity-60' : ''}`}>
-                        <td className="py-3 px-4">
-                          <div className="font-medium text-gray-900">{policy.title}</div>
-                          {policy.description && (
-                            <div className="text-xs text-gray-500 mt-0.5 max-w-xs truncate">{policy.description}</div>
+                  {policies.map((policy) => (
+                    <tr key={policy.id} className={`hover:bg-gray-50 transition-colors ${!policy.isActive ? 'opacity-60' : ''}`}>
+                      <td className="py-3 px-4">
+                        <div className="font-medium text-gray-900">{policy.title}</div>
+                        {policy.description && (
+                          <div className="text-xs text-gray-500 mt-0.5 max-w-xs truncate">{policy.description}</div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-gray-500 text-xs">
+                        {policy.frequency ?? <span className="italic text-gray-300">—</span>}
+                      </td>
+                      {allRoles.map((role) => (
+                        <td key={role.id} className="py-3 px-4 text-center">
+                          {policy.assignedRoleIds.has(role.id) ? (
+                            <span className="text-green-600 font-bold text-base" title="Required">✓</span>
+                          ) : (
+                            <span className="text-gray-200">—</span>
                           )}
                         </td>
-                        <td className="py-3 px-4 text-gray-500 text-xs">
-                          {policy.frequency ?? <span className="italic text-gray-300">—</span>}
-                        </td>
-                        {ALL_ACCOUNT_TYPES.map((t) => (
-                          <td key={t} className="py-3 px-4 text-center">
-                            {assignedTypes.has(t) ? (
-                              <span className="text-green-600 font-bold text-base" title="Required">✓</span>
-                            ) : (
-                              <span className="text-gray-200">—</span>
-                            )}
-                          </td>
-                        ))}
-                        <td className="py-3 px-4">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${policy.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}>
-                            {policy.isActive ? 'Active' : 'Inactive'}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-3">
-                            <Link
-                              href={`/admin/training?edit=${policy.id}`}
-                              className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                      ))}
+                      <td className="py-3 px-4">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${policy.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}>
+                          {policy.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-3">
+                          <Link
+                            href={`/admin/training?edit=${policy.id}`}
+                            className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                          >
+                            Edit
+                          </Link>
+                          <form action={deleteTrainingPolicy.bind(null, policy.id)}>
+                            <button
+                              type="submit"
+                              className="text-red-600 hover:text-red-800 font-medium text-sm"
                             >
-                              Edit
-                            </Link>
-                            <form action={deleteTrainingPolicy.bind(null, policy.id)}>
-                              <button
-                                type="submit"
-                                className="text-red-600 hover:text-red-800 font-medium text-sm"
-                              >
-                                Delete
-                              </button>
-                            </form>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                              Delete
+                            </button>
+                          </form>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

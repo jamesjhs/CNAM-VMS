@@ -36,7 +36,6 @@ function initSchema(db: BetterSqlite3.Database): void {
       emailVerified TEXT,
       image TEXT,
       status TEXT NOT NULL DEFAULT 'PENDING',
-      accountType TEXT NOT NULL DEFAULT 'VOLUNTEER',
       passwordHash TEXT,
       mustChangePassword INTEGER NOT NULL DEFAULT 0,
       createdAt TEXT NOT NULL,
@@ -252,8 +251,8 @@ function initSchema(db: BetterSqlite3.Database): void {
 
     CREATE TABLE IF NOT EXISTS training_policy_roles (
       policyId TEXT NOT NULL REFERENCES training_policies(id) ON DELETE CASCADE,
-      accountType TEXT NOT NULL,
-      PRIMARY KEY(policyId, accountType)
+      roleId   TEXT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+      PRIMARY KEY(policyId, roleId)
     );
 
     CREATE TABLE IF NOT EXISTS site_content (

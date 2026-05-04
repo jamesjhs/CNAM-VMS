@@ -34,7 +34,7 @@ export default async function AdminAvailabilityPage({
 
   const rawSlots = db.prepare(`
     SELECT vds.id, vds.userId, vds.date, vds.startTime, vds.endTime, vds.notes, vds.jobIds,
-           u.id as uid, u.name as uname, u.email as uemail, u.accountType as uaccountType
+           u.id as uid, u.name as uname, u.email as uemail
     FROM volunteer_date_slots vds
     JOIN users u ON vds.userId = u.id
     WHERE vds.date >= ? AND vds.date < ?
@@ -42,14 +42,14 @@ export default async function AdminAvailabilityPage({
   `).all(startDateStr, endDateStr) as {
     id: string; userId: string; date: string; startTime: string | null; endTime: string | null;
     notes: string | null; jobIds: string;
-    uid: string; uname: string | null; uemail: string; uaccountType: string;
+    uid: string; uname: string | null; uemail: string;
   }[];
 
   const slots = rawSlots.map((s) => ({
     ...s,
     date: unpackDate(s.date)!,
     jobIds: unpackArr<string>(s.jobIds, []),
-    user: { id: s.uid, name: s.uname, email: s.uemail, accountType: s.uaccountType },
+    user: { id: s.uid, name: s.uname, email: s.uemail },
   }));
 
   const rawJobs = db.prepare(`
@@ -215,9 +215,6 @@ export default async function AdminAvailabilityPage({
                             <div className="font-medium text-sm text-gray-900">
                               {slot.user.name ?? slot.user.email}
                             </div>
-                            <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
-                              {slot.user.accountType.toLowerCase()}
-                            </span>
                           </div>
                           {slot.user.name && (
                             <div className="text-xs text-gray-400 mb-2">{slot.user.email}</div>
