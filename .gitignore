@@ -439,4 +439,5 @@ tsconfig.tsbuildinfo
 next-env.d.ts
 
 # Deployment backups
+current
 current.backup*
