@@ -10,9 +10,28 @@ import type { UserStatus, UserAccountType } from '@/lib/db-types';
 
 const PHONE_REGEX = /^[\d\s\-\+\(\)]{7,20}$/;
 const MAX_LABEL_LENGTH = 50;
+const MAX_NAME_LENGTH = 150;
+const MAX_EMAIL_LENGTH = 254;
+const MAX_DESCRIPTION_LENGTH = 500;
+
+const VALID_STATUSES: readonly UserStatus[] = ['ACTIVE', 'PENDING', 'SUSPENDED'];
+const VALID_ACCOUNT_TYPES: readonly UserAccountType[] = ['VOLUNTEER', 'STAFF', 'MEMBER'];
 
 function isValidPhoneNumber(phone: string): boolean {
   return PHONE_REGEX.test(phone.trim());
+}
+
+function isValidStatus(status: string): status is UserStatus {
+  return VALID_STATUSES.includes(status as UserStatus);
+}
+
+function isValidAccountType(accountType: string): accountType is UserAccountType {
+  return VALID_ACCOUNT_TYPES.includes(accountType as UserAccountType);
+}
+
+/** Resolve the email of the root user from the environment. */
+function getRootEmail(): string | undefined {
+  return process.env.ROOT_USER_EMAIL?.toLowerCase().trim();
 }
 
 // ---------------------------------------------------------------------------
@@ -24,7 +43,10 @@ export async function createUser(email: string, name: string, accountType: UserA
 
   const trimmedEmail = email.trim().toLowerCase();
   const trimmedName = name.trim();
-  if (!trimmedEmail) return;
+
+  if (!trimmedEmail || trimmedEmail.length > MAX_EMAIL_LENGTH) return;
+  if (trimmedName.length > MAX_NAME_LENGTH) return;
+  if (!isValidAccountType(accountType)) return;
 
   const db = getDb();
   const id = createId();
@@ -53,6 +75,10 @@ export async function updateUserProfile(userId: string, name: string, email: str
 
   const trimmedName = name.trim() || null;
   const trimmedEmail = email.trim().toLowerCase();
+
+  if (!trimmedEmail || trimmedEmail.length > MAX_EMAIL_LENGTH) return;
+  if (trimmedName && trimmedName.length > MAX_NAME_LENGTH) return;
+  if (!isValidAccountType(accountType)) return;
 
   const db = getDb();
   db.prepare('UPDATE users SET name=?, email=?, accountType=?, updatedAt=? WHERE id=?').run(trimmedName, trimmedEmail, accountType, now(), userId);
@@ -110,7 +136,8 @@ export async function removeUserPhone(userId: string, phoneId: string) {
   const actor = await requireCapability('admin:users.write');
 
   const db = getDb();
-  db.prepare('DELETE FROM user_phones WHERE id = ?').run(phoneId);
+  // Scope the delete to the specific user to prevent IDOR
+  db.prepare('DELETE FROM user_phones WHERE id = ? AND userId = ?').run(phoneId, userId);
 
   await logAudit({
     userId: actor.id,
@@ -130,6 +157,8 @@ export async function removeUserPhone(userId: string, phoneId: string) {
 export async function updateUserStatus(userId: string, status: UserStatus) {
   const actor = await requireCapability('admin:users.write');
 
+  if (!isValidStatus(status)) return;
+
   const db = getDb();
   db.prepare('UPDATE users SET status=?, updatedAt=? WHERE id=?').run(status, now(), userId);
 
@@ -148,8 +177,22 @@ export async function updateUserStatus(userId: string, status: UserStatus) {
 export async function deleteUser(userId: string) {
   const actor = await requireCapability('admin:users.write');
 
+  // Prevent self-deletion via admin panel (would leave an orphaned active session)
+  if (actor.id === userId) {
+    redirect(`/admin/users/${userId}?error=CannotDeleteSelf`);
+  }
+
   const db = getDb();
   const target = db.prepare('SELECT email FROM users WHERE id = ?').get(userId) as { email: string } | undefined;
+  if (!target) {
+    redirect('/admin/users');
+  }
+
+  // Prevent deletion of the root/superadmin account
+  const rootEmail = getRootEmail();
+  if (rootEmail && target.email.toLowerCase() === rootEmail) {
+    redirect(`/admin/users/${userId}?error=CannotDeleteRoot`);
+  }
 
   db.prepare('DELETE FROM users WHERE id = ?').run(userId);
 
@@ -249,12 +292,14 @@ export async function createRole(name: string, description: string) {
   const actor = await requireCapability('admin:roles.write');
 
   const trimmedName = name.trim();
-  if (!trimmedName) return;
+  if (!trimmedName || trimmedName.length > MAX_NAME_LENGTH) return;
+  const trimmedDesc = description.trim();
+  if (trimmedDesc.length > MAX_DESCRIPTION_LENGTH) return;
 
   const db = getDb();
   const id = createId();
   const ts = now();
-  db.prepare('INSERT INTO roles (id, name, description, createdAt, updatedAt) VALUES (?,?,?,?,?)').run(id, trimmedName, description.trim() || null, ts, ts);
+  db.prepare('INSERT INTO roles (id, name, description, createdAt, updatedAt) VALUES (?,?,?,?,?)').run(id, trimmedName, trimmedDesc || null, ts, ts);
 
   await logAudit({
     userId: actor.id,
@@ -309,12 +354,14 @@ export async function createTeam(name: string, description: string) {
   const actor = await requireCapability('admin:teams.write');
 
   const trimmedName = name.trim();
-  if (!trimmedName) return;
+  if (!trimmedName || trimmedName.length > MAX_NAME_LENGTH) return;
+  const trimmedDesc = description.trim();
+  if (trimmedDesc.length > MAX_DESCRIPTION_LENGTH) return;
 
   const db = getDb();
   const id = createId();
   const ts = now();
-  db.prepare('INSERT INTO teams (id, name, description, createdAt, updatedAt) VALUES (?,?,?,?,?)').run(id, trimmedName, description.trim() || null, ts, ts);
+  db.prepare('INSERT INTO teams (id, name, description, createdAt, updatedAt) VALUES (?,?,?,?,?)').run(id, trimmedName, trimmedDesc || null, ts, ts);
 
   await logAudit({
     userId: actor.id,
@@ -331,10 +378,12 @@ export async function updateTeam(teamId: string, name: string, description: stri
   const actor = await requireCapability('admin:teams.write');
 
   const trimmedName = name.trim();
-  if (!trimmedName) return;
+  if (!trimmedName || trimmedName.length > MAX_NAME_LENGTH) return;
+  const trimmedDesc = description.trim();
+  if (trimmedDesc.length > MAX_DESCRIPTION_LENGTH) return;
 
   const db = getDb();
-  db.prepare('UPDATE teams SET name=?, description=?, updatedAt=? WHERE id=?').run(trimmedName, description.trim() || null, now(), teamId);
+  db.prepare('UPDATE teams SET name=?, description=?, updatedAt=? WHERE id=?').run(trimmedName, trimmedDesc || null, now(), teamId);
 
   await logAudit({
     userId: actor.id,

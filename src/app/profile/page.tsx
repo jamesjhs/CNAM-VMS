@@ -3,6 +3,7 @@ import NavBar from '@/components/NavBar';
 import { getDb, unpackTs } from '@/lib/db';
 import Link from 'next/link';
 import { updateOwnProfile, addOwnPhone, removeOwnPhone, changePasswordFromProfile } from './actions';
+import DeleteOwnAccountButton from './DeleteOwnAccountButton';
 
 const STATUS_STYLES: Record<string, string> = {
   ACTIVE: 'bg-green-100 text-green-800',
@@ -96,6 +97,7 @@ export default async function ProfilePage({
               <span className="text-lg">⚠</span>
               <div>
                 <strong className="block">
+                {error === 'PasswordRequired' && 'Please enter your current password to confirm this action'}
                   {error === 'MissingFields' && 'Please fill in all fields'}
                   {error === 'PasswordMismatch' && 'New passwords do not match'}
                   {error === 'TooShort' && 'New password must be at least 8 characters'}
@@ -322,7 +324,7 @@ export default async function ProfilePage({
 
         {/* Capabilities */}
         {sessionUser.capabilities.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
             <h2 className="font-semibold text-gray-900 mb-3">My Permissions</h2>
             <div className="flex flex-wrap gap-2">
               {sessionUser.capabilities.map((cap) => (
@@ -336,6 +338,16 @@ export default async function ProfilePage({
             </div>
           </div>
         )}
+
+        {/* Danger Zone */}
+        <div className="bg-white rounded-xl border border-red-200 p-6">
+          <h2 className="font-semibold text-red-700 mb-2">⚠ Danger Zone</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Permanently delete your account and all associated data. This cannot be undone.
+            You will be signed out immediately and your account will be removed from the system.
+          </p>
+          <DeleteOwnAccountButton />
+        </div>
       </main>
     </div>
   );

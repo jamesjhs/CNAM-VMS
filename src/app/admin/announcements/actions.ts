@@ -6,12 +6,16 @@ import { getDb, now } from '@/lib/db';
 import { requireCapability } from '@/lib/auth-helpers';
 import { logAudit } from '@/lib/audit';
 
+const MAX_TITLE_LENGTH = 200;
+const MAX_BODY_LENGTH = 10000;
+
 export async function createAnnouncement(title: string, body: string, pinned: boolean) {
   const actor = await requireCapability('admin:announcements.write');
 
   const trimmedTitle = title.trim();
   const trimmedBody = body.trim();
   if (!trimmedTitle || !trimmedBody) return;
+  if (trimmedTitle.length > MAX_TITLE_LENGTH || trimmedBody.length > MAX_BODY_LENGTH) return;
 
   const db = getDb();
   const id = createId();

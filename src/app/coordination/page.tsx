@@ -1,4 +1,4 @@
-import { requireAuth, hasAnyCapability } from '@/lib/auth-helpers';
+import { requireAuth, hasAnyCapability, hasCapability } from '@/lib/auth-helpers';
 import { getDb, unpackDate, unpackBool } from '@/lib/db';
 import Link from 'next/link';
 
@@ -38,12 +38,16 @@ export default async function CoordinationPage() {
     'staff:schedule.read',
   ];
 
-  const coordinationLinks = [
-    { href: '/coordination/volunteers', label: 'Volunteers', icon: '👥', description: 'Browse, filter, and manage volunteer information' },
-    { href: '/coordination/availability', label: 'Availability', icon: '📅', description: 'See which volunteers are available on specific dates' },
-    { href: '/coordination/projects', label: 'Projects', icon: '📋', description: 'Track projects, teams, and task assignments' },
-    { href: '/coordination/messages', label: 'Messages', icon: '💬', description: 'Communicate with individuals or groups of volunteers' },
+  const allCoordinationLinks = [
+    { href: '/coordination/volunteers', label: 'Volunteers', icon: '👥', description: 'Browse, filter, and manage volunteer information', requiredCapability: 'staff:volunteer.read' },
+    { href: '/coordination/availability', label: 'Availability', icon: '📅', description: 'See which volunteers are available on specific dates', requiredCapability: 'staff:schedule.read' },
+    { href: '/coordination/projects', label: 'Projects', icon: '📋', description: 'Track projects, teams, and task assignments', requiredCapability: null },
+    { href: '/coordination/messages', label: 'Messages', icon: '💬', description: 'Communicate with individuals or groups of volunteers', requiredCapability: null },
   ];
+
+  const coordinationLinks = allCoordinationLinks.filter(
+    (link) => link.requiredCapability === null || hasCapability(user, link.requiredCapability)
+  );
 
   return (
     <div className="min-h-screen flex flex-col">

@@ -1,6 +1,5 @@
-import { requireAuth, hasAnyCapability } from '@/lib/auth-helpers';
+import { requireAuth } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
-import { redirect } from 'next/navigation';
 import { ReactNode } from 'react';
 
 export const metadata = {
@@ -9,18 +8,8 @@ export const metadata = {
 };
 
 export default async function CoordinationLayout({ children }: { children: ReactNode }) {
-  // Require at least one staff capability
-  const user = await requireAuth();
-  const staffCapabilities = [
-    'staff:volunteer.read',
-    'staff:projects.read',
-    'staff:messaging.write',
-    'staff:schedule.read',
-  ];
-  
-  if (!hasAnyCapability(user, staffCapabilities)) {
-    redirect('/unauthorized');
-  }
+  // Require authentication — individual pages gate their own capabilities
+  await requireAuth();
 
   return (
     <div className="min-h-screen flex flex-col">

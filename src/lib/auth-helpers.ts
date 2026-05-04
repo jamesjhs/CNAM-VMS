@@ -23,20 +23,34 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
 
 /**
  * Require authentication. Redirects to sign-in if not authenticated.
+ * Also redirects suspended users immediately to the error page.
  */
 export async function requireAuth(): Promise<SessionUser> {
   const user = await getCurrentUser();
   if (!user) redirect('/auth/signin');
+  if (user.status === 'SUSPENDED') redirect('/auth/error?error=AccountSuspended');
   return user;
 }
 
 /**
- * Require a specific capability. Redirects to /unauthorized if missing.
+ * Require a specific capability. Redirects to /dashboard if missing,
+ * which avoids exposing the existence of restricted pages.
  */
 export async function requireCapability(capability: string): Promise<SessionUser> {
   const user = await requireAuth();
   if (!hasCapability(user, capability)) {
-    redirect('/unauthorized');
+    redirect('/dashboard');
+  }
+  return user;
+}
+
+/**
+ * Require at least one of the given capabilities. Redirects to /dashboard if none match.
+ */
+export async function requireAnyCapability(capabilities: string[]): Promise<SessionUser> {
+  const user = await requireAuth();
+  if (!hasAnyCapability(user, capabilities)) {
+    redirect('/dashboard');
   }
   return user;
 }

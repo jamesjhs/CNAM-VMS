@@ -2,7 +2,7 @@
 
 **City of Norwich Aviation Museum — Volunteer Management System**
 
-*Version 0.6.0 — May 2026*
+**Version 0.9.0 — May 2026**
 
 ---
 
@@ -43,15 +43,17 @@ If you have a question not answered here, or something isn't working as expected
 8. [Announcements](#8-announcements)
 9. [The Schedule & Calendar](#9-the-schedule--calendar)
 10. [Teams](#10-teams)
-11. [Your Availability Preferences](#11-your-availability-preferences)
-12. [Your Profile](#12-your-profile)
-13. [File Library](#13-file-library)
-14. [Managing Your Password](#14-managing-your-password)
-15. [Uploading Files (Administrators)](#15-uploading-files-administrators)
-16. [The Admin Panel (Administrators)](#16-the-admin-panel-administrators)
-17. [Email Notifications](#17-email-notifications)
-18. [Privacy and Security](#18-privacy-and-security)
-19. [Frequently Asked Questions](#19-frequently-asked-questions)
+11. [Messages](#11-messages)
+12. [Projects](#12-projects)
+13. [Your Availability Preferences](#13-your-availability-preferences)
+14. [Your Profile](#14-your-profile)
+15. [File Library](#15-file-library)
+16. [Managing Your Password](#16-managing-your-password)
+17. [Uploading Files (Administrators)](#17-uploading-files-administrators)
+18. [The Admin Panel (Administrators)](#18-the-admin-panel-administrators)
+19. [Email Notifications](#19-email-notifications)
+20. [Privacy and Security](#20-privacy-and-security)
+21. [Frequently Asked Questions](#21-frequently-asked-questions)
 
 ---
 
@@ -142,7 +144,7 @@ Type the 6-digit code into the box on the verification page and click **Verify**
 
 Once verified, you will be taken to your **Dashboard** (see [Section 5](#5-your-dashboard)).
 
-> **First sign-in?** If an administrator has set your account to require a password change, you will see a password-setting page first. See [Section 14](#14-managing-your-password) for details.
+> **First sign-in?** If an administrator has set your account to require a password change, you will see a password-setting page first. See [Section 16](#16-managing-your-password) for details.
 
 ---
 
@@ -175,15 +177,15 @@ If you have forgotten your password, click **Forgot password?** on the sign-in p
 
 ## 4. The Home Page
 
-When you visit the VMS without being signed in, you will see the home page. This is a welcome page for the museum's Volunteer Management System. It has a brief description of what the system does and a **"Sign in"** button.
+When you visit the VMS without being signed in, you will see the home page. This is a welcome page for the museum's Volunteer Management System with a brief description of what the system does and a **"Sign in"** button.
 
-If you are already signed in, the home page shows buttons to go to your **Dashboard** and to the **Admin Panel** (if you have administrator access).
+If you are already signed in, you will be taken **directly to your Dashboard** — the home page is only shown to visitors who are not yet signed in.
 
 The navigation bar at the top of every page shows:
-- **CNAM VMS** (in the top-left) — clicking this always takes you back to the home page
-- Links to **Dashboard**, **Schedule**, **Announcements**, **Teams**, and **Files** (these appear when you are signed in)
+- **CNAM VMS** (in the top-left) — clicking this always takes you back to the dashboard (or the home page if signed out)
+- Links to **Dashboard**, **Schedule**, **Announcements**, **Teams**, **Files**, **💬 Messages**, **📋 Projects**, and **❓ Help** (these appear when you are signed in)
 - Your name in the top-right, which links to your **Profile** page, along with a **Sign out** button
-- An **Admin** menu (if you have administrator access) with links to the various admin sections
+- An **Admin** menu (if you have administrator or staff access) with links to the various admin and coordination sections
 
 ---
 
@@ -203,7 +205,7 @@ A preview of the three most recent announcements from the museum team — things
 
 ### My Availability
 
-A quick link to record your general volunteering preferences, or to update specific dates when you are available. See [Section 9](#9-the-schedule--calendar) and [Section 11](#11-your-availability-preferences) for more detail.
+A quick link to record your general volunteering preferences, or to update specific dates when you are available. See [Section 9](#9-the-schedule--calendar) and [Section 13](#13-your-availability-preferences) for more detail.
 
 ### My Profile
 
@@ -328,7 +330,37 @@ Click on a team name to go to that team's individual page, where you can:
 
 ---
 
-## 11. Your Availability Preferences
+## 11. Messages
+
+The Messages page lets you send messages to individual volunteers or groups. Click **💬 Messages** in the navigation bar to open it.
+
+### Composing a message
+
+1. Choose whether to send to an **Individual Volunteer** or a **Group / Team**.
+2. Type your message in the text box.
+3. Click **Send Message**.
+
+Recipients will receive a notification when a message is sent to them. Keep messages clear, concise, and professional.
+
+> **Tip:** Use group messaging to communicate schedule changes, reminders, or general updates to an entire team at once.
+
+---
+
+## 12. Projects
+
+The Projects page shows all active teams and their assigned tasks. Click **📋 Projects** in the navigation bar to open it.
+
+For each team you can see:
+- The **team name** and description
+- **Member count** and **task count**
+- Each task's **title**, **urgency level** (Low / Medium / High), and **status** (Pending / In Progress)
+- The number of **work logs** recorded against each task
+
+This gives you an at-a-glance view of what is currently being worked on across the museum, making it easy to see where help may be needed.
+
+---
+
+## 13. Your Availability Preferences
 
 As well as recording availability for specific dates (see [Section 9](#9-the-schedule--calendar)), you can set your general volunteering preferences — the types of activity you are interested in helping with.
 
@@ -350,7 +382,7 @@ Click **Save preferences** when you are done.
 
 ---
 
-## 12. Your Profile
+## 14. Your Profile
 
 Your profile page lets you view and update your personal account information. To reach it, click your name in the top-right corner of any page.
 
@@ -374,9 +406,25 @@ Your profile also shows the **roles** and **teams** you have been assigned to. T
 
 At the bottom of your profile page is a list of your **capabilities** — the specific actions you are permitted to perform in the system. These are granted via your roles and are for information only.
 
+### Danger Zone — Deleting Your Account
+
+> ⚠️ **This action is permanent and cannot be reversed.**
+
+At the very bottom of your profile page, you will find the **Danger Zone** section. From here you can permanently delete your own account.
+
+Clicking **Delete my account** expands a confirmation form. You must enter your current password to proceed. Once confirmed:
+
+- Your account and **all associated data** (availability records, event sign-ups, team memberships, phone numbers) will be permanently removed.
+- You will be signed out immediately.
+- Your information will not be recoverable.
+
+If you are unsure, click **Cancel** to dismiss the form without taking any action.
+
+> **Note for administrators:** You cannot delete your own account from the admin panel. The self-deletion option in your own Profile page is the only way to do this. The root administrator account cannot be self-deleted either — contact your system manager if the root account needs to be removed.
+
 ---
 
-## 13. File Library
+## 15. File Library
 
 The File Library is where shared documents, images, and other resources are stored. To reach it, click **Files** in the navigation bar.
 
@@ -392,7 +440,7 @@ If you need a file to be added or removed, contact your administrator.
 
 ---
 
-## 14. Managing Your Password
+## 16. Managing Your Password
 
 ### Setting your password for the first time
 
@@ -416,7 +464,7 @@ If you have forgotten your password:
 
 ---
 
-## 15. Uploading Files (Administrators)
+## 17. Uploading Files (Administrators)
 
 If you have the appropriate administrator permission (`admin:files.write`), you can upload files to the VMS. To reach the upload page, click **Admin → Upload** in the navigation bar.
 
@@ -437,11 +485,11 @@ The following types of file can be uploaded:
 
 Files must be no larger than **10 MB** (your administrator may have configured a different limit).
 
-Once uploaded, files appear immediately in the File Library (see [Section 13](#13-file-library)) for all signed-in users to see and download. Administrators with the `admin:files.read` or `admin:files.write` capability can also manage files from the **Admin → Files** page, where they can delete files that are no longer needed.
+Once uploaded, files appear immediately in the File Library (see [Section 15](#15-file-library)) for all signed-in users to see and download. Administrators with the `admin:files.read` or `admin:files.write` capability can also manage files from the **Admin → Files** page, where they can delete files that are no longer needed.
 
 ---
 
-## 16. The Admin Panel (Administrators)
+## 18. The Admin Panel (Administrators)
 
 The Admin Panel is available to administrators with appropriate permissions. To access it, click **Admin** in the navigation bar.
 
@@ -495,7 +543,7 @@ The new account is created with **Pending** status. You will need to manage the 
 
 #### Managing an individual user
 
-Click **Manage** next to any user to open their detail page. Here you can:
+Click **Manage** next to any user to open their detail page. Here you can (with `admin:users.write`):
 
 - Change their **name**, **account type**, and **status** (Active, Pending, or Suspended)
 - Assign or remove **roles**
@@ -503,6 +551,10 @@ Click **Manage** next to any user to open their detail page. Here you can:
 - Add or remove **telephone numbers** on their behalf
 - Send a **password reset link** to their email
 - **Delete** the account (this cannot be undone)
+
+> **Note:** Administrators cannot delete their own account from the admin panel, and the root account cannot be deleted at all. To delete your own account, use the [Danger Zone](#danger-zone--deleting-your-account) on your Profile page.
+
+> **Note:** Users with `admin:users.read` but not `admin:users.write` can view user details but cannot make any changes.
 
 ---
 
@@ -683,7 +735,7 @@ This page shows all uploaded files with their original name, type, size, uploade
 - **Download** any file.
 - **Delete** a file — this removes it from the server permanently.
 
-To upload new files, use the Upload page (see [Section 15](#15-uploading-files-administrators)).
+To upload new files, use the Upload page (see [Section 17](#17-uploading-files-administrators)).
 
 ---
 
@@ -722,7 +774,7 @@ Edit the text in the box and click **Save**. A **Preview** link lets you see how
 
 ---
 
-## 17. Email Notifications
+## 19. Email Notifications
 
 The VMS sends email notifications automatically in certain situations:
 
@@ -736,7 +788,7 @@ All emails come from the museum's VMS email address and will have "CNAM VMS" in 
 
 ---
 
-## 18. Privacy and Security
+## 20. Privacy and Security
 
 The VMS is designed with privacy and security in mind:
 
@@ -744,7 +796,8 @@ The VMS is designed with privacy and security in mind:
 - **Two-step sign-in.** As well as your password, a one-time code is sent to your email each time you sign in. This means even if someone else obtained your password, they could not sign in without also having access to your email.
 - **Your email address is kept private.** It is only visible to administrators and is stored securely.
 - **Everything is logged.** Every sign-in and every significant action is recorded in the audit log, so any unusual activity can be spotted quickly.
-- **Access is controlled.** Each person can only see and do what they have been given permission for. Trying to access a page you do not have permission for will show an "Access Denied" message rather than any sensitive information.
+- **Access is controlled and hidden.** Each person can only see and do what they have been given permission for. Pages you do not have access to are not shown — they redirect silently to your dashboard rather than displaying an "Access Denied" message that would confirm the page exists.
+- **Suspended accounts are blocked immediately.** If your account is suspended, you are redirected to an error page on your very next page load.
 - **File uploads are checked.** Only certain types of file can be uploaded, and the system checks both the file's extension and its actual content type to prevent unsafe files from being stored.
 - **The system is kept up to date.** Security updates to the underlying software are applied regularly.
 
@@ -752,7 +805,7 @@ If you notice anything unusual or suspect that your account has been accessed wi
 
 ---
 
-## 19. Frequently Asked Questions
+## 21. Frequently Asked Questions
 
 **I entered my email and password but the verification code never arrived. What do I do?**
 

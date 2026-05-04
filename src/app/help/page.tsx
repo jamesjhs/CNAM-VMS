@@ -52,28 +52,34 @@ export default function HelpPage() {
       ],
     },
     {
-      id: 'coordination',
-      title: '👥 Coordination Features',
+      id: 'messaging-projects',
+      title: '💬 Messages & Projects',
       content: [
         {
-          heading: 'Coordination Dashboard',
-          text: 'The Coordination section provides a complete view of the timetabling system. You have access to all volunteers, their availability, upcoming projects, and team messaging.',
+          heading: 'Messages',
+          text: 'The Messages page lets you send messages to individual volunteers or groups. Access it directly from the navigation bar. Keep communication clear, professional, and logged for reference.',
+        },
+        {
+          heading: 'Projects',
+          text: 'The Projects page shows all active teams and their assigned projects. You can see task priorities, urgency levels, and work log counts across every team — giving you an at-a-glance view of what\'s in progress.',
+        },
+      ],
+    },
+    {
+      id: 'coordination',
+      title: '👥 Coordination Features (Staff)',
+      content: [
+        {
+          heading: 'Coordination Overview',
+          text: 'Staff with the appropriate capabilities can access the Coordination Overview via the Admin menu. It provides a summary of volunteers, teams, upcoming events, and availability.',
         },
         {
           heading: 'View All Volunteers',
-          text: 'See a complete list of all volunteers with their contact information and status. View which volunteers are available on upcoming dates.',
+          text: 'See a complete list of all volunteers with their contact information and status. Available to users with the Volunteer Read capability (Admin menu → Volunteers).',
         },
         {
           heading: 'Volunteer Availability',
-          text: 'View a calendar showing which volunteers are available on specific dates. This helps with scheduling and event coordination. Check upcoming availability at a glance.',
-        },
-        {
-          heading: 'Upcoming Projects',
-          text: 'See all upcoming projects and team assignments. Track task progress, urgency levels, and team member contributions through work logs.',
-        },
-        {
-          heading: 'Messaging',
-          text: 'Send messages to individual volunteers or groups. Keep everyone informed, coordinate schedules, and communicate important information.',
+          text: 'View a calendar showing which volunteers are available on specific dates. Available to users with the Schedule Read capability (Admin menu → Availability).',
         },
       ],
     },
@@ -199,6 +205,14 @@ export default function HelpPage() {
 
         {/* Quick Links */}
         <div className="mt-10 grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Link href="/messages" className="block p-4 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all">
+            <strong className="text-lg">💬 Messages</strong>
+            <p className="text-sm text-gray-600 mt-1">Send messages to volunteers or groups</p>
+          </Link>
+          <Link href="/projects" className="block p-4 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all">
+            <strong className="text-lg">📋 Projects</strong>
+            <p className="text-sm text-gray-600 mt-1">View active projects and team tasks</p>
+          </Link>
           <Link href="/dashboard" className="block p-4 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all">
             <strong className="text-lg">📊 Dashboard</strong>
             <p className="text-sm text-gray-600 mt-1">View your overview and quick actions</p>

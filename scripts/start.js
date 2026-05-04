@@ -33,6 +33,7 @@ console.log('[start.js] Rebuilding native modules for current Node.js version...
 const rebuild = spawn('npm', ['rebuild'], {
   cwd: projectRoot,
   stdio: 'inherit',
+  shell: true,
 });
 
 rebuild.on('exit', (code) => {

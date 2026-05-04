@@ -1,9 +1,9 @@
-import { requireCapability } from '@/lib/auth-helpers';
+import { requireAuth } from '@/lib/auth-helpers';
 import { getDb, unpackDate } from '@/lib/db';
 import Link from 'next/link';
 
 export default async function CoordinationProjectsPage() {
-  await requireCapability('staff:projects.read');
+  await requireAuth();
 
   const db = getDb();
 

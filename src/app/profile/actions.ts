@@ -8,9 +8,11 @@ import { requireAuth } from '@/lib/auth-helpers';
 import { logAudit } from '@/lib/audit';
 import { verifyPassword, hashPassword } from '@/lib/password';
 import { validatePasswordComplexity } from '@/lib/password-validation';
+import { signOut } from '@/auth';
 
 const PHONE_REGEX = /^[\d\s\-\+\(\)]{7,20}$/;
 const MAX_LABEL_LENGTH = 50;
+const MAX_NAME_LENGTH = 150;
 
 function isValidPhoneNumber(phone: string): boolean {
   return PHONE_REGEX.test(phone.trim());
@@ -20,6 +22,9 @@ export async function updateOwnProfile(name: string) {
   const actor = await requireAuth();
 
   const trimmedName = name.trim() || null;
+  if (trimmedName && trimmedName.length > MAX_NAME_LENGTH) {
+    redirect('/profile?error=NameTooLong');
+  }
   const db = getDb();
   db.prepare('UPDATE users SET name=?, updatedAt=? WHERE id=?').run(trimmedName, now(), actor.id);
 
@@ -132,4 +137,44 @@ export async function changePasswordFromProfile(formData: FormData) {
   });
 
   redirect('/profile?success=PasswordChanged');
+}
+
+/**
+ * Allow a user to permanently delete their own account.
+ * Requires the user's current password as confirmation.
+ * On success the session is invalidated and the user is redirected to the sign-in page.
+ */
+export async function deleteOwnAccount(formData: FormData) {
+  const actor = await requireAuth();
+
+  const password = (formData.get('password') as string | null) ?? '';
+  if (!password) {
+    redirect('/profile?error=PasswordRequired');
+  }
+
+  const db = getDb();
+  const user = db.prepare('SELECT passwordHash, email FROM users WHERE id = ?').get(actor.id) as { passwordHash: string | null; email: string } | undefined;
+
+  if (!user?.passwordHash) {
+    redirect('/profile?error=NoPassword');
+  }
+
+  const valid = await verifyPassword(password, user.passwordHash);
+  if (!valid) {
+    redirect('/profile?error=WrongCurrentPassword');
+  }
+
+  await logAudit({
+    userId: actor.id,
+    action: 'USER_SELF_DELETED',
+    resource: 'User',
+    resourceId: actor.id,
+    detail: { email: user.email },
+  });
+
+  // Delete the account — ON DELETE CASCADE removes all related rows
+  db.prepare('DELETE FROM users WHERE id = ?').run(actor.id);
+
+  // Sign out and redirect to sign-in (the JWT will be invalidated by the session cookie deletion)
+  await signOut({ redirectTo: '/auth/signin?deleted=1' });
 }

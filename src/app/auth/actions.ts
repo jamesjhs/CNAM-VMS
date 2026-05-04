@@ -178,7 +178,7 @@ export async function submitPassword(formData: FormData) {
     console.error('[mail] Failed to send OTP email:', err);
   }
 
-  console.log(`[auth] submitPassword: OTP issued for @${emailDomain(email)} — OTP code is: ${otp}`);
+  console.log(`[auth] submitPassword: OTP issued for @${emailDomain(email)} — sending verification code to user`);
 
   // Set pending cookies (httpOnly, short-lived)
   console.log(`[auth] submitPassword: setting pending cookies for user ${user.id}...`);
