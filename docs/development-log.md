@@ -17,6 +17,82 @@ Entries are listed in reverse chronological order (newest first). Each entry rec
 
 ---
 
+---
+
+## 4 May 2026 — Teams Page Restructure, Join Requests & Leader Management (v0.10.1)
+
+**Agent session:** GitHub Copilot Cloud Agent
+
+**What was done:**
+
+Bugfix version bumped from 0.10.0 to 0.10.1. Four improvements to the Teams section of the VMS were shipped in this session.
+
+### 1. Teams nav link shows member count
+
+The **Teams** link in the navigation bar now shows a count in brackets of how many teams the current user is a member of (e.g. **Teams (3)**). This gives volunteers an at-a-glance reminder of their team memberships from any page.
+
+**Files changed:**
+- `src/components/NavBar.tsx` — queries `user_teams` for the logged-in user and renders the count badge
+
+### 2. Teams page split into "My Teams" and "Other Teams"
+
+The Teams list page (`/teams`) was rewritten to be membership-scoped:
+
+- **My Teams** (top): Teams the current user belongs to, with unread-message count and active-task count badges. Each has a "Team page →" link.
+- **Other Teams** (collapsed `<details>` section at the bottom): Teams the user is **not** a member of, shown without a team-page link. Each has a **Request to Join** button. If a request is already pending, the button shows **⏳ Request Pending**.
+- Administrators with `admin:teams.read` see all teams in the "My Teams" section.
+
+**Files changed:**
+- `src/app/teams/page.tsx` — full rewrite
+
+### 3. Team join requests and leader member management
+
+A new `team_join_requests` database table was added to track requests from volunteers to join teams. Team leaders (and administrators) can now approve or deny these requests, and can also add members directly by email.
+
+- Any signed-in user can submit a join request for a team they are not a member of.
+- Requests can be re-submitted after a denial.
+- Team leaders see a **Member Management** panel on their team's page with:
+  - A list of pending join requests, each with **✓ Approve** and **✕ Deny** buttons.
+  - A direct **Add Member** form (enter an email address to add immediately).
+- These controls are also available to users with `admin:teams.write`.
+
+**Files changed:**
+- `src/lib/db.ts` — added `team_join_requests` table (`id`, `teamId`, `userId`, `status`, `requestedAt`, `resolvedAt`, `resolvedById`; UNIQUE on `teamId+userId`)
+- `src/lib/db-types.ts` — added `JoinRequestStatus` type (`PENDING | APPROVED | DENIED`)
+- `src/app/teams/actions.ts` (new) — `requestToJoinTeam`, `approveJoinRequest`, `denyJoinRequest`, `addTeamMemberByLeader` server actions
+- `src/app/teams/[id]/page.tsx` — membership gate (non-members without `admin:teams.read` are redirected); "Member Management" panel for leaders and admins
+
+### 4. Fixed ERROR 336804059 in team messages page
+
+Opening the Messages tab within a team produced "ERROR 336804059". The root cause was a synchronous `db.prepare().run()` write executed during the Server Component render — a side-effect-in-render anti-pattern in Next.js App Router that causes errors under certain conditions.
+
+**Fix:**
+- Removed the inline DB write from the render.
+- Created a new `MarkTeamRead` client component that calls the existing `markTeamRead` server action via `useEffect` (best-effort, errors silently ignored).
+- Replaced the nested inline `'use server'` wrapper on the send-message form with a clean `.bind(null, teamId)` bound action; updated `sendTeamMessage` signature to accept `(teamId, FormData)`.
+
+**Files changed:**
+- `src/app/teams/[id]/messages/page.tsx` — DB write removed, `<MarkTeamRead>` added
+- `src/components/MarkTeamRead.tsx` (new) — minimal client component
+- `src/app/messages/actions.ts` — `sendTeamMessage` updated to accept `FormData`
+
+### Decisions
+
+- Non-members are redirected from team detail pages rather than shown an error, keeping restricted pages invisible (consistent with the broader security posture established in v0.8.0).
+- Team leaders are identified by the existing `isLeader` flag on `user_teams`; no new capability was required.
+- The DB write in the messages render was moved to a client-side effect rather than a server action form to avoid page-load jank (read-tracking is best-effort).
+
+### Known issues / limitations
+
+- No email notification is sent to team leaders when a new join request arrives. This is a future enhancement.
+
+### Next steps
+
+- Email notifications for join requests to team leaders
+- Ability for volunteers to withdraw a pending join request
+
+---
+
 ## 3 May 2026 — Security Hardening, Access Control & Self-Service Account Deletion (v0.8.0)
 
 **Agent session:** GitHub Copilot CLI

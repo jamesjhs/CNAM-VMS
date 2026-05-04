@@ -43,7 +43,7 @@ export default function HelpPage() {
         },
         {
           heading: 'Teams & Tasks',
-          text: 'View your assigned team, upcoming team projects, and record your work hours on specific tasks. This helps track your volunteering contributions.',
+          text: 'The Teams page shows your teams at the top with unread-message and active-task badges. Teams you are not a member of appear in a collapsed "Other Teams" section — click "Request to Join" to ask a team leader to add you. Open any team page to see its tasks in full, submit work logs, leave feedback, and access the team message thread.',
         },
         {
           heading: 'Announcements',
@@ -101,7 +101,7 @@ export default function HelpPage() {
         },
         {
           heading: 'Teams Management',
-          text: 'Create teams, assign members, and manage team-related content and workflows.',
+          text: 'Create teams, assign members, and manage team-related content and workflows. Admins can assign one or more team leaders from the Team Admins section on each team card. Team leaders can then approve join requests and add members directly from the team page.',
         },
         {
           heading: 'Audit Log',
@@ -227,7 +227,7 @@ export default function HelpPage() {
           </Link>
           <Link href="/teams" className="block p-4 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all">
             <strong className="text-lg">👥 Teams</strong>
-            <p className="text-sm text-gray-600 mt-1">View team projects and tasks</p>
+            <p className="text-sm text-gray-600 mt-1">View your teams, tasks, and request to join new ones</p>
           </Link>
           <Link href="/announcements" className="block p-4 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all">
             <strong className="text-lg">📢 Announcements</strong>

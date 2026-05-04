@@ -1,9 +1,10 @@
 import { requireAuth, hasCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
 import Link from 'next/link';
-import { getDb, unpackBool, unpackTs, now } from '@/lib/db';
+import { getDb, unpackBool, unpackTs } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import { sendTeamMessage, deleteMessage, reportMessage } from '../../../messages/actions';
+import MarkTeamRead from '@/components/MarkTeamRead';
 
 export default async function TeamMessagesPage({
   params,
@@ -28,11 +29,8 @@ export default async function TeamMessagesPage({
 
   if (!isMember && !canReadAllTeams) notFound();
 
-  // Mark team read immediately
-  const ts = now();
-  db.prepare(
-    `INSERT OR REPLACE INTO message_reads (userId, context, lastReadAt) VALUES (?, ?, ?)`,
-  ).run(currentUser.id, `team:${teamId}`, ts);
+  // Mark team conversation as read via a client-side effect (see MarkTeamRead component)
+  // — avoids a DB write side-effect inside the Server Component render.
 
   const rawMessages = db.prepare(`
     SELECT m.id, m.body, m.senderId, m.isDeleted, m.deletedAt, m.createdAt,
@@ -168,14 +166,7 @@ export default async function TeamMessagesPage({
 
           {/* Compose form */}
           <div className="px-6 py-4 border-t border-gray-100">
-            <form
-              action={async (fd: FormData) => {
-                'use server';
-                const body = fd.get('body') as string;
-                await sendTeamMessage(teamId, body);
-              }}
-              className="flex gap-3"
-            >
+            <form action={sendTeamMessage.bind(null, teamId)} className="flex gap-3">
               <textarea
                 name="body"
                 required
@@ -193,6 +184,8 @@ export default async function TeamMessagesPage({
             </form>
           </div>
         </div>
+        {/* Silently mark this team conversation as read on page load */}
+        <MarkTeamRead teamId={teamId} />
       </main>
     </div>
   );

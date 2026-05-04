@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { signOutAction } from '@/lib/signout-action';
 import MobileMenu, { type NavLink } from './MobileMenu';
 import VersionDisplay from './VersionDisplay';
+import { getDb } from '@/lib/db';
 
 export default async function NavBar() {
   const session = await auth();
@@ -26,6 +27,20 @@ export default async function NavBar() {
 
   const showAdminMenu = isAdmin || isStaff;
 
+  // Count how many teams the current user is a member of (for nav badge)
+  const userId = (session?.user as { id?: string } | undefined)?.id;
+  let myTeamCount = 0;
+  if (userId) {
+    try {
+      const db = getDb();
+      const countRow = db.prepare('SELECT COUNT(*) as cnt FROM user_teams WHERE userId = ?').get(userId) as { cnt: number } | undefined;
+      myTeamCount = countRow?.cnt ?? 0;
+    } catch {
+      // Non-critical — leave count as 0 if DB is unavailable
+    }
+  }
+  const teamsLabel = myTeamCount > 0 ? `Teams (${myTeamCount})` : 'Teams';
+
   // Build nav link lists to pass to the mobile menu client component
   const mainLinks: NavLink[] = session
     ? [
@@ -33,7 +48,7 @@ export default async function NavBar() {
         { href: '/schedule', label: 'Schedule & Availability' },
         { href: '/announcements', label: 'Announcements' },
         { href: '/files', label: 'Files' },
-        { href: '/teams', label: 'Teams' },
+        { href: '/teams', label: teamsLabel },
         { href: '/messages', label: '💬 Messages' },
         { href: '/projects', label: '📋 Projects' },
         { href: '/help', label: '❓ Help' },
@@ -87,7 +102,7 @@ export default async function NavBar() {
                   Files
                 </Link>
                 <Link href="/teams" className="text-gray-300 hover:text-white text-sm transition-colors">
-                  Teams
+                  {teamsLabel}
                 </Link>
                 <Link href="/messages" className="text-gray-300 hover:text-white text-sm transition-colors">
                   💬 Messages

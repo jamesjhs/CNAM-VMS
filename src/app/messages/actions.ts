@@ -43,9 +43,10 @@ export async function sendDirectMessage(recipientId: string, body: string): Prom
   revalidatePath(`/messages/${recipientId}`);
 }
 
-export async function sendTeamMessage(teamId: string, body: string): Promise<void> {
+export async function sendTeamMessage(teamId: string, formData: FormData): Promise<void> {
   const actor = await requireAuth();
 
+  const body = (formData.get('body') as string | null) ?? '';
   const trimmed = body.trim();
   if (!trimmed) throw new Error('Message body cannot be empty.');
   if (trimmed.length > 2000) throw new Error('Message body must be 2000 characters or fewer.');

@@ -17,3 +17,6 @@ export const TASK_URGENCIES: TaskUrgency[] = ['ROUTINE', 'MODERATE', 'URGENT'];
 
 export type JobScheduleType = 'ONE_OFF' | 'WEEKLY' | 'MONTHLY';
 export const JOB_SCHEDULE_TYPES: JobScheduleType[] = ['ONE_OFF', 'WEEKLY', 'MONTHLY'];
+
+export type JoinRequestStatus = 'PENDING' | 'APPROVED' | 'DENIED';
+export const JOIN_REQUEST_STATUSES: JoinRequestStatus[] = ['PENDING', 'APPROVED', 'DENIED'];
