@@ -4,7 +4,7 @@ import { getDb, unpackBool, unpackArr, unpackTs } from '@/lib/db';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { addWorkLogEntry, addTeamFeedback } from '../../admin/teams/actions';
-import { approveJoinRequest, denyJoinRequest, addTeamMemberByLeader } from '../actions';
+import { approveJoinRequest, denyJoinRequest, addTeamMemberByLeader, setTeamLeaderStatus } from '../actions';
 import type { TaskType, TaskUrgency } from '@/lib/db-types';
 
 const TASK_TYPE_LABELS: Record<TaskType, string> = {
@@ -194,6 +194,11 @@ export default async function TeamPage({
             ✓ Feedback submitted. Thank you.
           </div>
         )}
+        {success === 'leader' && (
+          <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+            ✓ Team leader status updated.
+          </div>
+        )}
         {error === 'NotMember' && (
           <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
             You must be a member of this team to submit entries or feedback.
@@ -242,6 +247,58 @@ export default async function TeamPage({
             </Link>
           </div>
         </div>
+
+        {/* Members */}
+        <section className="mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            Team Members
+            <span className="ml-2 text-sm font-normal text-gray-400">
+              ({members.length} member{members.length !== 1 ? 's' : ''})
+            </span>
+          </h2>
+          <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-50">
+            {members.length === 0 ? (
+              <p className="px-6 py-4 text-sm text-gray-400">No members yet.</p>
+            ) : (
+              members.map((member) => (
+                <div key={member.userId} className="px-6 py-3 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="text-sm font-medium text-gray-900 truncate">
+                      {member.user.name ?? member.user.email}
+                    </span>
+                    {member.user.name && (
+                      <span className="text-xs text-gray-400 truncate hidden sm:block">{member.user.email}</span>
+                    )}
+                    {member.isLeader && (
+                      <span className="shrink-0 text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
+                        Team Lead
+                      </span>
+                    )}
+                  </div>
+                  {(isLeader || isAdmin) && (
+                    <form
+                      action={async () => {
+                        'use server';
+                        await setTeamLeaderStatus(id, member.userId, !member.isLeader);
+                      }}
+                    >
+                      <button
+                        type="submit"
+                        className={`shrink-0 text-xs px-3 py-1 rounded-lg border font-medium transition-colors ${
+                          member.isLeader
+                            ? 'text-indigo-600 border-indigo-200 hover:bg-indigo-50'
+                            : 'text-gray-500 border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        {member.isLeader ? 'Remove Leader' : 'Set as Leader'}
+                      </button>
+                    </form>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </section>
 
         {/* Tasks */}
         <section className="mb-8">

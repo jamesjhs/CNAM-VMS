@@ -143,6 +143,43 @@ export async function denyJoinRequest(requestId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Set / unset team leader status (team leader or admin)
+// ---------------------------------------------------------------------------
+
+export async function setTeamLeaderStatus(teamId: string, userId: string, makeLeader: boolean): Promise<void> {
+  const actor = await requireAuth();
+  const db = getDb();
+
+  const team = db.prepare('SELECT id FROM teams WHERE id = ?').get(teamId);
+  if (!team) redirect('/teams');
+
+  assertLeaderOrAdmin(actor.id, teamId, actor.capabilities, db);
+
+  const membership = db.prepare(
+    'SELECT isLeader FROM user_teams WHERE userId = ? AND teamId = ?',
+  ).get(userId, teamId) as { isLeader: number } | undefined;
+  if (!membership) redirect(`/teams/${teamId}?error=NotMember`);
+
+  db.prepare('UPDATE user_teams SET isLeader = ? WHERE userId = ? AND teamId = ?').run(
+    makeLeader ? 1 : 0,
+    userId,
+    teamId,
+  );
+
+  await logAudit({
+    userId: actor.id,
+    action: makeLeader ? 'TEAM_LEADER_ADDED' : 'TEAM_LEADER_REMOVED',
+    resource: 'Team',
+    resourceId: teamId,
+    detail: { userId },
+  });
+
+  revalidatePath(`/teams/${teamId}`);
+  revalidatePath('/teams');
+  redirect(`/teams/${teamId}?success=leader`);
+}
+
+// ---------------------------------------------------------------------------
 // Add a team member directly (team leader or admin)
 // ---------------------------------------------------------------------------
 
