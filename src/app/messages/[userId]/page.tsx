@@ -130,12 +130,7 @@ export default async function DirectMessageThreadPage({
                     {!msg.isDeleted && (
                       <div className={`flex gap-2 ${msg.isMine ? 'justify-end' : 'justify-start'}`}>
                         {/* Report button */}
-                        <form
-                          action={async () => {
-                            'use server';
-                            await reportMessage(msg.id);
-                          }}
-                        >
+                        <form action={reportMessage.bind(null, msg.id)}>
                           <button
                             type="submit"
                             title={msg.alreadyReported ? 'Already reported' : 'Report message'}
@@ -151,12 +146,7 @@ export default async function DirectMessageThreadPage({
 
                         {/* Delete button */}
                         {(msg.isMine || canAdmin) && (
-                          <form
-                            action={async () => {
-                              'use server';
-                              await deleteMessage(msg.id);
-                            }}
-                          >
+                          <form action={deleteMessage.bind(null, msg.id)}>
                             <button
                               type="submit"
                               title="Delete message"

@@ -60,19 +60,24 @@ export default async function DashboardPage() {
   `).all(user.id, todayStr, in30dStr) as { eventId: string }[];
   const mySignupSet = new Set(mySignupIds.map((s) => s.eventId));
 
-  // Unread direct message count
-  const { dmUnreadCount } = db.prepare(`
-    SELECT COUNT(*) as dmUnreadCount
+  // Unread direct message count — load read timestamps into a map first, then count in application code
+  const dmReadRows = db.prepare(`
+    SELECT context, lastReadAt FROM message_reads
+    WHERE userId = ? AND context LIKE 'direct:%'
+  `).all(user.id) as { context: string; lastReadAt: string }[];
+  const dmReadMap = new Map(dmReadRows.map((r) => [r.context, r.lastReadAt]));
+
+  const dmRaw = db.prepare(`
+    SELECT senderId, createdAt
     FROM messages
-    WHERE recipientId = ?
-      AND isDeleted = 0
-      AND teamId IS NULL
-      AND createdAt > COALESCE(
-        (SELECT lastReadAt FROM message_reads
-         WHERE userId = ? AND context = 'direct:' || senderId),
-        '1970-01-01T00:00:00.000Z'
-      )
-  `).get(user.id, user.id) as { dmUnreadCount: number };
+    WHERE recipientId = ? AND isDeleted = 0 AND teamId IS NULL AND senderId IS NOT NULL
+  `).all(user.id) as { senderId: string; createdAt: string }[];
+
+  let dmUnreadCount = 0;
+  for (const row of dmRaw) {
+    const lastRead = dmReadMap.get(`direct:${row.senderId}`) ?? '1970-01-01T00:00:00.000Z';
+    if (row.createdAt > lastRead) dmUnreadCount++;
+  }
 
   // Get teams for this user
   const rawUserTeams = db.prepare(`
