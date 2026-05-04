@@ -57,6 +57,17 @@ export default async function TeamPage({
     userId: string; isLeader: number; uid: string; uname: string | null; uemail: string;
   }[];
 
+  // Unread team message count for the current user
+  const lastReadRow = db.prepare(
+    `SELECT lastReadAt FROM message_reads WHERE userId = ? AND context = ?`,
+  ).get(currentUser.id, `team:${id}`) as { lastReadAt: string } | undefined;
+  const lastReadAt = lastReadRow?.lastReadAt ?? '1970-01-01T00:00:00.000Z';
+  const { teamUnreadCount } = db.prepare(`
+    SELECT COUNT(*) as teamUnreadCount
+    FROM messages
+    WHERE teamId = ? AND senderId != ? AND isDeleted = 0 AND createdAt > ?
+  `).get(id, currentUser.id, lastReadAt) as { teamUnreadCount: number };
+
   const members = rawMembers.map((m) => ({
     userId: m.userId,
     isLeader: unpackBool(m.isLeader),
@@ -189,6 +200,20 @@ export default async function TeamPage({
                 ⚙️ Manage
               </Link>
             )}
+            <Link
+              href={`/teams/${id}/messages`}
+              className="relative text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+            >
+              💬 Messages
+              {teamUnreadCount > 0 && (
+                <span
+                  aria-label={`${teamUnreadCount} unread team message${teamUnreadCount !== 1 ? 's' : ''}`}
+                  className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold"
+                >
+                  {teamUnreadCount > 9 ? '9+' : teamUnreadCount}
+                </span>
+              )}
+            </Link>
           </div>
         </div>
 

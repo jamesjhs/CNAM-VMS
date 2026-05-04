@@ -7,24 +7,24 @@ export default async function CoordinationVolunteersPage() {
 
   const db = getDb();
 
-  // Get all volunteers with their info
+  // Get all users with the Volunteer role
   const rawVolunteers = db.prepare(`
-    SELECT u.id, u.name, u.email, u.accountType, u.status, u.createdAt,
+    SELECT u.id, u.name, u.email, u.status, u.createdAt,
            (SELECT number FROM user_phones WHERE userId = u.id AND isPrimary = 1 LIMIT 1) as phone,
            COUNT(DISTINCT ut.teamId) as teamCount,
            COUNT(DISTINCT es.eventId) as eventSignups
     FROM users u
+    JOIN user_roles ur ON u.id = ur.userId
+    JOIN roles r ON ur.roleId = r.id AND r.name = 'Volunteer'
     LEFT JOIN user_teams ut ON u.id = ut.userId
     LEFT JOIN event_signups es ON u.id = es.userId
-    WHERE u.accountType = ?
     GROUP BY u.id
     ORDER BY u.name ASC
-  `).all('VOLUNTEER') as {
+  `).all() as {
     id: string;
     name: string | null;
     email: string;
     phone: string | null;
-    accountType: string;
     status: string;
     createdAt: string;
     teamCount: number;

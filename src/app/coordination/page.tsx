@@ -7,8 +7,14 @@ export default async function CoordinationPage() {
   const db = getDb();
 
   // Get stats
-  const volunteersCount = db.prepare('SELECT COUNT(*) as count FROM users WHERE accountType = ?').get('VOLUNTEER') as { count: number };
-  const staffCount = db.prepare('SELECT COUNT(*) as count FROM users WHERE accountType = ?').get('STAFF') as { count: number };
+  const volunteersCount = db.prepare(`
+    SELECT COUNT(DISTINCT ur.userId) as count
+    FROM user_roles ur JOIN roles r ON ur.roleId = r.id WHERE r.name = 'Volunteer'
+  `).get() as { count: number };
+  const staffCount = db.prepare(`
+    SELECT COUNT(DISTINCT ur.userId) as count
+    FROM user_roles ur JOIN roles r ON ur.roleId = r.id WHERE r.name IN ('Staff', 'Admin', 'Root')
+  `).get() as { count: number };
   const activeTeams = db.prepare('SELECT COUNT(*) as count FROM teams').get() as { count: number };
   
   const now = new Date();

@@ -2,7 +2,7 @@
 
 City of Norwich Aviation Museum — Volunteer Management System
 
-**Version 0.8.0**
+**Version 0.10.0**
 
 A web-based volunteer and task management application built with Next.js, TypeScript, Tailwind CSS, and SQLite.
 
@@ -17,6 +17,7 @@ A web-based volunteer and task management application built with Next.js, TypeSc
 - 🎓 **Training policies** — compliance matrix showing training requirements per account type
 - 👤 **User management** — add users, manage status and roles, send password resets; read-only and read-write capability separation
 - 📁 **File library** — upload and share documents and images; secure download for all authenticated users
+- 💬 **Messaging system** — direct messages between volunteers and team-wide conversation threads; unread badges on dashboard and team pages; soft-delete, message reporting, and read-tracking per conversation
 - 📊 **Audit logging** for all key actions with paginated viewer and filters
 - ✏️ **Site content editor** — manage the privacy policy and other site-wide text
 - 📧 **Notification service** (email with stub fallback)

@@ -437,3 +437,7 @@ prisma/migrations/dev.db
 Thumbs.db
 tsconfig.tsbuildinfo
 next-env.d.ts
+
+# Deployment backups
+current
+current.backup*

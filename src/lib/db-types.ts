@@ -6,9 +6,6 @@
 export type UserStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED';
 export const USER_STATUSES: UserStatus[] = ['PENDING', 'ACTIVE', 'SUSPENDED'];
 
-export type UserAccountType = 'VOLUNTEER' | 'STAFF' | 'MEMBER';
-export const USER_ACCOUNT_TYPES: UserAccountType[] = ['VOLUNTEER', 'STAFF', 'MEMBER'];
-
 export type CalendarEventType = 'EVENT' | 'ROSTER' | 'HELP_NEEDED';
 export const CALENDAR_EVENT_TYPES: CalendarEventType[] = ['EVENT', 'ROSTER', 'HELP_NEEDED'];
 

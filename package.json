@@ -1,9 +1,10 @@
 {
   "name": "cnam-vms",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "private": true,
   "scripts": {
     "dev": "cross-env PORT=3001 next dev -p 3001",
+    "prebuild": "ts-node --project tsconfig.seed.json scripts/migrate-remove-account-type.ts",
     "build": "cross-env NODE_OPTIONS=--max-old-space-size=512 next build",
     "postbuild": "node scripts/postbuild.js",
     "start": "node scripts/start.js",
@@ -12,7 +13,8 @@
     "db:seed": "ts-node --project tsconfig.seed.json scripts/seed.ts",
     "db:set-initial-password": "ts-node --project tsconfig.seed.json scripts/set-initial-password.ts",
     "db:reset-password": "ts-node --project tsconfig.seed.json scripts/reset-password.ts",
-    "db:create-user": "ts-node --project tsconfig.seed.json scripts/create-user.ts"
+    "db:create-user": "ts-node --project tsconfig.seed.json scripts/create-user.ts",
+    "db:promote-to-root": "ts-node --project tsconfig.seed.json scripts/promote-to-root.ts"
   },
   "dependencies": {
     "@paralleldrive/cuid2": "^3.3.0",

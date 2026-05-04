@@ -16,18 +16,12 @@ import {
   resetUserLockout,
 } from '../actions';
 import DeleteUserButton from './DeleteUserButton';
-import type { UserStatus, UserAccountType } from '@/lib/db-types';
+import type { UserStatus } from '@/lib/db-types';
 
 const STATUS_STYLES: Record<UserStatus, string> = {
   ACTIVE: 'bg-green-100 text-green-800',
   SUSPENDED: 'bg-red-100 text-red-800',
   PENDING: 'bg-yellow-100 text-yellow-800',
-};
-
-const ACCOUNT_TYPE_LABELS: Record<UserAccountType, string> = {
-  VOLUNTEER: 'Volunteer',
-  STAFF: 'Staff',
-  MEMBER: 'Member',
 };
 
 export default async function UserDetailPage({
@@ -45,7 +39,7 @@ export default async function UserDetailPage({
   const db = getDb();
 
   const rawUser = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as {
-    id: string; email: string; name: string | null; status: string; accountType: string;
+    id: string; email: string; name: string | null; status: string;
     createdAt: string; updatedAt: string; mustChangePassword: number;
   } | undefined;
 
@@ -54,7 +48,6 @@ export default async function UserDetailPage({
   const user = {
     ...rawUser,
     status: rawUser.status as UserStatus,
-    accountType: rawUser.accountType as UserAccountType,
     createdAt: unpackTs(rawUser.createdAt),
   };
 
@@ -149,9 +142,6 @@ export default async function UserDetailPage({
               <span className={`inline-flex items-center px-2.5 py-1 rounded text-sm font-medium ${STATUS_STYLES[user.status]}`}>
                 {user.status}
               </span>
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
-                {ACCOUNT_TYPE_LABELS[user.accountType]}
-              </span>
             </div>
           </div>
         </div>
@@ -165,8 +155,7 @@ export default async function UserDetailPage({
               'use server';
               const name = formData.get('name') as string;
               const email = formData.get('email') as string;
-              const accountType = formData.get('accountType') as UserAccountType;
-              await updateUserProfile(user.id, name, email, accountType);
+              await updateUserProfile(user.id, name, email);
             }}
             className="space-y-4"
           >
@@ -191,18 +180,6 @@ export default async function UserDetailPage({
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Account Type</label>
-              <select
-                name="accountType"
-                defaultValue={user.accountType}
-                className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="VOLUNTEER">Volunteer</option>
-                <option value="STAFF">Staff</option>
-                <option value="MEMBER">Member</option>
-              </select>
             </div>
             <button
               type="submit"

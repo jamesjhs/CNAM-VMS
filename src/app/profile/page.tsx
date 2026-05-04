@@ -20,7 +20,7 @@ export default async function ProfilePage({
   const sessionUser = await requireAuth();
 
   const db = getDb();
-  type UserRow = { id: string; email: string; name: string | null; status: string; accountType: string; createdAt: string };
+  type UserRow = { id: string; email: string; name: string | null; status: string; createdAt: string };
   type PhoneRow = { id: string; number: string; label: string | null };
   type RoleRow = { roleId: string; roleName: string; roleDescription: string | null };
   type TeamRow = { teamId: string; teamName: string; teamDescription: string | null };
@@ -31,7 +31,7 @@ export default async function ProfilePage({
   let userTeams: any[] = [];
 
   try {
-    rawUser = db.prepare('SELECT id, email, name, status, accountType, createdAt FROM users WHERE id = ?').get(sessionUser.id) as UserRow | undefined;
+    rawUser = db.prepare('SELECT id, email, name, status, createdAt FROM users WHERE id = ?').get(sessionUser.id) as UserRow | undefined;
     if (!rawUser) return null;
 
     phones = db.prepare('SELECT id, number, label FROM user_phones WHERE userId = ? ORDER BY createdAt ASC').all(sessionUser.id) as PhoneRow[];
@@ -123,10 +123,6 @@ export default async function ProfilePage({
               <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUS_STYLES[user.status] ?? ''}`}>
                 {user.status}
               </span>
-            </div>
-            <div>
-              <span className="text-gray-500">Account type:</span>{' '}
-              <span className="font-medium capitalize">{user.accountType.toLowerCase()}</span>
             </div>
             <div>
               <span className="text-gray-500">Member since:</span>{' '}

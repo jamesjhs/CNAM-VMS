@@ -5,13 +5,12 @@ import { createId } from '@paralleldrive/cuid2';
 import { getDb, now } from '@/lib/db';
 import { requireCapability } from '@/lib/auth-helpers';
 import { logAudit } from '@/lib/audit';
-import type { UserAccountType } from '@/lib/db-types';
 
 export async function createTrainingPolicy(
   title: string,
   description: string,
   frequency: string,
-  accountTypes: UserAccountType[],
+  roleIds: string[],
 ) {
   const actor = await requireCapability('admin:training.write');
 
@@ -24,8 +23,8 @@ export async function createTrainingPolicy(
   db.prepare('INSERT INTO training_policies (id, title, description, frequency, createdAt, updatedAt) VALUES (?,?,?,?,?,?)').run(
     id, trimmedTitle, description.trim() || null, frequency.trim() || null, ts, ts,
   );
-  for (const accountType of accountTypes) {
-    db.prepare('INSERT OR IGNORE INTO training_policy_roles (policyId, accountType) VALUES (?,?)').run(id, accountType);
+  for (const roleId of roleIds) {
+    db.prepare('INSERT OR IGNORE INTO training_policy_roles (policyId, roleId) VALUES (?,?)').run(id, roleId);
   }
 
   await logAudit({
@@ -33,7 +32,7 @@ export async function createTrainingPolicy(
     action: 'TRAINING_POLICY_CREATED',
     resource: 'TrainingPolicy',
     resourceId: id,
-    detail: { title: trimmedTitle, accountTypes },
+    detail: { title: trimmedTitle, roleIds },
   });
 
   revalidatePath('/admin/training');
@@ -45,7 +44,7 @@ export async function updateTrainingPolicy(
   description: string,
   frequency: string,
   isActive: boolean,
-  accountTypes: UserAccountType[],
+  roleIds: string[],
 ) {
   const actor = await requireCapability('admin:training.write');
 
@@ -58,8 +57,8 @@ export async function updateTrainingPolicy(
       trimmedTitle, description.trim() || null, frequency.trim() || null, isActive ? 1 : 0, now(), policyId,
     );
     db.prepare('DELETE FROM training_policy_roles WHERE policyId = ?').run(policyId);
-    for (const accountType of accountTypes) {
-      db.prepare('INSERT INTO training_policy_roles (policyId, accountType) VALUES (?,?)').run(policyId, accountType);
+    for (const roleId of roleIds) {
+      db.prepare('INSERT INTO training_policy_roles (policyId, roleId) VALUES (?,?)').run(policyId, roleId);
     }
   })();
 
@@ -68,7 +67,7 @@ export async function updateTrainingPolicy(
     action: 'TRAINING_POLICY_UPDATED',
     resource: 'TrainingPolicy',
     resourceId: policyId,
-    detail: { title: trimmedTitle, accountTypes, isActive },
+    detail: { title: trimmedTitle, roleIds, isActive },
   });
 
   revalidatePath('/admin/training');
