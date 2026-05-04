@@ -125,7 +125,7 @@ export default async function TeamsPage({
                         </span>
                         {unread > 0 && (
                           <span className="inline-flex items-center gap-1 text-xs font-medium text-white bg-blue-600 px-2 py-0.5 rounded-full">
-                            💬 {unread > 99 ? '99+' : unread} unread
+                            💬 {unread > 9 ? '9+' : unread} unread
                           </span>
                         )}
                       </div>
