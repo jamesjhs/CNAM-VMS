@@ -242,7 +242,10 @@ export default async function DashboardPage() {
                         <div className="flex items-center gap-2 mb-0.5">
                           <p className="text-sm font-medium text-gray-900 truncate">{team.name}</p>
                           {team.teamUnreadCount > 0 && (
-                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold shrink-0">
+                            <span
+                              aria-label={`${team.teamUnreadCount} unread team message${team.teamUnreadCount !== 1 ? 's' : ''}`}
+                              className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold shrink-0"
+                            >
                               {team.teamUnreadCount > 9 ? '9+' : team.teamUnreadCount}
                             </span>
                           )}
@@ -318,7 +321,10 @@ function DashCardWithBadge({
   return (
     <Link href={href} className="relative block bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
       {badgeCount > 0 && (
-        <span className="absolute top-3 right-3 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-red-500 text-white text-xs font-bold">
+        <span
+          aria-label={`${badgeCount} unread message${badgeCount !== 1 ? 's' : ''}`}
+          className="absolute top-3 right-3 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-red-500 text-white text-xs font-bold"
+        >
           {badgeCount > 99 ? '99+' : badgeCount}
         </span>
       )}

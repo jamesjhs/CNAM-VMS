@@ -124,7 +124,7 @@ export default async function MessagesPage() {
                     required
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">Select a volunteer…</option>
+                    <option value="">Select a recipient…</option>
                     {allUsers.map((u) => (
                       <option key={u.id} value={u.id}>
                         {u.name ?? u.email}
@@ -190,7 +190,10 @@ export default async function MessagesPage() {
                                 {conv.partnerName ?? conv.partnerEmail}
                               </span>
                               {conv.unreadCount > 0 && (
-                                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0">
+                                <span
+                                  aria-label={`${conv.unreadCount} unread message${conv.unreadCount !== 1 ? 's' : ''}`}
+                                  className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0"
+                                >
                                   {conv.unreadCount > 9 ? '9+' : conv.unreadCount}
                                 </span>
                               )}

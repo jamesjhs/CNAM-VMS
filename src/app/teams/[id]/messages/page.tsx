@@ -24,9 +24,9 @@ export default async function TeamMessagesPage({
     'SELECT 1 FROM user_teams WHERE userId = ? AND teamId = ?',
   ).get(currentUser.id, teamId) as { 1: number } | undefined;
 
-  const isAdmin = hasCapability(currentUser, 'admin:teams.read');
+  const canReadAllTeams = hasCapability(currentUser, 'admin:teams.read');
 
-  if (!isMember && !isAdmin) notFound();
+  if (!isMember && !canReadAllTeams) notFound();
 
   // Mark team read immediately
   const ts = now();

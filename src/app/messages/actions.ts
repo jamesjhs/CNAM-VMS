@@ -128,7 +128,20 @@ export async function reportMessage(messageId: string): Promise<void> {
      VALUES (?, ?, ?, ?)`,
   ).run(createId(), messageId, actor.id, now());
 
+  // Revalidate all pages where this message could appear
+  const msg = db.prepare(
+    'SELECT teamId, senderId, recipientId FROM messages WHERE id = ?',
+  ).get(messageId) as { teamId: string | null; senderId: string | null; recipientId: string | null } | undefined;
+
   revalidatePath('/messages');
+  if (msg) {
+    if (msg.teamId) {
+      revalidatePath(`/teams/${msg.teamId}/messages`);
+    } else {
+      if (msg.recipientId) revalidatePath(`/messages/${msg.recipientId}`);
+      if (msg.senderId) revalidatePath(`/messages/${msg.senderId}`);
+    }
+  }
 }
 
 export async function markDirectRead(otherUserId: string): Promise<void> {

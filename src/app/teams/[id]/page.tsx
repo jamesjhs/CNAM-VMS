@@ -206,7 +206,10 @@ export default async function TeamPage({
             >
               💬 Messages
               {teamUnreadCount > 0 && (
-                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold">
+                <span
+                  aria-label={`${teamUnreadCount} unread team message${teamUnreadCount !== 1 ? 's' : ''}`}
+                  className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold"
+                >
                   {teamUnreadCount > 9 ? '9+' : teamUnreadCount}
                 </span>
               )}
