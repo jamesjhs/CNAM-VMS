@@ -341,6 +341,38 @@ function initSchema(db: BetterSqlite3.Database): void {
       updatedAt TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_bank_holidays_date ON bank_holidays(date);
+
+    CREATE TABLE IF NOT EXISTS messages (
+      id TEXT PRIMARY KEY NOT NULL,
+      body TEXT NOT NULL,
+      senderId TEXT REFERENCES users(id) ON DELETE SET NULL,
+      teamId TEXT REFERENCES teams(id) ON DELETE CASCADE,
+      recipientId TEXT REFERENCES users(id) ON DELETE CASCADE,
+      isDeleted INTEGER NOT NULL DEFAULT 0,
+      deletedAt TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_messages_senderId ON messages(senderId);
+    CREATE INDEX IF NOT EXISTS idx_messages_teamId ON messages(teamId);
+    CREATE INDEX IF NOT EXISTS idx_messages_recipientId ON messages(recipientId);
+    CREATE INDEX IF NOT EXISTS idx_messages_createdAt ON messages(createdAt);
+
+    CREATE TABLE IF NOT EXISTS message_reports (
+      id TEXT PRIMARY KEY NOT NULL,
+      messageId TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+      reportedById TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      createdAt TEXT NOT NULL,
+      UNIQUE(messageId, reportedById)
+    );
+    CREATE INDEX IF NOT EXISTS idx_message_reports_messageId ON message_reports(messageId);
+
+    CREATE TABLE IF NOT EXISTS message_reads (
+      userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      context TEXT NOT NULL,
+      lastReadAt TEXT NOT NULL,
+      PRIMARY KEY(userId, context)
+    );
   `);
 }
 

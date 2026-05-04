@@ -60,6 +60,20 @@ export default async function DashboardPage() {
   `).all(user.id, todayStr, in30dStr) as { eventId: string }[];
   const mySignupSet = new Set(mySignupIds.map((s) => s.eventId));
 
+  // Unread direct message count
+  const { dmUnreadCount } = db.prepare(`
+    SELECT COUNT(*) as dmUnreadCount
+    FROM messages
+    WHERE recipientId = ?
+      AND isDeleted = 0
+      AND teamId IS NULL
+      AND createdAt > COALESCE(
+        (SELECT lastReadAt FROM message_reads
+         WHERE userId = ? AND context = 'direct:' || senderId),
+        '1970-01-01T00:00:00.000Z'
+      )
+  `).get(user.id, user.id) as { dmUnreadCount: number };
+
   // Get teams for this user
   const rawUserTeams = db.prepare(`
     SELECT ut.teamId, t.id as tid, t.name as tname
@@ -74,6 +88,7 @@ export default async function DashboardPage() {
       id: string; name: string;
       userTeams: { user: { name: string | null; email: string } }[];
       tasks: { id: string; urgency: string }[];
+      teamUnreadCount: number;
     };
   }[] = [];
 
@@ -89,12 +104,23 @@ export default async function DashboardPage() {
       'SELECT id, urgency FROM team_tasks WHERE teamId = ? AND isActive = 1',
     ).all(ut.teamId) as { id: string; urgency: string }[];
 
+    const teamLastReadRow = db.prepare(
+      `SELECT lastReadAt FROM message_reads WHERE userId = ? AND context = ?`,
+    ).get(user.id, `team:${ut.teamId}`) as { lastReadAt: string } | undefined;
+    const teamLastReadAt = teamLastReadRow?.lastReadAt ?? '1970-01-01T00:00:00.000Z';
+    const { teamUnreadCount } = db.prepare(`
+      SELECT COUNT(*) as teamUnreadCount
+      FROM messages
+      WHERE teamId = ? AND senderId != ? AND isDeleted = 0 AND createdAt > ?
+    `).get(ut.teamId, user.id, teamLastReadAt) as { teamUnreadCount: number };
+
     myTeams.push({
       team: {
         id: ut.tid,
         name: ut.tname,
         userTeams: teamLeaders.map((l) => ({ user: { name: l.name, email: l.email } })),
         tasks: teamTasks,
+        teamUnreadCount,
       },
     });
   }
@@ -118,7 +144,7 @@ export default async function DashboardPage() {
           <DashCard title="Schedule &amp; Availability" icon="📅" href="/schedule" description="Browse events, sign up for shifts, record your availability, and choose what you can help with." />
           <DashCard title="Team Tasks" icon="✅" href="/teams" description="View active tasks across all teams, urgency levels, and requirements." />
           <DashCard title="Files &amp; Documents" icon="📁" href="/files" description="Browse and download files and documents shared by the museum team." />
-          <DashCard title="Messages" icon="💬" href="/messages" description="Send messages to individual volunteers or groups and keep everyone in the loop." />
+          <DashCardWithBadge title="Messages" icon="💬" href="/messages" description="Send messages to individual volunteers or groups and keep everyone in the loop." badgeCount={dmUnreadCount} />
           <DashCard title="Projects" icon="📋" href="/projects" description="Track active projects across teams, see task priorities and team member contributions." />
           <DashCard title="My Profile" icon="👤" href="/profile" description="Update your name, contact details, and general activity preferences." />
           <DashCard title="My Teams" icon="👥" href="/teams" description="View your team memberships, submit work logs or feedback." />
@@ -213,7 +239,14 @@ export default async function DashboardPage() {
                   return (
                     <div key={team.id} className="flex items-center justify-between gap-3 p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-colors">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{team.name}</p>
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <p className="text-sm font-medium text-gray-900 truncate">{team.name}</p>
+                          {team.teamUnreadCount > 0 && (
+                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold shrink-0">
+                              {team.teamUnreadCount > 9 ? '9+' : team.teamUnreadCount}
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2 mt-0.5">
                           {urgentCount > 0 && (
                             <span className="text-xs font-medium text-red-700">
@@ -262,6 +295,33 @@ function DashCard({
 }) {
   return (
     <Link href={href} className="block bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
+      <div className="text-3xl mb-3">{icon}</div>
+      <h2 className="font-semibold text-gray-900 mb-1">{title}</h2>
+      <p className="text-gray-500 text-sm">{description}</p>
+    </Link>
+  );
+}
+
+function DashCardWithBadge({
+  title,
+  icon,
+  href,
+  description,
+  badgeCount,
+}: {
+  title: string;
+  icon: string;
+  href: string;
+  description: string;
+  badgeCount: number;
+}) {
+  return (
+    <Link href={href} className="relative block bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
+      {badgeCount > 0 && (
+        <span className="absolute top-3 right-3 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-red-500 text-white text-xs font-bold">
+          {badgeCount > 99 ? '99+' : badgeCount}
+        </span>
+      )}
       <div className="text-3xl mb-3">{icon}</div>
       <h2 className="font-semibold text-gray-900 mb-1">{title}</h2>
       <p className="text-gray-500 text-sm">{description}</p>
