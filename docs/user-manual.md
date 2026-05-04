@@ -2,7 +2,7 @@
 
 **City of Norwich Aviation Museum — Volunteer Management System**
 
-**Version 0.9.0 — May 2026**
+**Version 0.10.1 — May 2026**
 
 ---
 
@@ -308,12 +308,38 @@ At the bottom of the schedule page is a **Rolling duties** panel listing duties 
 
 Volunteers are organised into teams. To see the teams and their current work, click **Teams** in the navigation bar.
 
-The Teams page lists all teams alphabetically. For each team you can see:
+The number in brackets next to the **Teams** link (for example, **Teams (3)**) shows how many teams you are currently a member of.
+
+### Your teams
+
+The top part of the Teams page shows the teams you belong to. For each team you can see:
 
 - The **team name** and a short description
-- The **team leader** (name and email address)
+- The **team leader(s)** (name and email address)
 - How many **members** are in the team
-- Any **active tasks** — work that the team is currently undertaking
+- How many **active tasks** the team currently has
+- A badge showing any **unread messages** in the team conversation
+
+Click **Team page →** to go to that team's individual page, where you can:
+- See full details of each active task, including equipment needed and any safety notes
+- **Submit a work log** — record what you did and any observations
+- **Add feedback** on a task
+- Open the team's **message thread** (💬 Messages)
+
+### Other teams
+
+Teams you are **not** a member of appear in a collapsible section at the bottom of the page, labelled **Other Teams**. Click the heading to expand it.
+
+For each team in this section you can see the team name, description, leader, member count, and number of active tasks — but you cannot open the team's full page.
+
+If you would like to join a team:
+
+1. Find the team in the **Other Teams** section.
+2. Click **Request to Join**.
+3. Your request is sent to the team leader (and administrators) for review.
+4. Once approved, the team will move to the top section and you will have full access.
+
+While your request is pending, the button will show **⏳ Request Pending**. If your request is denied, you can submit a new one at any time.
 
 ### Active tasks
 
@@ -322,11 +348,6 @@ Each active task shows:
 - The **urgency level** — Urgent (red), Moderate (amber), or Routine (green)
 - The **task type** — for example, maintenance, inspection, or restoration work
 - How many people are needed and whether a supervisor is required
-
-Click on a team name to go to that team's individual page, where you can:
-- See full details of each active task, including equipment needed and any safety notes
-- **Submit a work log** — record what you did, how long it took, and any observations
-- **Add feedback** on a task
 
 ---
 
@@ -616,7 +637,7 @@ On the role detail page, you will see all available capabilities. Capabilities a
 
 Access via **Admin → Teams**.
 
-Teams group volunteers together for organisational purposes. Each team can have a designated leader, a list of members, and a set of active tasks.
+Teams group volunteers together for organisational purposes. Each team can have one or more designated leaders, a list of members, and a set of active tasks.
 
 #### Creating a team
 
@@ -628,8 +649,17 @@ Teams group volunteers together for organisational purposes. Each team can have 
 From the Teams admin page, each team card shows the team's name, description, number of members, and number of tasks. You can:
 
 - **Edit** the name and description.
-- **Set the team leader** — choose from the team's current members using the dropdown.
+- **Set team leaders** — click any member's name in the **Team Admins** section to toggle their leader status. Leaders are highlighted in indigo. A team can have multiple leaders.
 - **Delete** the team (only possible if the team has no members).
+
+#### Team leaders
+
+Users with the **team leader** role for a team can, from the team's own page:
+
+- **Approve or deny join requests** — when a volunteer clicks "Request to Join" on the Teams page, the request appears in the **Pending Join Requests** panel on the team page. Leaders click **✓ Approve** or **✕ Deny**.
+- **Add members directly** — enter a volunteer's email address in the **Add Member Directly** form to add them without requiring a join request.
+
+Administrators with `admin:teams.write` can also approve/deny requests and add members from the team page in the same way.
 
 #### Team task forms
 
@@ -638,7 +668,7 @@ Team tasks define structured pieces of work for a team to carry out — for exam
 - Create a new task form with a title, description, task type, urgency level, personnel requirements, equipment list, and safety notes.
 - Edit or delete existing task forms.
 
-Active tasks created from these forms appear on the [Teams page](#10-teams) visible to all volunteers.
+Active tasks created from these forms appear on the [Teams page](#10-teams) visible to team members.
 
 ---
 
@@ -873,4 +903,4 @@ Please contact your administrator and describe what you were doing, what you exp
 
 ---
 
-*This manual will be updated as new features are added to the system. Last updated: March 2026.*
+*This manual will be updated as new features are added to the system. Last updated: May 2026 (v0.10.1).*
