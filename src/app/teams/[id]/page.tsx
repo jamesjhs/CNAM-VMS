@@ -491,14 +491,7 @@ export default async function TeamPage({
               {/* Add member directly */}
               <div>
                 <h3 className="text-sm font-medium text-gray-700 mb-3">Add Member Directly</h3>
-                <form
-                  action={async (fd: FormData) => {
-                    'use server';
-                    const email = fd.get('email') as string;
-                    await addTeamMemberByLeader(id, email);
-                  }}
-                  className="flex gap-2"
-                >
+                <form action={addTeamMemberByLeader.bind(null, id)} className="flex gap-2">
                   <input
                     name="email"
                     type="email"

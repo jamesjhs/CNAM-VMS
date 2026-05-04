@@ -146,7 +146,7 @@ export async function denyJoinRequest(requestId: string): Promise<void> {
 // Add a team member directly (team leader or admin)
 // ---------------------------------------------------------------------------
 
-export async function addTeamMemberByLeader(teamId: string, userEmail: string): Promise<void> {
+export async function addTeamMemberByLeader(teamId: string, formData: FormData): Promise<void> {
   const actor = await requireAuth();
   const db = getDb();
 
@@ -155,7 +155,7 @@ export async function addTeamMemberByLeader(teamId: string, userEmail: string): 
 
   assertLeaderOrAdmin(actor.id, teamId, actor.capabilities, db);
 
-  const trimmedEmail = (userEmail ?? '').trim().toLowerCase();
+  const trimmedEmail = ((formData.get('email') as string | null) ?? '').trim().toLowerCase();
   if (!trimmedEmail) redirect(`/teams/${teamId}?error=MissingEmail`);
 
   const targetUser = db.prepare(
