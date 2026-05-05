@@ -11,6 +11,14 @@
 import { ConfidentialClientApplication } from '@azure/msal-node';
 import { getDb } from '@/lib/db';
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+/** How long to cache the resolved SharePoint site/drive ID (ms). */
+const SITE_CACHE_TTL_MS = 3_600_000; // 1 hour
+
+/** Allowed top-level folders in the SharePoint document library. */
+export const SHAREPOINT_TOP_LEVEL_FOLDERS = ['Training', 'Policies', 'Teams'] as const;
+
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 export interface SharePointConfig {
@@ -182,7 +190,7 @@ async function getSiteAndDriveId(
     siteId,
     driveId: drive.id,
     fingerprint,
-    expiresAt: now + 3_600_000, // 1-hour cache
+    expiresAt: now + SITE_CACHE_TTL_MS,
   };
   return { siteId, driveId: drive.id };
 }
@@ -190,16 +198,59 @@ async function getSiteAndDriveId(
 // ─── Path helpers ─────────────────────────────────────────────────────────────
 
 /**
- * Validate that a folder path used in Graph API URLs contains only safe characters.
- * Prevents SSRF via path traversal or URL manipulation in SharePoint paths.
- * Throws if the path is unsafe.
+ * Sanitize and validate a folder path from external input.
+ *
+ * - Decodes percent-encoded sequences first (handles %2e%2e, %2f etc.)
+ * - Applies a strict allowlist: only alphanumerics, spaces, hyphens, underscores, dots, slashes
+ * - Removes any remaining `..` traversal sequences
+ * - Validates that non-empty paths start with one of the three allowed top-level folders
+ *   (Training, Policies, Teams) to prevent access to unintended library sections
+ *
+ * Returns the sanitized path string (which may be empty if all segments were stripped).
+ * Throws if the path fails the top-level allowlist check.
+ */
+export function sanitizeFolderPath(raw: string): string {
+  let decoded = raw;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    // If decoding fails, treat as-is
+  }
+
+  const sanitized = decoded
+    .split('/')
+    .map((seg) => seg.replace(/\.\./g, '').replace(/[^a-zA-Z0-9 \-_.]/g, ''))
+    .filter(Boolean)
+    .join('/');
+
+  if (sanitized) {
+    const topLevel = sanitized.split('/')[0];
+    if (!SHAREPOINT_TOP_LEVEL_FOLDERS.includes(topLevel as (typeof SHAREPOINT_TOP_LEVEL_FOLDERS)[number])) {
+      throw new Error(`Access denied: folder path must start with one of: ${SHAREPOINT_TOP_LEVEL_FOLDERS.join(', ')}`);
+    }
+  }
+
+  return sanitized;
+}
+
+/**
+ * Validate that an already-internal folder path contains only safe characters.
+ * Used for paths constructed internally (not from user input) to guard against
+ * unexpected values reaching the Graph API URL.
  */
 function assertSafeFolderPath(folderPath: string): void {
   if (!folderPath) return;
-  // Reject any remaining .. sequences or characters outside the allowlist
   if (/\.\./.test(folderPath) || /[^a-zA-Z0-9 \-_./]/.test(folderPath)) {
     throw new Error(`Unsafe SharePoint folder path: ${folderPath}`);
   }
+}
+
+/**
+ * Sanitize a filename for use in SharePoint URLs and Content-Disposition headers.
+ * Replaces any character outside the safe set (including quotes and backslashes) with underscore.
+ */
+export function sanitizeSharePointFilename(filename: string): string {
+  return filename.replace(/[^a-zA-Z0-9._\- ]/g, '_');
 }
 
 // ─── Folder operations ────────────────────────────────────────────────────────
@@ -291,7 +342,7 @@ export async function uploadFile(
   buffer: Buffer,
 ): Promise<SharePointItem> {
   assertSafeFolderPath(folderPath);
-  const safeFilename = filename.replace(/[^a-zA-Z0-9._\- ]/g, '_');
+  const safeFilename = sanitizeSharePointFilename(filename);
   const { driveId } = await getSiteAndDriveId(config);
   const uploadPath = folderPath
     ? `/drives/${driveId}/root:/${folderPath}/${safeFilename}:/content`

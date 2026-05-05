@@ -2,7 +2,12 @@ import { requireAuth, hasCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
 import { getDb } from '@/lib/db';
 import Link from 'next/link';
-import { getSharePointConfig, listFolder, isSharePointConfigured } from '@/lib/sharepoint';
+import {
+  getSharePointConfig,
+  listFolder,
+  isSharePointConfigured,
+  sanitizeFolderPath,
+} from '@/lib/sharepoint';
 import type { SharePointItem } from '@/lib/sharepoint';
 import SharePointUploadForm from './SharePointUploadForm';
 
@@ -48,24 +53,6 @@ function buildBreadcrumbs(path: string): { label: string; href: string }[] {
   return crumbs;
 }
 
-/**
- * Decode and sanitize a folder path from user input.
- * Decodes percent-encoded sequences first (handles %2e%2e, %2f etc.) then
- * applies a strict allowlist and removes any remaining path-traversal sequences.
- */
-function sanitizeFolderPath(raw: string): string {
-  let decoded = raw;
-  try {
-    decoded = decodeURIComponent(raw);
-  } catch {
-    // If decoding fails treat as-is
-  }
-  return decoded
-    .split('/')
-    .map((seg) => seg.replace(/\.\./g, '').replace(/[^a-zA-Z0-9 \-_.]/g, ''))
-    .filter(Boolean)
-    .join('/');
-}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -118,8 +105,15 @@ export default async function SharePointFilesPage({
   }
 
   const { path: rawPath } = await searchParams;
-  // Sanitize the path: decode first (handles %2e%2e etc.) then strip unsafe chars
-  const currentPath = sanitizeFolderPath(rawPath ?? '');
+  // Sanitize the path: decode first (handles %2e%2e etc.), strip unsafe chars,
+  // and validate against the top-level folder allowlist (throws on invalid path).
+  let currentPath = '';
+  let sanitizeError: string | null = null;
+  try {
+    currentPath = sanitizeFolderPath(rawPath ?? '');
+  } catch (err) {
+    sanitizeError = err instanceof Error ? err.message : 'Invalid path.';
+  }
   const breadcrumbs = buildBreadcrumbs(currentPath);
 
   const config = getSharePointConfig()!;
@@ -190,9 +184,9 @@ export default async function SharePointFilesPage({
           </div>
         </div>
 
-        {fetchError && (
+        {(fetchError ?? sanitizeError) && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
-            <strong>Error loading files:</strong> {fetchError}
+            <strong>Error:</strong> {fetchError ?? sanitizeError}
           </div>
         )}
 

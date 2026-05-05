@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import type { SessionUser } from '@/lib/auth-helpers';
-import { getSharePointConfig, downloadItem } from '@/lib/sharepoint';
+import { getSharePointConfig, downloadItem, sanitizeSharePointFilename } from '@/lib/sharepoint';
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -29,9 +29,7 @@ export async function GET(request: NextRequest) {
     const { buffer, filename, mimeType } = await downloadItem(config, itemId);
 
     // Sanitise filename for Content-Disposition header
-    const safeFilename = filename
-      .replace(/[^a-zA-Z0-9._\- ]/g, '_')
-      .replace(/["\\]/g, '_'); // prevent header injection
+    const safeFilename = sanitizeSharePointFilename(filename);
 
     return new NextResponse(new Uint8Array(buffer), {
       headers: {

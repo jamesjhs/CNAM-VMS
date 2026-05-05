@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface SharePointUploadFormProps {
   folderPath: string;
@@ -10,6 +11,7 @@ interface SharePointUploadFormProps {
 export default function SharePointUploadForm({ folderPath, onSuccess }: SharePointUploadFormProps) {
   const [status, setStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
+  const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -39,8 +41,8 @@ export default function SharePointUploadForm({ folderPath, onSuccess }: SharePoi
         setMessage(`"${data.name}" uploaded successfully.`);
         form.reset();
         onSuccess?.();
-        // Refresh the server-rendered file listing after a short delay
-        setTimeout(() => window.location.reload(), 1500);
+        // Refresh the server-rendered file listing
+        setTimeout(() => router.refresh(), 1500);
       } else {
         setStatus('error');
         setMessage(data.error ?? 'Upload failed.');

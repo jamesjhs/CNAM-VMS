@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import type { SessionUser } from '@/lib/auth-helpers';
-import { getSharePointConfig, uploadFile } from '@/lib/sharepoint';
+import { getSharePointConfig, uploadFile, sanitizeFolderPath } from '@/lib/sharepoint';
 import { validateFile } from '@/lib/uploads';
 import { logAudit } from '@/lib/audit';
 
@@ -15,6 +15,10 @@ function isRateLimited(userId: string): boolean {
   const entry = uploadAttempts.get(userId);
 
   if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+    // Also clean up any other stale entries to prevent unbounded growth
+    for (const [key, val] of uploadAttempts) {
+      if (now - val.windowStart > RATE_LIMIT_WINDOW_MS) uploadAttempts.delete(key);
+    }
     uploadAttempts.set(userId, { count: 1, windowStart: now });
     return false;
   }
@@ -61,21 +65,14 @@ export async function POST(request: NextRequest) {
   }
 
   const rawFolderPath = ((formData.get('folderPath') as string | null) ?? '').trim();
-  // Decode and sanitize the folder path to prevent path traversal via %2e%2e etc.
   let folderPath: string;
   try {
-    folderPath = decodeURIComponent(rawFolderPath);
-  } catch {
-    folderPath = rawFolderPath;
-  }
-  // Strip dangerous sequences; only allow alphanumerics, spaces, hyphens, underscores, dots, slashes
-  folderPath = folderPath
-    .split('/')
-    .map((seg) => seg.replace(/\.\./g, '').replace(/[^a-zA-Z0-9 \-_.]/g, ''))
-    .filter(Boolean)
-    .join('/');
-  if (folderPath.startsWith('/')) {
-    return NextResponse.json({ error: 'Invalid folder path' }, { status: 400 });
+    folderPath = sanitizeFolderPath(rawFolderPath);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Invalid folder path' },
+      { status: 400 },
+    );
   }
 
   const originalName = file instanceof File ? file.name : 'upload';
