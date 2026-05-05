@@ -1,10 +1,9 @@
 {
   "name": "cnam-vms",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "private": true,
   "scripts": {
     "dev": "cross-env PORT=3001 next dev -p 3001",
-    "prebuild": "ts-node --project tsconfig.seed.json scripts/migrate-remove-account-type.ts",
     "build": "cross-env NODE_OPTIONS=--max-old-space-size=512 next build",
     "postbuild": "node scripts/postbuild.js",
     "start": "node scripts/start.js",

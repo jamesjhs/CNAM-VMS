@@ -2,7 +2,7 @@
 
 **City of Norwich Aviation Museum — Volunteer Management System**
 
-**Version 0.10.1 — May 2026**
+**Version 0.10.2 — May 2026**
 
 ---
 
@@ -312,15 +312,15 @@ The number in brackets next to the **Teams** link (for example, **Teams (3)**) s
 
 ### Your teams
 
-The top part of the Teams page shows the teams you belong to. For each team you can see:
+The top part of the Teams page shows the teams you explicitly belong to. For each team you can see:
 
-- The **team name** and a short description
+- The **team name** (click it to open the team's full page)
 - The **team leader(s)** (name and email address)
 - How many **members** are in the team
 - How many **active tasks** the team currently has
 - A badge showing any **unread messages** in the team conversation
 
-Click **Team page →** to go to that team's individual page, where you can:
+Click **→** or the team name to go to that team's individual page, where you can:
 - See full details of each active task, including equipment needed and any safety notes
 - **Submit a work log** — record what you did and any observations
 - **Add feedback** on a task
@@ -328,18 +328,26 @@ Click **Team page →** to go to that team's individual page, where you can:
 
 ### Other teams
 
-Teams you are **not** a member of appear in a collapsible section at the bottom of the page, labelled **Other Teams**. Click the heading to expand it.
+Teams you are **not** explicitly a member of always appear in the **Teams I'm not in** section, regardless of your role. This includes administrators and staff who have not been added to the team.
 
-For each team in this section you can see the team name, description, leader, member count, and number of active tasks — but you cannot open the team's full page.
+What you can do in this section depends on your role:
+
+| Role | What you see |
+|------|-------------|
+| **Volunteer / standard user** | Team name, leader, and member count only — no link to the team page. Click **Request to Join** to submit a membership request. |
+| **Staff** (has `admin:teams.read`) | Team name as a clickable link — you can view the full team page in read-only mode. No management controls are shown. |
+| **Admin** (has `admin:teams.write`) | Team name as a clickable link — you can view the full team page and use all management controls (approve/deny requests, add members, set leaders). |
 
 If you would like to join a team:
 
-1. Find the team in the **Other Teams** section.
+1. Find the team in the **Teams I'm not in** section.
 2. Click **Request to Join**.
 3. Your request is sent to the team leader (and administrators) for review.
 4. Once approved, the team will move to the top section and you will have full access.
 
 While your request is pending, the button will show **⏳ Request Pending**. If your request is denied, you can submit a new one at any time.
+
+> **Note:** Even if you hold an administrative role, your own membership in a team is always based on your explicit membership record. An admin or staff member who is not a member of a team will see it in the **Teams I'm not in** section, not the **Teams I'm in** section.
 
 ### Active tasks
 
@@ -618,8 +626,8 @@ On the role detail page, you will see all available capabilities. Capabilities a
 | `admin:users.write` | Create, update, and delete users |
 | `admin:roles.read` | View roles and capabilities |
 | `admin:roles.write` | Create, update, and delete roles |
-| `admin:teams.read` | View teams in the admin panel |
-| `admin:teams.write` | Create, update, and delete teams and tasks |
+| `admin:teams.read` | View any team's detail page (read-only, regardless of membership) |
+| `admin:teams.write` | Create, update, and delete teams and tasks; full management access to all team pages |
 | `admin:tasks.write` | Create and manage team task forms |
 | `admin:audit.read` | View the audit log |
 | `admin:files.read` | View and download uploaded files |
@@ -633,7 +641,9 @@ On the role detail page, you will see all available capabilities. Capabilities a
 
 ### Team Management
 
-**Required permission:** `admin:teams.read` (to view), `admin:teams.write` (to make changes)
+**Required permission:** `admin:teams.write` (to create/manage teams via Admin panel)
+
+Users with `admin:teams.read` can view any team's detail page in read-only mode directly from the Teams section; they cannot create or edit teams via the admin panel.
 
 Access via **Admin → Teams**.
 
