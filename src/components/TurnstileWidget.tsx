@@ -41,6 +41,10 @@ export default function TurnstileWidget({ onTokenChange, siteKey }: TurnstileWid
   }
 
   const renderWidget = (container: HTMLDivElement) => {
+    if (!siteKey) {
+      console.error('[TurnstileWidget] renderWidget aborted — siteKey is empty');
+      return;
+    }
     if (!window.turnstile) {
       console.warn('[TurnstileWidget] renderWidget called but window.turnstile is not available yet');
       return;
