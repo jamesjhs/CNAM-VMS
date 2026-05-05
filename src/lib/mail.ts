@@ -131,7 +131,12 @@ export async function sendMail(opts: {
     return { success: true }; // In dev/test mode, consider it successful
   }
 
-  console.log(`[mail] Sending "${opts.subject}" to ${opts.to} via SMTP (${cfg.host})`);
+  const t0 = Date.now();
+  console.log(
+    `[mail] Sending "${opts.subject}" to ${opts.to} via SMTP — ` +
+    `host=${cfg.host}:${cfg.port} secure=${cfg.secure} requireTls=${cfg.requireTls} ` +
+    `pool=true maxConnections=2`,
+  );
   try {
     await getTransport().sendMail({
       from: cfg.from || 'noreply@example.com',
@@ -140,10 +145,11 @@ export async function sendMail(opts: {
       text: opts.text,
       html: opts.html,
     });
+    console.log(`[mail] "${opts.subject}" delivered to ${opts.to} in ${Date.now() - t0}ms`);
     return { success: true };
   } catch (err) {
     const error = err instanceof Error ? err.message : 'Unknown error';
-    console.error(`[mail] Failed to send email to ${opts.to}: ${error}`);
+    console.error(`[mail] FAILED to send "${opts.subject}" to ${opts.to} after ${Date.now() - t0}ms: ${error}`);
     return { success: false, error };
   }
 }

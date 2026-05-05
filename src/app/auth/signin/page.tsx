@@ -12,6 +12,13 @@ export default async function SignInPage({
   const session = await auth();
   if (session) redirect(callbackUrl ?? '/dashboard');
 
+  // Read the Turnstile site key inside the request handler so it is evaluated
+  // fresh on each request.  This avoids any module-level caching and ensures the
+  // client component always receives the current value without relying on
+  // build-time NEXT_PUBLIC_ inlining (which only captures the value at
+  // `npm run build`).
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+
   return (
     <div className="min-h-screen bg-[#1a3a5c] flex items-center justify-center px-4">
       <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden">
@@ -40,7 +47,7 @@ export default async function SignInPage({
             </div>
           )}
 
-          <SignInForm callbackUrl={callbackUrl} error={error} reset={!!reset} />
+          <SignInForm callbackUrl={callbackUrl} error={error} reset={!!reset} siteKey={siteKey} />
 
           <p className="mt-6 text-center text-xs text-gray-400">
             Don&apos;t have an account? Contact your administrator to request access.
