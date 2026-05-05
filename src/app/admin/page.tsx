@@ -9,7 +9,7 @@ export default async function AdminPage() {
     'admin:audit.read', 'admin:files.read', 'admin:announcements.write',
     'admin:calendar.write', 'admin:theme.write', 'admin:training.write',
     'admin:tasks.write', 'admin:settings.write', 'admin:museum.write',
-    'admin:act-as.write',
+    'admin:act-as.write', 'admin:sharepoint.write',
     // Staff caps — coordination overview now lives under Admin
     'staff:volunteer.read', 'staff:projects.read', 'staff:messaging.write', 'staff:schedule.read',
   ];
@@ -23,6 +23,7 @@ export default async function AdminPage() {
   const canManageAnnouncements = user.capabilities.includes('admin:announcements.write');
   const canManageCalendar = user.capabilities.includes('admin:calendar.write');
   const canManageSettings = user.capabilities.includes('admin:settings.write');
+  const canManageSharePoint = user.capabilities.includes('admin:sharepoint.write');
   const canManageMuseum = user.capabilities.includes('admin:museum.write');
   const canManageTheme = user.capabilities.includes('admin:theme.write');
   const canManageTasks = user.capabilities.includes('admin:tasks.write');
@@ -147,6 +148,14 @@ export default async function AdminPage() {
               icon="⚙️"
               title="System Settings"
               description="Configure site-wide settings including SMTP email delivery."
+            />
+          )}
+          {canManageSharePoint && (
+            <AdminCard
+              href="/admin/sharepoint"
+              icon="☁️"
+              title="SharePoint Integration"
+              description="Connect to Azure SharePoint for team-based document storage with Training, Policies and Teams folders."
             />
           )}
           {canManageMuseum && (

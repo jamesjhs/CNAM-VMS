@@ -7,6 +7,7 @@ import { getDb, now } from '@/lib/db';
 import { requireCapability } from '@/lib/auth-helpers';
 import { logAudit } from '@/lib/audit';
 import type { UserStatus } from '@/lib/db-types';
+import { getSharePointConfig, createTeamFolder } from '@/lib/sharepoint';
 
 const PHONE_REGEX = /^[\d\s\-\+\(\)]{7,20}$/;
 const MAX_LABEL_LENGTH = 50;
@@ -356,12 +357,33 @@ export async function createTeam(name: string, description: string) {
   const ts = now();
   db.prepare('INSERT INTO teams (id, name, description, createdAt, updatedAt) VALUES (?,?,?,?,?)').run(id, trimmedName, trimmedDesc || null, ts, ts);
 
+  // Create a matching SharePoint folder (non-fatal if SharePoint is not configured or the call fails)
+  let sharepointFolderPath: string | null = null;
+  const spConfig = getSharePointConfig();
+  if (spConfig) {
+    try {
+      sharepointFolderPath = await createTeamFolder(spConfig, trimmedName);
+      db.prepare('UPDATE teams SET sharepoint_folder_path=?, updatedAt=? WHERE id=?').run(
+        sharepointFolderPath, now(), id,
+      );
+      await logAudit({
+        userId: actor.id,
+        action: 'SHAREPOINT_FOLDER_CREATED',
+        resource: 'Team',
+        resourceId: id,
+        detail: { folderPath: sharepointFolderPath },
+      });
+    } catch (err) {
+      console.warn('[SharePoint] Failed to create team folder for team', trimmedName, err);
+    }
+  }
+
   await logAudit({
     userId: actor.id,
     action: 'TEAM_CREATED',
     resource: 'Team',
     resourceId: id,
-    detail: { name: trimmedName },
+    detail: { name: trimmedName, sharepointFolderPath },
   });
 
   revalidatePath('/admin/teams');

@@ -16,6 +16,7 @@
     "db:promote-to-root": "ts-node --project tsconfig.seed.json scripts/promote-to-root.ts"
   },
   "dependencies": {
+    "@azure/msal-node": "^5.1.5",
     "@paralleldrive/cuid2": "^3.3.0",
     "better-sqlite3-multiple-ciphers": "^12.9.0",
     "next": "^16.2.4",
