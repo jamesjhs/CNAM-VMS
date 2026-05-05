@@ -387,6 +387,13 @@ function initSchema(db: BetterSqlite3.Database): void {
       PRIMARY KEY(userId, context)
     );
   `);
+
+  // ─── Schema migrations ─────────────────────────────────────────────────────
+  // Add sharepoint_folder_path to teams if the column doesn't yet exist (added in v0.11.0).
+  const teamsInfo = db.prepare('PRAGMA table_info(teams)').all() as { name: string }[];
+  if (!teamsInfo.some((c) => c.name === 'sharepoint_folder_path')) {
+    db.exec('ALTER TABLE teams ADD COLUMN sharepoint_folder_path TEXT');
+  }
 }
 
 function openDb(): BetterSqlite3.Database {

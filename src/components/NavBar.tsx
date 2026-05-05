@@ -69,6 +69,7 @@ export default async function NavBar() {
     if (capabilities.includes('admin:theme.write')) adminLinks.push({ href: '/admin/content', label: 'Site Content' });
     if (capabilities.includes('admin:tasks.write')) adminLinks.push({ href: '/admin/teams/tasks', label: 'Task Forms' });
     if (capabilities.includes('admin:training.write')) adminLinks.push({ href: '/admin/training', label: 'Training Policies' });
+    if (capabilities.includes('admin:sharepoint.write')) adminLinks.push({ href: '/admin/sharepoint', label: 'SharePoint Settings' });
     // Coordination items (staff access)
     if (isStaff) adminLinks.push({ href: '/coordination', label: 'Coordination Overview' });
     if (capabilities.includes('staff:volunteer.read')) adminLinks.push({ href: '/coordination/volunteers', label: 'Volunteers' });
@@ -180,6 +181,11 @@ export default async function NavBar() {
                       {capabilities.includes('admin:training.write') && (
                         <Link href="/admin/training" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                           Training Policies
+                        </Link>
+                      )}
+                      {capabilities.includes('admin:sharepoint.write') && (
+                        <Link href="/admin/sharepoint" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          SharePoint Settings
                         </Link>
                       )}
                       {/* Coordination items for staff */}

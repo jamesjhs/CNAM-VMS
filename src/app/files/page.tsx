@@ -1,6 +1,8 @@
 import { requireAuth } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
 import { getDb, unpackTs } from '@/lib/db';
+import Link from 'next/link';
+import { isSharePointConfigured } from '@/lib/sharepoint';
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -23,6 +25,8 @@ const MIME_ICONS: Record<string, string> = {
 export default async function FilesPage() {
   await requireAuth();
 
+  const spConfigured = isSharePointConfigured();
+
   const db = getDb();
   const rawFiles = db.prepare(
     'SELECT id, originalName, mimeType, size, createdAt FROM file_assets ORDER BY createdAt DESC',
@@ -34,11 +38,21 @@ export default async function FilesPage() {
     <div className="min-h-screen flex flex-col">
       <NavBar />
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Files &amp; Documents</h1>
-          <p className="text-gray-500">
-            Browse and download files and documents shared by the museum team.
-          </p>
+        <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">Files &amp; Documents</h1>
+            <p className="text-gray-500">
+              Browse and download files and documents shared by the museum team.
+            </p>
+          </div>
+          {spConfigured && (
+            <Link
+              href="/files/sharepoint"
+              className="shrink-0 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              ☁️ SharePoint Files
+            </Link>
+          )}
         </div>
 
         {files.length === 0 ? (

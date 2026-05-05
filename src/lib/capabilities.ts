@@ -23,4 +23,7 @@ export const CAPABILITIES = [
   { key: 'staff:schedule.read', description: 'View full schedule and availability' },
   { key: 'volunteer:tasks.read', description: 'View tasks' },
   { key: 'volunteer:tasks.write', description: 'Create and update tasks' },
+  { key: 'admin:sharepoint.write', description: 'Configure SharePoint integration settings — root only' },
+  { key: 'files:sharepoint.read', description: 'Browse files stored in SharePoint' },
+  { key: 'files:sharepoint.write', description: 'Upload files to SharePoint' },
 ] as const;
