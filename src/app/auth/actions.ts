@@ -58,6 +58,9 @@ function safeCallbackUrl(url: string | null | undefined): string {
 // ---------------------------------------------------------------------------
 
 export async function submitPassword(formData: FormData) {
+  const t0 = Date.now();
+  const elapsed = () => `${Date.now() - t0}ms`;
+
   const email = (formData.get('email') as string | null)?.toLowerCase().trim() ?? '';
   const password = (formData.get('password') as string | null) ?? '';
   const callbackUrl = safeCallbackUrl(formData.get('callbackUrl') as string | null);
@@ -70,13 +73,9 @@ export async function submitPassword(formData: FormData) {
     (formData.get('turnstileToken') as string | null)?.trim() ||
     '';
 
+  console.log(`[auth] submitPassword: START — isTurnstileEnabled=${isTurnstileEnabled} | token present=${!!turnstileToken} | token length=${turnstileToken.length}`);
+
   // Verify Turnstile token if enabled
-  console.log(
-    '[auth] submitPassword: Turnstile check —',
-    `isTurnstileEnabled=${isTurnstileEnabled}`,
-    `| token present=${!!turnstileToken}`,
-    `| token length=${turnstileToken.length}`,
-  );
   if (isTurnstileEnabled && !turnstileToken) {
     console.warn(
       '[auth] submitPassword: Turnstile is enabled on the server but the submitted form contains no token. ' +
@@ -86,7 +85,9 @@ export async function submitPassword(formData: FormData) {
     );
   }
   if (isTurnstileEnabled) {
+    const tTurnstile = Date.now();
     const isValidToken = await verifyTurnstileToken(turnstileToken);
+    console.log(`[auth] submitPassword: Turnstile verify took ${Date.now() - tTurnstile}ms (total ${elapsed()})`);
     if (!isValidToken) {
       console.warn('[auth] submitPassword: Turnstile verification failed');
       redirect('/auth/signin?error=TurnstileVerificationFailed');
@@ -144,7 +145,9 @@ export async function submitPassword(formData: FormData) {
     redirect('/auth/error?error=AccountSuspended');
   }
 
+  const tBcrypt = Date.now();
   const valid = await verifyPassword(password, user.passwordHash);
+  console.log(`[auth] submitPassword: bcrypt verify took ${Date.now() - tBcrypt}ms (total ${elapsed()})`);
   if (!valid) {
     console.warn(`[auth] submitPassword: password verification FAILED for @${emailDomain(email)}`);
     db.prepare('INSERT INTO verification_tokens (identifier, token, expires) VALUES (?,?,?)').run(
@@ -173,15 +176,22 @@ export async function submitPassword(formData: FormData) {
     packTs(new Date(Date.now() + OTP_EXPIRY_MS)),
   );
 
-  // Send OTP email
-  try {
-    const mailResult = await sendOtpEmail(email, otp);
-    if (!mailResult.success) {
-      console.error(`[mail] Failed to send OTP email for @${emailDomain(email)}: ${mailResult.error}`);
+  console.log(`[auth] submitPassword: OTP stored in DB, firing email (total so far: ${elapsed()})`);
+
+  // Fire OTP email without awaiting — the OTP is already in the database, so
+  // the user can be redirected to the verification page immediately.  SMTP
+  // latency (connection, TLS handshake, server acknowledgment) no longer
+  // contributes to the sign-in delay.  Results and timing are logged below so
+  // any SMTP issues remain visible in pm2 logs.
+  void sendOtpEmail(email, otp).then((mailResult) => {
+    if (mailResult.success) {
+      console.log(`[auth] OTP email delivered to @${emailDomain(email)} (background, total from submit start: ${elapsed()})`);
+    } else {
+      console.error(`[auth] OTP email FAILED for @${emailDomain(email)}: ${mailResult.error} (background, total from submit start: ${elapsed()})`);
     }
-  } catch (err) {
-    console.error('[mail] Failed to send OTP email:', err);
-  }
+  }).catch((err: unknown) => {
+    console.error(`[auth] OTP email threw for @${emailDomain(email)}: ${err instanceof Error ? err.message : String(err)} (background, total from submit start: ${elapsed()})`);
+  });
 
   // Set pending cookies (httpOnly, short-lived)
   const cookieStore = await cookies();
@@ -207,6 +217,7 @@ export async function submitPassword(formData: FormData) {
     path: '/',
   });
 
+  console.log(`[auth] submitPassword: redirecting to /auth/verify-otp — total server time: ${elapsed()}`);
   redirect('/auth/verify-otp');
 }
 
