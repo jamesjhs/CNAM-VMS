@@ -48,7 +48,10 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              // Cloudflare Turnstile requires its script and challenge iframe origin.
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
+              // Turnstile renders the CAPTCHA challenge inside an iframe served from Cloudflare.
+              "frame-src https://challenges.cloudflare.com",
               "worker-src 'self'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",

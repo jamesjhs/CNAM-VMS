@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { submitPassword } from '../actions';
 import TurnstileWidget from '@/components/TurnstileWidget';
@@ -33,9 +33,9 @@ export default function SignInForm({ callbackUrl, error, reset, siteKey }: SignI
   };
   const errorMsg = submitError || (error ? (errorMessages[error] ?? 'Something went wrong. Please try again.') : null);
 
-  const handleTokenChange = (token: string) => {
+  const handleTokenChange = useCallback((token: string) => {
     setTurnstileToken(token);
-  };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

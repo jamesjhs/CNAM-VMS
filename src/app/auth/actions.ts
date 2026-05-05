@@ -62,7 +62,13 @@ export async function submitPassword(formData: FormData) {
   const password = (formData.get('password') as string | null) ?? '';
   const callbackUrl = safeCallbackUrl(formData.get('callbackUrl') as string | null);
   const keepSignedIn = formData.get('keepSignedIn') === '1';
-  const turnstileToken = (formData.get('turnstileToken') as string | null) ?? '';
+  // Cloudflare's implicit-render widget injects a hidden input named
+  // "cf-turnstile-response" into the parent form when the challenge is solved.
+  // We also accept "turnstileToken" for backwards-compat / belt-and-suspenders.
+  const turnstileToken =
+    (formData.get('cf-turnstile-response') as string | null)?.trim() ||
+    (formData.get('turnstileToken') as string | null)?.trim() ||
+    '';
 
   // Verify Turnstile token if enabled
   console.log(
