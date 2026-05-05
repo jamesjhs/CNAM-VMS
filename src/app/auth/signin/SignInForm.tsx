@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { submitPassword } from '../actions';
 import TurnstileWidget from '@/components/TurnstileWidget';
@@ -64,11 +64,6 @@ export default function SignInForm({ callbackUrl, error, reset }: SignInFormProp
       setSubmitError('Failed to sign in. Please check your email and password and try again.');
     }
   };
-
-  useEffect(() => {
-    // Reset submit error when component updates
-    setIsSubmitting(false);
-  }, [error]);
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>

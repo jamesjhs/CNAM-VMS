@@ -1,6 +1,6 @@
 # CNAM-VMS Technical Architecture & Information Flows
 
-**Version 0.6.0 — May 2026**
+**Version 0.6.1 — May 2026**
 
 This document provides a comprehensive technical overview of the CNAM-VMS system, including architecture, information flows, dependencies, database schema, and key functions. It is intended for developers, system architects, and technical administrators.
 
@@ -688,12 +688,12 @@ Recommended approach for future:
 - [ ] `PORT` — Server port (default 3001)
 
 ### Package.json Scripts
-- `npm run dev` — Development server
+- `npm run dev` — Development server (port 3001)
 - `npm run build` — Production build
 - `npm start` — Run production server
 - `npm run lint` — Lint code
 - `npm run typecheck` — Type-check without emitting
-- `npm run db:seed` — Initialize database
+- `npm run db:seed` — Initialize database and capabilities
 - `npm run db:set-initial-password` — Set root password
 - `npm run db:reset-password` — Reset user password
 - `npm run db:create-user` — Create user from CLI
@@ -703,8 +703,8 @@ Recommended approach for future:
 - `admin:users.write` — Create/edit/delete users
 - `admin:roles.read` — View roles
 - `admin:roles.write` — Create/edit/delete roles
-- `admin:teams.read` — View teams
-- `admin:teams.write` — Manage teams
+- `admin:teams.read` — View any team's detail page in read-only mode (non-member access); view teams in admin panel
+- `admin:teams.write` — Full management access to all team pages; create/edit/delete teams via admin panel
 - `admin:audit.read` — View audit log
 - `admin:files.read` — View files
 - `admin:files.write` — Upload files
@@ -714,6 +714,6 @@ Recommended approach for future:
 
 ---
 
-**Document version:** 0.5.0  
+**Document version:** 0.6.1  
 **Last updated:** May 2026  
 **For questions or corrections:** Contact the development team
