@@ -327,7 +327,7 @@ function initSchema(db: BetterSqlite3.Database): void {
       date TEXT NOT NULL UNIQUE,
       title TEXT NOT NULL,
       description TEXT,
-      createdById TEXT NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+      createdById TEXT REFERENCES users(id) ON DELETE SET NULL,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL
     );
@@ -339,7 +339,7 @@ function initSchema(db: BetterSqlite3.Database): void {
       endDate TEXT NOT NULL,
       status TEXT NOT NULL,
       notes TEXT,
-      createdById TEXT NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+      createdById TEXT REFERENCES users(id) ON DELETE SET NULL,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL
     );
@@ -349,7 +349,7 @@ function initSchema(db: BetterSqlite3.Database): void {
       id TEXT PRIMARY KEY NOT NULL,
       date TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
-      createdById TEXT NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+      createdById TEXT REFERENCES users(id) ON DELETE SET NULL,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL
     );
@@ -393,6 +393,67 @@ function initSchema(db: BetterSqlite3.Database): void {
   const teamsInfo = db.prepare('PRAGMA table_info(teams)').all() as { name: string }[];
   if (!teamsInfo.some((c) => c.name === 'sharepoint_folder_path')) {
     db.exec('ALTER TABLE teams ADD COLUMN sharepoint_folder_path TEXT');
+  }
+
+  // Fix museum tables: createdById was incorrectly defined as NOT NULL with ON DELETE SET NULL,
+  // causing SQLITE_CONSTRAINT_FOREIGNKEY when deleting a user who had created museum records.
+  // Migrate each affected table by recreating it without the NOT NULL constraint.
+  for (const table of ['museum_status', 'museum_opening_hours', 'bank_holidays'] as const) {
+    const colInfo = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string; notnull: number }[];
+    const createdByCol = colInfo.find((c) => c.name === 'createdById');
+    if (createdByCol && createdByCol.notnull === 1) {
+      // createdById is still NOT NULL — rebuild the table to drop that constraint.
+      db.exec(`
+        ALTER TABLE ${table} RENAME TO ${table}_migration_backup;
+      `);
+      // Re-create with the correct (nullable) definition — pulled from the canonical CREATE above.
+      if (table === 'museum_status') {
+        db.exec(`
+          CREATE TABLE museum_status (
+            id TEXT PRIMARY KEY NOT NULL,
+            date TEXT NOT NULL UNIQUE,
+            title TEXT NOT NULL,
+            description TEXT,
+            createdById TEXT REFERENCES users(id) ON DELETE SET NULL,
+            createdAt TEXT NOT NULL,
+            updatedAt TEXT NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_museum_status_date ON museum_status(date);
+          INSERT INTO museum_status SELECT * FROM museum_status_migration_backup;
+          DROP TABLE museum_status_migration_backup;
+        `);
+      } else if (table === 'museum_opening_hours') {
+        db.exec(`
+          CREATE TABLE museum_opening_hours (
+            id TEXT PRIMARY KEY NOT NULL,
+            startDate TEXT NOT NULL,
+            endDate TEXT NOT NULL,
+            status TEXT NOT NULL,
+            notes TEXT,
+            createdById TEXT REFERENCES users(id) ON DELETE SET NULL,
+            createdAt TEXT NOT NULL,
+            updatedAt TEXT NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_opening_hours_dates ON museum_opening_hours(startDate, endDate);
+          INSERT INTO museum_opening_hours SELECT * FROM museum_opening_hours_migration_backup;
+          DROP TABLE museum_opening_hours_migration_backup;
+        `);
+      } else {
+        db.exec(`
+          CREATE TABLE bank_holidays (
+            id TEXT PRIMARY KEY NOT NULL,
+            date TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL,
+            createdById TEXT REFERENCES users(id) ON DELETE SET NULL,
+            createdAt TEXT NOT NULL,
+            updatedAt TEXT NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_bank_holidays_date ON bank_holidays(date);
+          INSERT INTO bank_holidays SELECT * FROM bank_holidays_migration_backup;
+          DROP TABLE bank_holidays_migration_backup;
+        `);
+      }
+    }
   }
 }
 
