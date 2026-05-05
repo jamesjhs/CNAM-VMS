@@ -362,7 +362,7 @@ export async function createTeam(name: string, description: string) {
   const spConfig = getSharePointConfig();
   if (spConfig) {
     try {
-      sharepointFolderPath = await createTeamFolder(spConfig, trimmedName);
+      sharepointFolderPath = await createTeamFolder(spConfig, trimmedName, id);
       db.prepare('UPDATE teams SET sharepoint_folder_path=?, updatedAt=? WHERE id=?').run(
         sharepointFolderPath, now(), id,
       );

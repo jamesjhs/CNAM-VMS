@@ -60,9 +60,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'No file provided' }, { status: 400 });
   }
 
-  const folderPath = ((formData.get('folderPath') as string | null) ?? '').trim();
-  // Prevent path traversal in the folderPath field
-  if (folderPath.includes('..') || folderPath.startsWith('/')) {
+  const rawFolderPath = ((formData.get('folderPath') as string | null) ?? '').trim();
+  // Decode and sanitize the folder path to prevent path traversal via %2e%2e etc.
+  let folderPath: string;
+  try {
+    folderPath = decodeURIComponent(rawFolderPath);
+  } catch {
+    folderPath = rawFolderPath;
+  }
+  // Strip dangerous sequences; only allow alphanumerics, spaces, hyphens, underscores, dots, slashes
+  folderPath = folderPath
+    .split('/')
+    .map((seg) => seg.replace(/\.\./g, '').replace(/[^a-zA-Z0-9 \-_.]/g, ''))
+    .filter(Boolean)
+    .join('/');
+  if (folderPath.startsWith('/')) {
     return NextResponse.json({ error: 'Invalid folder path' }, { status: 400 });
   }
 

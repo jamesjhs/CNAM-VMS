@@ -187,6 +187,21 @@ async function getSiteAndDriveId(
   return { siteId, driveId: drive.id };
 }
 
+// ─── Path helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Validate that a folder path used in Graph API URLs contains only safe characters.
+ * Prevents SSRF via path traversal or URL manipulation in SharePoint paths.
+ * Throws if the path is unsafe.
+ */
+function assertSafeFolderPath(folderPath: string): void {
+  if (!folderPath) return;
+  // Reject any remaining .. sequences or characters outside the allowlist
+  if (/\.\./.test(folderPath) || /[^a-zA-Z0-9 \-_./]/.test(folderPath)) {
+    throw new Error(`Unsafe SharePoint folder path: ${folderPath}`);
+  }
+}
+
 // ─── Folder operations ────────────────────────────────────────────────────────
 
 /**
@@ -196,6 +211,7 @@ export async function ensureFolder(
   config: SharePointConfig,
   folderPath: string,
 ): Promise<void> {
+  assertSafeFolderPath(folderPath);
   const { driveId } = await getSiteAndDriveId(config);
   const parts = folderPath.split('/').filter(Boolean);
 
@@ -252,6 +268,7 @@ export async function listFolder(
   config: SharePointConfig,
   folderPath: string,
 ): Promise<SharePointItem[]> {
+  assertSafeFolderPath(folderPath);
   const { driveId } = await getSiteAndDriveId(config);
   const endpoint = folderPath
     ? `/drives/${driveId}/root:/${folderPath}:/children`
@@ -273,10 +290,12 @@ export async function uploadFile(
   filename: string,
   buffer: Buffer,
 ): Promise<SharePointItem> {
+  assertSafeFolderPath(folderPath);
+  const safeFilename = filename.replace(/[^a-zA-Z0-9._\- ]/g, '_');
   const { driveId } = await getSiteAndDriveId(config);
   const uploadPath = folderPath
-    ? `/drives/${driveId}/root:/${folderPath}/${filename}:/content`
-    : `/drives/${driveId}/root:/${filename}:/content`;
+    ? `/drives/${driveId}/root:/${folderPath}/${safeFilename}:/content`
+    : `/drives/${driveId}/root:/${safeFilename}:/content`;
 
   return graphRequest<SharePointItem>(
     config,
@@ -335,26 +354,33 @@ export async function deleteItem(config: SharePointConfig, itemId: string): Prom
 
 /**
  * Convert a team name to a URL-safe folder slug.
+ * Returns a non-empty string — if the name produces an empty slug, returns 'team'.
  */
 export function slugifyTeamName(name: string): string {
-  return name
+  const slug = name
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')
     .trim()
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .slice(0, 60);
+  return slug || 'team';
 }
 
 /**
  * Create the SharePoint folder for a team (Teams/<slug>) and return its path.
  * Ensures the parent Teams folder exists first.
+ * @param teamId Optional team ID used as a suffix when the name slug is ambiguous.
  */
 export async function createTeamFolder(
   config: SharePointConfig,
   teamName: string,
+  teamId?: string,
 ): Promise<string> {
-  const slug = slugifyTeamName(teamName);
+  let slug = slugifyTeamName(teamName);
+  // Append a short ID suffix when provided, to prevent collisions between teams
+  // whose names produce the same slug (e.g. "!!!" and "###" both become "team").
+  if (teamId) slug = `${slug}-${teamId.slice(-6)}`;
   const folderPath = `Teams/${slug}`;
   await ensureFolder(config, 'Teams');
   await ensureFolder(config, folderPath);

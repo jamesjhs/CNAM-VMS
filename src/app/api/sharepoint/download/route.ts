@@ -29,7 +29,9 @@ export async function GET(request: NextRequest) {
     const { buffer, filename, mimeType } = await downloadItem(config, itemId);
 
     // Sanitise filename for Content-Disposition header
-    const safeFilename = filename.replace(/[^a-zA-Z0-9._\- ]/g, '_');
+    const safeFilename = filename
+      .replace(/[^a-zA-Z0-9._\- ]/g, '_')
+      .replace(/["\\]/g, '_'); // prevent header injection
 
     return new NextResponse(new Uint8Array(buffer), {
       headers: {

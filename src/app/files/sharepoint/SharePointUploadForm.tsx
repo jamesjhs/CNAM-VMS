@@ -39,6 +39,8 @@ export default function SharePointUploadForm({ folderPath, onSuccess }: SharePoi
         setMessage(`"${data.name}" uploaded successfully.`);
         form.reset();
         onSuccess?.();
+        // Refresh the server-rendered file listing after a short delay
+        setTimeout(() => window.location.reload(), 1500);
       } else {
         setStatus('error');
         setMessage(data.error ?? 'Upload failed.');

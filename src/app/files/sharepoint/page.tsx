@@ -48,6 +48,25 @@ function buildBreadcrumbs(path: string): { label: string; href: string }[] {
   return crumbs;
 }
 
+/**
+ * Decode and sanitize a folder path from user input.
+ * Decodes percent-encoded sequences first (handles %2e%2e, %2f etc.) then
+ * applies a strict allowlist and removes any remaining path-traversal sequences.
+ */
+function sanitizeFolderPath(raw: string): string {
+  let decoded = raw;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    // If decoding fails treat as-is
+  }
+  return decoded
+    .split('/')
+    .map((seg) => seg.replace(/\.\./g, '').replace(/[^a-zA-Z0-9 \-_.]/g, ''))
+    .filter(Boolean)
+    .join('/');
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function SharePointFilesPage({
@@ -99,7 +118,8 @@ export default async function SharePointFilesPage({
   }
 
   const { path: rawPath } = await searchParams;
-  const currentPath = (rawPath ?? '').replace(/\.\.+/g, '').replace(/^\//, '').trim();
+  // Sanitize the path: decode first (handles %2e%2e etc.) then strip unsafe chars
+  const currentPath = sanitizeFolderPath(rawPath ?? '');
   const breadcrumbs = buildBreadcrumbs(currentPath);
 
   const config = getSharePointConfig()!;
@@ -276,7 +296,7 @@ export default async function SharePointFilesPage({
                             </div>
                           </td>
                           <td className="py-3 px-4 text-gray-500 whitespace-nowrap hidden sm:table-cell">
-                            {item.size !== undefined ? formatBytes(item.size) : item.folder ? '—' : '—'}
+                            {item.size !== undefined ? formatBytes(item.size) : '—'}
                           </td>
                           <td className="py-3 px-4 text-gray-500 whitespace-nowrap text-xs hidden md:table-cell">
                             {item.lastModifiedDateTime
