@@ -4,36 +4,23 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { submitPassword } from '../actions';
 import TurnstileWidget from '@/components/TurnstileWidget';
-import { isTurnstileEnabled, TURNSTILE_SITE_KEY } from '@/lib/turnstile';
 
 interface SignInFormProps {
   callbackUrl?: string;
   error?: string;
   reset?: boolean;
+  // Passed from the server component at request time so the correct value is
+  // always available regardless of when the app was last built.
+  siteKey?: string;
 }
 
-export default function SignInForm({ callbackUrl, error, reset }: SignInFormProps) {
+export default function SignInForm({ callbackUrl, error, reset, siteKey }: SignInFormProps) {
   const [turnstileToken, setTurnstileToken] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string>('');
 
-  // ── Client-side Turnstile diagnostic ───────────────────────────────────────
-  // These values are evaluated in the browser from the compiled Next.js bundle.
-  // NEXT_PUBLIC_TURNSTILE_SITE_KEY is required — without the NEXT_PUBLIC_ prefix
-  // Next.js will strip the value from the client bundle at build time.
-  console.log(
-    '[SignInForm] Client-side Turnstile state —',
-    `isTurnstileEnabled=${isTurnstileEnabled}`,
-    `| TURNSTILE_SITE_KEY defined=${!!TURNSTILE_SITE_KEY}`,
-  );
-  if (!TURNSTILE_SITE_KEY && !isTurnstileEnabled) {
-    console.warn(
-      '[SignInForm] NEXT_PUBLIC_TURNSTILE_SITE_KEY is not set — Turnstile widget will not render. ' +
-      'If Turnstile is intentionally disabled, ignore this message. ' +
-      'Otherwise ensure NEXT_PUBLIC_TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY are set in .env ' +
-      'and the app was rebuilt.',
-    );
-  }
+  // isTurnstileEnabled is derived from the prop, not from a build-time constant.
+  const isTurnstileEnabled = !!siteKey;
 
   const errorMessages: Record<string, string> = {
     InvalidCredentials: 'Incorrect email address or password. Please try again.',
@@ -152,17 +139,12 @@ export default function SignInForm({ callbackUrl, error, reset }: SignInFormProp
         </label>
       </div>
 
-      {isTurnstileEnabled && TURNSTILE_SITE_KEY && (
+      {isTurnstileEnabled && siteKey && (
         <div className="pt-2">
           <div className="text-xs text-gray-500 mb-2">
             ✓ Verification ready {turnstileToken ? '(completed)' : '(pending)'}
           </div>
-          <TurnstileWidget siteKey={TURNSTILE_SITE_KEY} onTokenChange={handleTokenChange} />
-        </div>
-      )}
-      {!TURNSTILE_SITE_KEY && isTurnstileEnabled && (
-        <div className="text-xs text-red-600 mb-2">
-          ⚠️ Turnstile enabled but SITE_KEY is undefined (was it set before build?)
+          <TurnstileWidget siteKey={siteKey} onTokenChange={handleTokenChange} />
         </div>
       )}
 
