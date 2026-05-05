@@ -17,10 +17,6 @@ export default function SignInForm({ callbackUrl, error, reset }: SignInFormProp
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string>('');
 
-  useEffect(() => {
-    console.log('[SignIn] Component mounted — isTurnstileEnabled=' + isTurnstileEnabled + ', SITE_KEY=' + (TURNSTILE_SITE_KEY ? TURNSTILE_SITE_KEY.substring(0, 8) + '...' : 'undefined'));
-  }, []);
-
   const errorMessages: Record<string, string> = {
     InvalidCredentials: 'Incorrect email address or password. Please try again.',
     MissingFields: 'Please enter your email address and password.',
@@ -33,57 +29,38 @@ export default function SignInForm({ callbackUrl, error, reset }: SignInFormProp
   const errorMsg = submitError || (error ? (errorMessages[error] ?? 'Something went wrong. Please try again.') : null);
 
   const handleTokenChange = (token: string) => {
-    console.log(`[SignIn] Turnstile token received: ${token.length > 0 ? `${token.length} chars` : 'EMPTY'}`);
-    if (token.length > 0) {
-      console.log(`[SignIn] Token first 20 chars: ${token.substring(0, 20)}...`);
-    }
     setTurnstileToken(token);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSubmitError('');
-    
-    console.log(`[SignIn] Form submitted — isTurnstileEnabled=${isTurnstileEnabled}, tokenLength=${turnstileToken.length}`);
-    
+
     // Check Turnstile if enabled
     if (isTurnstileEnabled) {
       if (!turnstileToken) {
-        console.warn('[SignIn] Form submitted but Turnstile token is empty! Widget may have failed.');
         setSubmitError('Please complete the security verification below.');
         return;
       }
-      console.log('[SignIn] Turnstile token verified, proceeding with password submission...');
     }
 
-    console.log('[SignIn] Form submitted, starting authentication...');
     setIsSubmitting(true);
 
-    // Wrap the server action in error handling
     try {
       const formData = new FormData(e.currentTarget);
-      // Manually add Turnstile token to FormData
       if (isTurnstileEnabled) {
         formData.set('turnstileToken', turnstileToken);
-        console.log('[SignIn] Added Turnstile token to FormData');
       }
-      const email = formData.get('email');
-      console.log(`[SignIn] Submitting password for @${String(email).split('@')[1] || 'unknown'}...`);
-      console.log(`[SignIn] Turnstile token included: ${turnstileToken ? 'yes' : 'no'}`);
       await submitPassword(formData);
     } catch (err) {
       setIsSubmitting(false);
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
-      console.error('[SignIn] Submission error:', err);
-      
+
       // Rethrow NEXT_REDIRECT so Next.js can process redirects
       if (errorMessage.includes('NEXT_REDIRECT')) {
-        console.log('[SignIn] NEXT_REDIRECT caught — authentication successful, processing redirect');
         throw err;
       }
-      
-      // Show generic error for other failures
-      console.error('[SignIn] Login failed:', errorMessage);
+
       setSubmitError('Failed to sign in. Please check your email and password and try again.');
     }
   };

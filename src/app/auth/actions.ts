@@ -64,23 +64,16 @@ export async function submitPassword(formData: FormData) {
   const keepSignedIn = formData.get('keepSignedIn') === '1';
   const turnstileToken = (formData.get('turnstileToken') as string | null) ?? '';
 
-  console.log(`[auth] submitPassword: starting login flow for @${emailDomain(email)}`);
-
   // Verify Turnstile token if enabled
   if (isTurnstileEnabled) {
-    console.log('[auth] submitPassword: verifying Turnstile token...');
     const isValidToken = await verifyTurnstileToken(turnstileToken);
     if (!isValidToken) {
       console.warn('[auth] submitPassword: Turnstile verification failed');
       redirect('/auth/signin?error=TurnstileVerificationFailed');
     }
-    console.log('[auth] submitPassword: Turnstile verification passed');
-  } else {
-    console.log('[auth] submitPassword: Turnstile disabled, skipping verification');
   }
 
   if (!email || !password) {
-    console.warn('[auth] submitPassword: missing email or password');
     redirect('/auth/signin?error=MissingFields');
   }
 
@@ -131,7 +124,6 @@ export async function submitPassword(formData: FormData) {
     redirect('/auth/error?error=AccountSuspended');
   }
 
-  console.log(`[auth] submitPassword: account found for @${emailDomain(email)}, verifying password...`);
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) {
     console.warn(`[auth] submitPassword: password verification FAILED for @${emailDomain(email)}`);
@@ -143,7 +135,6 @@ export async function submitPassword(formData: FormData) {
     redirect('/auth/signin?error=InvalidCredentials');
   }
 
-  console.log(`[auth] submitPassword: password VERIFIED for @${emailDomain(email)} — generating OTP...`);
   // Successful password check — clear any failure records for this email
   db.prepare('DELETE FROM verification_tokens WHERE identifier = ?').run(pwFailIdentifier);
 
@@ -161,27 +152,18 @@ export async function submitPassword(formData: FormData) {
     createHash('sha256').update(otp).digest('hex'),
     packTs(new Date(Date.now() + OTP_EXPIRY_MS)),
   );
-  console.log(`[auth] submitPassword: OTP stored in database for @${emailDomain(email)} — expires in 10 min`);
 
   // Send OTP email
   try {
-    console.log(`[auth] submitPassword: sending OTP email to @${emailDomain(email)}...`);
     const mailResult = await sendOtpEmail(email, otp);
     if (!mailResult.success) {
       console.error(`[mail] Failed to send OTP email for @${emailDomain(email)}: ${mailResult.error}`);
-      // Still proceed to verify page so user can retry; we'll show a warning there
-    } else {
-      console.log(`[mail] OTP email sent successfully for @${emailDomain(email)}`);
     }
   } catch (err) {
-    // Log the SMTP error so it is visible in PM2 logs
     console.error('[mail] Failed to send OTP email:', err);
   }
 
-  console.log(`[auth] submitPassword: OTP issued for @${emailDomain(email)} — sending verification code to user`);
-
   // Set pending cookies (httpOnly, short-lived)
-  console.log(`[auth] submitPassword: setting pending cookies for user ${user.id}...`);
   const cookieStore = await cookies();
   cookieStore.set(PENDING_UID_COOKIE, user.id, {
     httpOnly: true,
@@ -216,11 +198,9 @@ export async function submitOtp(formData: FormData) {
   const code = (formData.get('code') as string | null)?.trim().replace(/\s/g, '') ?? '';
 
   if (!code) {
-    console.warn('[auth] submitOtp: no OTP code provided');
     redirect('/auth/verify-otp?error=MissingCode');
   }
 
-  console.log('[auth] submitOtp: verifying OTP code...');
   const cookieStore = await cookies();
   const userId = cookieStore.get(PENDING_UID_COOKIE)?.value;
   const callbackUrl = safeCallbackUrl(cookieStore.get(CALLBACK_URL_COOKIE)?.value);
@@ -240,7 +220,6 @@ export async function submitOtp(formData: FormData) {
     redirect('/auth/signin?error=InvalidCredentials');
   }
 
-  console.log(`[auth] submitOtp: verifying OTP for user ${userId} (@${emailDomain(user.email)})`);
   const identifier = `otp:${user.email}`;
   const failIdentifier = `otp-fail:${user.email}`;
   const cutoff = packTs(new Date());
@@ -285,12 +264,10 @@ export async function submitOtp(formData: FormData) {
   }
 
   // OTP is correct — delete it (single-use) and clear failure records
-  console.log(`[auth] submitOtp: OTP code VERIFIED for @${emailDomain(user.email)}`);
   db.prepare('DELETE FROM verification_tokens WHERE identifier = ?').run(identifier);
   db.prepare('DELETE FROM verification_tokens WHERE identifier = ?').run(failIdentifier);
 
   // Create a one-time completion token (2-minute TTL) — hash before storage
-  console.log(`[auth] submitOtp: creating completion token for user ${userId}...`);
   const completionToken = randomBytes(32).toString('hex');
   const completionIdentifier = `auth:complete:${userId}`;
   db.prepare('DELETE FROM verification_tokens WHERE identifier = ?').run(completionIdentifier);
@@ -301,7 +278,6 @@ export async function submitOtp(formData: FormData) {
   );
 
   // Clear pending cookies
-  console.log('[auth] submitOtp: clearing pending cookies...');
   cookieStore.delete(PENDING_UID_COOKIE);
   cookieStore.delete(CALLBACK_URL_COOKIE);
   cookieStore.delete(KEEP_SIGNED_IN_COOKIE);
@@ -311,10 +287,8 @@ export async function submitOtp(formData: FormData) {
     ? '/auth/change-password'
     : callbackUrl;
 
-  console.log(`[auth] submitOtp: calling signIn for user ${userId}, redirecting to ${redirectTo}...`);
   // signIn throws a NEXT_REDIRECT internally; Next.js handles it as a redirect response
   await signIn('credentials', { userId, completionToken, keepSignedIn: keepSignedIn ? '1' : '0', redirectTo });
-  console.log(`[auth] submitOtp: COMPLETE — user ${userId} successfully signed in`);
 }
 
 // ---------------------------------------------------------------------------

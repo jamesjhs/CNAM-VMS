@@ -15,6 +15,7 @@ export async function GET() {
       database: 'connected',
     });
   } catch (error) {
+    console.error('[readyz] Database connectivity check failed:', error);
     return Response.json(
       {
         ok: false,
@@ -22,7 +23,6 @@ export async function GET() {
         version: APP_VERSION,
         timestamp: new Date().toISOString(),
         database: 'error',
-        error: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 503 }
     );

@@ -1,4 +1,4 @@
-import { requireAuth } from '@/lib/auth-helpers';
+import { requireAuth, hasCapability } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
 import { getDb } from '@/lib/db';
 import Link from 'next/link';
@@ -12,6 +12,9 @@ export default async function TeamsPage({
   const currentUser = await requireAuth();
   const { success } = await searchParams;
   const db = getDb();
+
+  // Can this user directly view any team's detail page without being a member?
+  const canReadAsAdmin = hasCapability(currentUser, 'admin:teams.read') || hasCapability(currentUser, 'admin:teams.write');
 
   // All teams
   const allTeams = db.prepare('SELECT id, name, description FROM teams ORDER BY name ASC').all() as {
@@ -160,7 +163,16 @@ export default async function TeamsPage({
                     className="bg-white rounded-xl border border-gray-200 px-6 py-4 flex items-center justify-between gap-4 flex-wrap"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900">{team.name}</p>
+                      {canReadAsAdmin ? (
+                        <Link
+                          href={`/teams/${team.id}`}
+                          className="font-semibold text-blue-700 hover:underline"
+                        >
+                          {team.name}
+                        </Link>
+                      ) : (
+                        <p className="font-semibold text-gray-900">{team.name}</p>
+                      )}
                       {team.description && (
                         <p className="text-sm text-gray-500 mt-0.5">{team.description}</p>
                       )}
@@ -174,7 +186,15 @@ export default async function TeamsPage({
                       </p>
                     </div>
                     <div className="shrink-0">
-                      {isPending ? (
+                      {canReadAsAdmin ? (
+                        <Link
+                          href={`/teams/${team.id}`}
+                          className="text-sm text-gray-400 hover:text-blue-600 transition-colors"
+                          aria-label={`View ${team.name}`}
+                        >
+                          →
+                        </Link>
+                      ) : isPending ? (
                         <span className="inline-block text-sm text-amber-700 bg-amber-50 border border-amber-200 px-4 py-2 rounded-lg font-medium cursor-default">
                           ⏳ Request Pending
                         </span>

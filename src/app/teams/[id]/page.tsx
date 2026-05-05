@@ -52,10 +52,14 @@ export default async function TeamPage({
   const isMember = !!(db.prepare(
     'SELECT 1 FROM user_teams WHERE userId = ? AND teamId = ?',
   ).get(currentUser.id, id));
-  const isAdmin = hasCapability(currentUser, 'admin:teams.read');
 
-  // Non-members (who are also not admins) cannot view team detail pages
-  if (!isMember && !isAdmin) redirect('/teams');
+  // admin:teams.read  → read-only access to any team (staff / coordinator role)
+  // admin:teams.write → full management access to any team (admin role)
+  const canReadAsAdmin  = hasCapability(currentUser, 'admin:teams.read') || hasCapability(currentUser, 'admin:teams.write');
+  const canWriteAsAdmin = hasCapability(currentUser, 'admin:teams.write');
+
+  // Non-members without at least read-level admin access cannot see team detail pages
+  if (!isMember && !canReadAsAdmin) redirect('/teams');
 
   const rawMembers = db.prepare(`
     SELECT ut.userId, ut.isLeader, u.id as uid, u.name as uname, u.email as uemail
@@ -152,10 +156,11 @@ export default async function TeamPage({
 
   const leaders = members.filter((m) => m.isLeader);
   const isLeader = members.some((m) => m.userId === currentUser.id && m.isLeader);
-  const canViewLogs = isLeader || isAdmin;
+  const canViewLogs = isLeader || canReadAsAdmin;
+  const canManageMembers = isLeader || canWriteAsAdmin;
 
-  // Pending join requests — visible to leaders and admins
-  const pendingRequests = (isLeader || isAdmin)
+  // Pending join requests — visible to leaders and write-admins
+  const pendingRequests = canManageMembers
     ? (db.prepare(`
         SELECT tjr.id, tjr.userId, tjr.requestedAt, u.name as uname, u.email as uemail
         FROM team_join_requests tjr
@@ -223,7 +228,7 @@ export default async function TeamPage({
                 {members.length} member{members.length !== 1 ? 's' : ''}
               </p>
             </div>
-            {isAdmin && (
+            {canWriteAsAdmin && (
               <Link
                 href="/admin/teams"
                 className="text-sm text-gray-500 hover:text-gray-700 font-medium"
@@ -275,7 +280,7 @@ export default async function TeamPage({
                       </span>
                     )}
                   </div>
-                  {(isLeader || isAdmin) && (
+                  {canManageMembers && (
                     <form action={setTeamLeaderStatus.bind(null, id, member.userId, !member.isLeader)}>
                       <button
                         type="submit"
@@ -299,7 +304,7 @@ export default async function TeamPage({
         <section className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Active Tasks</h2>
-            {isAdmin && (
+            {canWriteAsAdmin && (
               <Link
                 href="/admin/teams/tasks"
                 className="text-sm text-blue-600 hover:underline"
@@ -385,28 +390,30 @@ export default async function TeamPage({
                   <div className="px-6 py-4">
                     <h4 className="text-sm font-medium text-gray-700 mb-3">Work Log</h4>
 
-                    <form
-                      action={async (fd: FormData) => {
-                        'use server';
-                        const entry = fd.get('entry') as string;
-                        await addWorkLogEntry(task.id, entry);
-                      }}
-                      className="flex gap-2 mb-4"
-                    >
-                      <input
-                        name="entry"
-                        type="text"
-                        required
-                        placeholder="Add a work log entry…"
-                        className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <button
-                        type="submit"
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+                    {isMember && (
+                      <form
+                        action={async (fd: FormData) => {
+                          'use server';
+                          const entry = fd.get('entry') as string;
+                          await addWorkLogEntry(task.id, entry);
+                        }}
+                        className="flex gap-2 mb-4"
                       >
-                        Add
-                      </button>
-                    </form>
+                        <input
+                          name="entry"
+                          type="text"
+                          required
+                          placeholder="Add a work log entry…"
+                          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          type="submit"
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+                        >
+                          Add
+                        </button>
+                      </form>
+                    )}
 
                     {canViewLogs ? (
                       task.workLogs.length === 0 ? (
@@ -438,28 +445,30 @@ export default async function TeamPage({
         <section>
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Team Feedback</h2>
           <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <form
-              action={async (fd: FormData) => {
-                'use server';
-                const feedback = fd.get('feedback') as string;
-                await addTeamFeedback(team.id, feedback);
-              }}
-              className="flex gap-2 mb-6"
-            >
-              <input
-                name="feedback"
-                type="text"
-                required
-                placeholder="Share feedback about this team…"
-                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                type="submit"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+            {isMember && (
+              <form
+                action={async (fd: FormData) => {
+                  'use server';
+                  const feedback = fd.get('feedback') as string;
+                  await addTeamFeedback(team.id, feedback);
+                }}
+                className="flex gap-2 mb-6"
               >
-                Submit
-              </button>
-            </form>
+                <input
+                  name="feedback"
+                  type="text"
+                  required
+                  placeholder="Share feedback about this team…"
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  type="submit"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+                >
+                  Submit
+                </button>
+              </form>
+            )}
 
             {canViewLogs ? (
               feedbacks.length === 0 ? (
@@ -483,8 +492,8 @@ export default async function TeamPage({
           </div>
         </section>
 
-        {/* ── Join Request Management (leaders and admins only) ────────── */}
-        {(isLeader || isAdmin) && (
+        {/* ── Join Request Management (leaders and write-admins only) ─────────── */}
+        {canManageMembers && (
           <section className="mt-8">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Member Management</h2>
             <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
