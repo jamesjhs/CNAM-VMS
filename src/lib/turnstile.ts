@@ -1,31 +1,10 @@
-export const TURNSTILE_SITE_KEY = process.env.TURNSTILE_SITE_KEY;
+// NEXT_PUBLIC_ prefix is required so Next.js includes this value in the client
+// bundle and browser-side components (SignInForm, TurnstileWidget) can read it.
+// TURNSTILE_SECRET_KEY must NOT have the prefix — it is server-side only.
+export const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY;
 
 export const isTurnstileEnabled = !!TURNSTILE_SITE_KEY && !!TURNSTILE_SECRET_KEY;
-
-// ── Module-load diagnostic (server-side only) ─────────────────────────────────
-// This runs once when the module is first imported on the server.
-// If both keys are set but logins are still failing, the most common cause is
-// that TURNSTILE_SITE_KEY is not prefixed with NEXT_PUBLIC_, which means the
-// browser-side client components (SignInForm, TurnstileWidget) see the key as
-// undefined, never render the widget, and submit the form without a token.
-console.log(
-  '[Turnstile] Module initialised —',
-  `isTurnstileEnabled=${isTurnstileEnabled}`,
-  `| SITE_KEY set=${!!TURNSTILE_SITE_KEY}`,
-  `| SECRET_KEY set=${!!TURNSTILE_SECRET_KEY}`,
-);
-if (TURNSTILE_SITE_KEY && !process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) {
-  console.warn(
-    '[Turnstile] WARNING: TURNSTILE_SITE_KEY is set but NEXT_PUBLIC_TURNSTILE_SITE_KEY is NOT set. ' +
-    'Next.js client components cannot access env vars that lack the NEXT_PUBLIC_ prefix. ' +
-    'The browser will see TURNSTILE_SITE_KEY as undefined, so isTurnstileEnabled will be false ' +
-    'in SignInForm — no widget will render and no token will be generated. ' +
-    'The server still sees the key as set and will reject any login attempt without a token. ' +
-    'Fix: add NEXT_PUBLIC_TURNSTILE_SITE_KEY=<same value> to your .env file and rebuild.',
-  );
-}
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface TurnstileVerifyResponse {
   success: boolean;
@@ -50,11 +29,7 @@ export async function verifyTurnstileToken(token: string): Promise<boolean> {
   }
 
   if (!token) {
-    console.warn(
-      '[Turnstile] No token provided — rejecting. ' +
-      'If this happens on every login attempt, the client is not generating a token. ' +
-      'Check that NEXT_PUBLIC_TURNSTILE_SITE_KEY is set in .env (not just TURNSTILE_SITE_KEY).',
-    );
+    console.warn('[Turnstile] No token provided — rejecting. Check that NEXT_PUBLIC_TURNSTILE_SITE_KEY is set in .env and the app was rebuilt.');
     return false;
   }
 

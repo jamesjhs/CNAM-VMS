@@ -75,9 +75,8 @@ export async function submitPassword(formData: FormData) {
     console.warn(
       '[auth] submitPassword: Turnstile is enabled on the server but the submitted form contains no token. ' +
       'This usually means the client-side SignInForm component is not rendering the Turnstile widget. ' +
-      'Root cause: TURNSTILE_SITE_KEY is set without a NEXT_PUBLIC_ prefix, so Next.js strips it from ' +
-      'the browser bundle — the client sees the key as undefined, treats Turnstile as disabled, ' +
-      'and never calls the widget. Fix: add NEXT_PUBLIC_TURNSTILE_SITE_KEY to .env and rebuild.',
+      'Ensure NEXT_PUBLIC_TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY are both set in .env and ' +
+      'the app was rebuilt after adding NEXT_PUBLIC_TURNSTILE_SITE_KEY.',
     );
   }
   if (isTurnstileEnabled) {

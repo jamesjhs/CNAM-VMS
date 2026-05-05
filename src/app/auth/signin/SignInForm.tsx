@@ -19,27 +19,21 @@ export default function SignInForm({ callbackUrl, error, reset }: SignInFormProp
 
   // ── Client-side Turnstile diagnostic ───────────────────────────────────────
   // These values are evaluated in the browser from the compiled Next.js bundle.
-  // If TURNSTILE_SITE_KEY was set in .env WITHOUT a NEXT_PUBLIC_ prefix, Next.js
-  // will have stripped it from the client bundle at build time — both values
-  // below will be undefined/false in the browser even though the server sees them.
+  // NEXT_PUBLIC_TURNSTILE_SITE_KEY is required — without the NEXT_PUBLIC_ prefix
+  // Next.js will strip the value from the client bundle at build time.
   console.log(
     '[SignInForm] Client-side Turnstile state —',
     `isTurnstileEnabled=${isTurnstileEnabled}`,
     `| TURNSTILE_SITE_KEY defined=${!!TURNSTILE_SITE_KEY}`,
   );
   if (!TURNSTILE_SITE_KEY && !isTurnstileEnabled) {
-    // Check if server *might* have the key even though we don't.
-    // We can't know for sure from the client, but warn about the common mistake.
     console.warn(
-      '[SignInForm] TURNSTILE_SITE_KEY is undefined in this browser context. ' +
-      'If the server has Turnstile keys set (you see "[Turnstile] isTurnstileEnabled=true" in server logs), ' +
-      'the likely cause is that the env var is named TURNSTILE_SITE_KEY instead of ' +
-      'NEXT_PUBLIC_TURNSTILE_SITE_KEY. Next.js only exposes env vars prefixed with NEXT_PUBLIC_ ' +
-      'to the browser. No widget will be rendered and no token will be submitted, causing ' +
-      'every login attempt to fail with TurnstileVerificationFailed on the server.',
+      '[SignInForm] NEXT_PUBLIC_TURNSTILE_SITE_KEY is not set — Turnstile widget will not render. ' +
+      'If Turnstile is intentionally disabled, ignore this message. ' +
+      'Otherwise ensure NEXT_PUBLIC_TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY are set in .env ' +
+      'and the app was rebuilt.',
     );
   }
-  // ───────────────────────────────────────────────────────────────────────────
 
   const errorMessages: Record<string, string> = {
     InvalidCredentials: 'Incorrect email address or password. Please try again.',
