@@ -1,4 +1,4 @@
-import { requireAuth, hasCapability } from '@/lib/auth-helpers';
+import { requireAuth } from '@/lib/auth-helpers';
 import NavBar from '@/components/NavBar';
 import { getDb } from '@/lib/db';
 import Link from 'next/link';
@@ -12,7 +12,6 @@ export default async function TeamsPage({
   const currentUser = await requireAuth();
   const { success } = await searchParams;
   const db = getDb();
-  const isAdmin = hasCapability(currentUser, 'admin:teams.read');
 
   // All teams
   const allTeams = db.prepare('SELECT id, name, description FROM teams ORDER BY name ASC').all() as {
@@ -70,9 +69,8 @@ export default async function TeamsPage({
   ).all(currentUser.id) as { teamId: string; status: string }[];
   const joinRequestMap = new Map(joinRequestRows.map((r) => [r.teamId, r.status]));
 
-  // Admins see all teams under "Teams I'm in"
-  const myTeams = allTeams.filter((t) => myTeamIds.has(t.id) || isAdmin);
-  const otherTeams = isAdmin ? [] : allTeams.filter((t) => !myTeamIds.has(t.id));
+  const myTeams = allTeams.filter((t) => myTeamIds.has(t.id));
+  const otherTeams = allTeams.filter((t) => !myTeamIds.has(t.id));
 
   return (
     <div className="min-h-screen flex flex-col">
