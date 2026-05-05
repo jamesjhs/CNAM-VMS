@@ -17,6 +17,8 @@ declare global {
           theme?: 'light' | 'dark';
           callback?: (token: string) => void;
           'error-callback'?: () => void;
+          'expired-callback'?: () => void;
+          'timeout-callback'?: () => void;
         }
       ) => string;
       reset: (widgetId: string) => void;
@@ -30,10 +32,59 @@ export default function TurnstileWidget({ onTokenChange, siteKey }: TurnstileWid
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
 
+  console.log(`[TurnstileWidget] Rendering — siteKey=${siteKey ? siteKey.substring(0, 8) + '...' : '(undefined/empty)'}`);
+  if (!siteKey) {
+    console.error(
+      '[TurnstileWidget] siteKey prop is empty/undefined — widget cannot render. ' +
+      'Ensure NEXT_PUBLIC_TURNSTILE_SITE_KEY is set in .env and the app was rebuilt after the change.',
+    );
+  }
+
+  const renderWidget = (container: HTMLDivElement) => {
+    if (!siteKey) {
+      console.error('[TurnstileWidget] renderWidget aborted — siteKey is empty');
+      return;
+    }
+    if (!window.turnstile) {
+      console.warn('[TurnstileWidget] renderWidget called but window.turnstile is not available yet');
+      return;
+    }
+    console.log(`[TurnstileWidget] Calling window.turnstile.render — siteKey prefix: ${siteKey.substring(0, 8)}...`);
+    try {
+      widgetIdRef.current = window.turnstile.render(container, {
+        sitekey: siteKey,
+        theme: 'light',
+        callback: (token: string) => {
+          console.log(`[TurnstileWidget] Token received — length=${token.length}, prefix=${token.substring(0, 10)}...`);
+          onTokenChange(token);
+        },
+        'error-callback': () => {
+          console.error(
+            '[TurnstileWidget] Widget reported an error. ' +
+            'Possible causes: invalid sitekey, network or CSP blocking challenges.cloudflare.com, ' +
+            'or the site domain is not listed in the Turnstile dashboard allowed-origins.',
+          );
+          onTokenChange('');
+        },
+        'expired-callback': () => {
+          console.warn('[TurnstileWidget] Token expired — user must re-verify before submitting');
+          onTokenChange('');
+        },
+        'timeout-callback': () => {
+          console.warn('[TurnstileWidget] Challenge timed out — token cleared');
+          onTokenChange('');
+        },
+      });
+      console.log(`[TurnstileWidget] Widget rendered successfully — widgetId=${widgetIdRef.current}`);
+    } catch (error) {
+      console.error('[TurnstileWidget] window.turnstile.render threw an error:', error);
+    }
+  };
+
   useEffect(() => {
     // Load Turnstile script if not already loaded
     if (!window.turnstile) {
-      console.log('[Turnstile] Loading script from Cloudflare...');
+      console.log('[TurnstileWidget] window.turnstile not present — loading script from Cloudflare...');
       const script = document.createElement('script');
       script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
       script.async = true;
@@ -41,59 +92,35 @@ export default function TurnstileWidget({ onTokenChange, siteKey }: TurnstileWid
       document.head.appendChild(script);
 
       script.onload = () => {
-        console.log('[Turnstile] Script loaded successfully');
-        if (containerRef.current && window.turnstile) {
-          try {
-            console.log(`[Turnstile] Rendering widget with siteKey: ${siteKey.substring(0, 8)}...`);
-            widgetIdRef.current = window.turnstile.render(containerRef.current, {
-              sitekey: siteKey,
-              theme: 'light',
-              callback: (token: string) => {
-                console.log(`[Turnstile] Token received, length: ${token.length}`);
-                onTokenChange(token);
-              },
-              'error-callback': () => {
-                console.warn('[Turnstile] Widget error occurred');
-              },
-            });
-            console.log(`[Turnstile] Widget rendered successfully, widgetId: ${widgetIdRef.current}`);
-          } catch (error) {
-            console.error('[Turnstile] Failed to render widget:', error);
-          }
+        console.log('[TurnstileWidget] Script loaded — window.turnstile available:', !!window.turnstile);
+        if (containerRef.current) {
+          renderWidget(containerRef.current);
         }
       };
       script.onerror = () => {
-        console.error('[Turnstile] Failed to load script from Cloudflare');
+        console.error(
+          '[TurnstileWidget] Failed to load https://challenges.cloudflare.com/turnstile/v0/api.js. ' +
+          'Check network connectivity and that Content-Security-Policy is not blocking this URL.',
+        );
       };
-    } else if (containerRef.current && window.turnstile) {
+    } else if (containerRef.current) {
       // Turnstile already loaded, render immediately
-      console.log('[Turnstile] Turnstile already loaded, rendering widget immediately...');
-      try {
-        widgetIdRef.current = window.turnstile.render(containerRef.current, {
-          sitekey: siteKey,
-          theme: 'light',
-          callback: (token: string) => {
-            console.log(`[Turnstile] Token received, length: ${token.length}`);
-            onTokenChange(token);
-          },
-        });
-        console.log(`[Turnstile] Widget rendered successfully, widgetId: ${widgetIdRef.current}`);
-      } catch (error) {
-        console.error('[Turnstile] Failed to render widget:', error);
-      }
+      console.log('[TurnstileWidget] window.turnstile already present — rendering widget immediately');
+      renderWidget(containerRef.current);
     }
 
     return () => {
       // Cleanup on unmount
       if (widgetIdRef.current && window.turnstile) {
         try {
-          console.log(`[Turnstile] Removing widget ${widgetIdRef.current}`);
+          console.log(`[TurnstileWidget] Removing widget ${widgetIdRef.current} on unmount`);
           window.turnstile.remove(widgetIdRef.current);
         } catch (e) {
-          console.error('Error removing Turnstile widget:', e);
+          console.error('[TurnstileWidget] Error removing widget on unmount:', e);
         }
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siteKey, onTokenChange]);
 
   return <div ref={containerRef} />;

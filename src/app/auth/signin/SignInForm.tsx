@@ -17,6 +17,30 @@ export default function SignInForm({ callbackUrl, error, reset }: SignInFormProp
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string>('');
 
+  // ── Client-side Turnstile diagnostic ───────────────────────────────────────
+  // These values are evaluated in the browser from the compiled Next.js bundle.
+  // If TURNSTILE_SITE_KEY was set in .env WITHOUT a NEXT_PUBLIC_ prefix, Next.js
+  // will have stripped it from the client bundle at build time — both values
+  // below will be undefined/false in the browser even though the server sees them.
+  console.log(
+    '[SignInForm] Client-side Turnstile state —',
+    `isTurnstileEnabled=${isTurnstileEnabled}`,
+    `| TURNSTILE_SITE_KEY defined=${!!TURNSTILE_SITE_KEY}`,
+  );
+  if (!TURNSTILE_SITE_KEY && !isTurnstileEnabled) {
+    // Check if server *might* have the key even though we don't.
+    // We can't know for sure from the client, but warn about the common mistake.
+    console.warn(
+      '[SignInForm] TURNSTILE_SITE_KEY is undefined in this browser context. ' +
+      'If the server has Turnstile keys set (you see "[Turnstile] isTurnstileEnabled=true" in server logs), ' +
+      'the likely cause is that the env var is named TURNSTILE_SITE_KEY instead of ' +
+      'NEXT_PUBLIC_TURNSTILE_SITE_KEY. Next.js only exposes env vars prefixed with NEXT_PUBLIC_ ' +
+      'to the browser. No widget will be rendered and no token will be submitted, causing ' +
+      'every login attempt to fail with TurnstileVerificationFailed on the server.',
+    );
+  }
+  // ───────────────────────────────────────────────────────────────────────────
+
   const errorMessages: Record<string, string> = {
     InvalidCredentials: 'Incorrect email address or password. Please try again.',
     MissingFields: 'Please enter your email address and password.',
@@ -36,12 +60,23 @@ export default function SignInForm({ callbackUrl, error, reset }: SignInFormProp
     e.preventDefault();
     setSubmitError('');
 
+    console.log(
+      '[SignInForm] handleSubmit —',
+      `isTurnstileEnabled=${isTurnstileEnabled}`,
+      `| turnstileToken present=${!!turnstileToken}`,
+      `| turnstileToken length=${turnstileToken.length}`,
+    );
+
     // Check Turnstile if enabled
     if (isTurnstileEnabled) {
       if (!turnstileToken) {
+        console.warn('[SignInForm] Blocking submission — Turnstile enabled but no token available');
         setSubmitError('Please complete the security verification below.');
         return;
       }
+      console.log('[SignInForm] Turnstile token present — proceeding with submission');
+    } else {
+      console.log('[SignInForm] Turnstile is disabled client-side — submitting without token (server may disagree!)');
     }
 
     setIsSubmitting(true);
