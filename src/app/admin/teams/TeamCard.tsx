@@ -159,23 +159,30 @@ export default function TeamCard({
         ) : (
           <div className="flex flex-wrap gap-2">
             {team.userTeams.map(({ userId, isLeader, user }) => (
-              <form
-                key={userId}
-                action={toggleLeaderAction.bind(null, team.id, userId)}
-              >
-                <button
-                  type="submit"
-                  title={isLeader ? 'Remove admin role' : 'Grant admin role'}
-                  className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
-                    isLeader
-                      ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
-                      : 'bg-white text-gray-600 border-gray-200 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700'
-                  }`}
+              <div key={userId} className="flex items-center gap-1">
+                <form action={toggleLeaderAction.bind(null, team.id, userId)}>
+                  <button
+                    type="submit"
+                    title={isLeader ? 'Remove admin role' : 'Grant admin role'}
+                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
+                      isLeader
+                        ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                        : 'bg-white text-gray-600 border-gray-200 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700'
+                    }`}
+                  >
+                    {isLeader && <span>★</span>}
+                    {user.name ?? user.email}
+                  </button>
+                </form>
+                <Link
+                  href={`/messages/${user.id}`}
+                  title={`Message ${user.name ?? user.email}`}
+                  className="text-gray-300 hover:text-blue-500 transition-colors text-xs leading-none"
+                  aria-label={`Message ${user.name ?? user.email}`}
                 >
-                  {isLeader && <span>★</span>}
-                  {user.name ?? user.email}
-                </button>
-              </form>
+                  💬
+                </Link>
+              </div>
             ))}
           </div>
         )}

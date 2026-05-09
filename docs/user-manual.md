@@ -2,7 +2,7 @@
 
 **City of Norwich Aviation Museum — Volunteer Management System**
 
-**Version 0.10.3 — May 2026**
+**Version 0.10.4 — May 2026**
 
 ---
 
@@ -372,6 +372,8 @@ The Messages page lets you send messages to individual volunteers or groups. Cli
 Recipients will receive a notification when a message is sent to them. Keep messages clear, concise, and professional.
 
 > **Tip:** Use group messaging to communicate schedule changes, reminders, or general updates to an entire team at once.
+
+> **Tip:** Anywhere you see a volunteer's name — in team pages, the schedule, user lists, or coordination views — you can click their name to open a direct message thread with them instantly. A 💬 icon appears on hover to indicate the link.
 
 ---
 

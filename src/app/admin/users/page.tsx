@@ -4,6 +4,7 @@ import { getDb, unpackTs } from '@/lib/db';
 import Link from 'next/link';
 import type { UserStatus } from '@/lib/db-types';
 import { createUser } from './actions';
+import UserLink from '@/components/UserLink';
 
 const STATUS_STYLES: Record<UserStatus, string> = {
   ACTIVE: 'bg-green-100 text-green-800',
@@ -129,7 +130,9 @@ export default async function UsersAdminPage() {
                   {users.map((user) => (
                     <tr key={user.id} className="hover:bg-gray-50 transition-colors">
                       <td className="py-3 px-4">
-                        <div className="font-medium text-gray-900">{user.name ?? <span className="text-gray-400 italic">No name</span>}</div>
+                        <div className="font-medium text-gray-900">
+                          <UserLink userId={user.id} name={user.name} email={user.email} className="hover:text-blue-600" />
+                        </div>
                         <div className="text-gray-500">{user.email}</div>
                       </td>
                       <td className="py-3 px-4">

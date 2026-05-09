@@ -1,6 +1,7 @@
 import { requireCapability } from '@/lib/auth-helpers';
-import { getDb, unpackDate, unpackBool } from '@/lib/db';
+import { getDb, unpackDate } from '@/lib/db';
 import Link from 'next/link';
+import UserLink from '@/components/UserLink';
 
 export default async function CoordinationVolunteersPage() {
   await requireCapability('staff:volunteer.read');
@@ -86,7 +87,9 @@ export default async function CoordinationVolunteersPage() {
                 const isAvailable = availabilityMap.has(vol.id);
                 return (
                   <tr key={vol.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{vol.name || 'Unnamed'}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                      <UserLink userId={vol.id} name={vol.name} email={vol.email} className="hover:text-blue-600" />
+                    </td>
                     <td className="px-6 py-4 text-sm text-gray-600">{vol.email}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{vol.phone || '—'}</td>
                     <td className="px-6 py-4 text-sm">

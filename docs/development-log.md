@@ -19,6 +19,55 @@ Entries are listed in reverse chronological order (newest first). Each entry rec
 
 ---
 
+---
+
+## 9 May 2026 — Clickable Usernames, Profile Page Fix (v0.10.4)
+
+**Agent session:** GitHub Copilot CLI Agent
+
+**What was done:**
+
+Bugfix version bumped from 0.10.3 to 0.10.4. Two improvements shipped.
+
+### 1. Clickable usernames open direct messages
+
+Every volunteer name displayed anywhere on the site — in the admin user list, schedule sign-ups, team pages (members, leaders, join requests, work logs, feedback), the coordination volunteers page, and the admin teams panel — is now a clickable link. Clicking a name opens a direct message thread with that volunteer (`/messages/[userId]`). A 💬 icon fades in on hover to signal the affordance without cluttering the UI.
+
+A new shared `UserLink` component was created to provide this behaviour consistently. The component is deliberately not applied inside the messaging pages themselves to avoid self-referential loops.
+
+**Files changed:**
+- `src/components/UserLink.tsx` (new) — reusable link-to-DM component
+- `src/app/admin/users/page.tsx` — user rows now use `UserLink`
+- `src/app/admin/schedule/page.tsx` — sign-up names now use `UserLink`
+- `src/app/admin/teams/TeamCard.tsx` — member pills now include a 💬 link alongside the leader-toggle button
+- `src/app/teams/page.tsx` — team leader names use `UserLink`; `uid` added to SQL query
+- `src/app/teams/[id]/page.tsx` — leaders, members, join requesters, work log authors, and feedback authors all use `UserLink`; `uid` added to work log and feedback SQL queries
+- `src/app/coordination/volunteers/page.tsx` — volunteer name column uses `UserLink`
+
+### 2. Profile page blank screen fixed
+
+Clicking a user's own name in the navigation bar would produce a completely blank page with no NavBar or content. Root cause: the profile page returned `null` (React renders nothing) when the session user ID had no matching database record, instead of showing an error page.
+
+**Fix:** Replaced `return null` with a user-friendly "Profile Not Found" error page (with NavBar) that explains the session may be out of sync and provides a "Sign out and sign back in" link to resolve it. A server-side log message is also emitted to help diagnose stale-session situations.
+
+**Files changed:**
+- `src/app/profile/page.tsx` — `return null` replaced with a proper error UI (yellow warning card + sign-out link)
+
+### QC — v0.10.4
+
+- Build: ✅ clean (`npm run build` exit 0, all 55 routes compiled)
+- Audit: ✅ 0 vulnerabilities (`npm audit`)
+- TypeScript: ✅ no errors
+- Dead import removed: `unpackBool` in `src/app/coordination/volunteers/page.tsx`
+- Security review: no issues found — all routes/actions properly guarded; SQL parameterised; CSP headers intact; IDOR protection verified on phone deletion and team join-request management
+
+### Decisions
+
+- `UserLink` deliberately omits self-linking detection (i.e., linking to your own DM). Opening your own DM thread works fine (you just see an empty conversation), and the added logic complexity is not worth the marginal UX gain.
+- The profile "not found" case prompts sign-out rather than auto-redirecting, giving the user control and making the error visible rather than silently swallowing the session state issue.
+
+---
+
 ## 4 May 2026 — Teams Page Restructure, Join Requests & Leader Management (v0.10.1)
 
 **Agent session:** GitHub Copilot Cloud Agent

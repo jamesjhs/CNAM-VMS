@@ -6,6 +6,7 @@ import { notFound, redirect } from 'next/navigation';
 import { addWorkLogEntry, addTeamFeedback } from '../../admin/teams/actions';
 import { approveJoinRequest, denyJoinRequest, addTeamMemberByLeader, setTeamLeaderStatus } from '../actions';
 import type { TaskType, TaskUrgency } from '@/lib/db-types';
+import UserLink from '@/components/UserLink';
 
 const TASK_TYPE_LABELS: Record<TaskType, string> = {
   SITE: 'Site',
@@ -106,14 +107,14 @@ export default async function TeamPage({
 
   const rawWorkLogs = taskIds.length > 0
     ? db.prepare(`
-        SELECT wl.id, wl.taskId, wl.entry, wl.createdAt, u.name as uname, u.email as uemail
+        SELECT wl.id, wl.taskId, wl.entry, wl.createdAt, u.id as uid, u.name as uname, u.email as uemail
         FROM team_work_logs wl
         JOIN users u ON wl.userId = u.id
         WHERE wl.taskId IN (${taskIds.map(() => '?').join(',')})
         ORDER BY wl.createdAt DESC
       `).all(...taskIds) as {
         id: string; taskId: string; entry: string; createdAt: string;
-        uname: string | null; uemail: string;
+        uid: string; uname: string | null; uemail: string;
       }[]
     : [];
 
@@ -134,24 +135,24 @@ export default async function TeamPage({
     workLogs: (workLogsByTask.get(t.id) ?? []).map((wl) => ({
       ...wl,
       createdAt: unpackTs(wl.createdAt),
-      user: { name: wl.uname, email: wl.uemail },
+      user: { id: wl.uid, name: wl.uname, email: wl.uemail },
     })),
   }));
 
   const rawFeedbacks = db.prepare(`
-    SELECT tf.id, tf.feedback, tf.createdAt, u.name as uname, u.email as uemail
+    SELECT tf.id, tf.feedback, tf.createdAt, u.id as uid, u.name as uname, u.email as uemail
     FROM team_feedback tf
     JOIN users u ON tf.userId = u.id
     WHERE tf.teamId = ?
     ORDER BY tf.createdAt DESC
   `).all(id) as {
-    id: string; feedback: string; createdAt: string; uname: string | null; uemail: string;
+    id: string; feedback: string; createdAt: string; uid: string; uname: string | null; uemail: string;
   }[];
 
   const feedbacks = rawFeedbacks.map((f) => ({
     ...f,
     createdAt: unpackTs(f.createdAt),
-    user: { name: f.uname, email: f.uemail },
+    user: { id: f.uid, name: f.uname, email: f.uemail },
   }));
 
   const leaders = members.filter((m) => m.isLeader);
@@ -220,7 +221,12 @@ export default async function TeamPage({
                 <p className="text-sm text-indigo-600">
                   👤 Team Admin{leaders.length !== 1 ? 's' : ''}:{' '}
                   <span className="font-medium">
-                    {leaders.map((m) => m.user.name ?? m.user.email).join(', ')}
+                    {leaders.map((m, i) => (
+                      <span key={m.userId}>
+                        {i > 0 && ', '}
+                        <UserLink userId={m.user.id} name={m.user.name} email={m.user.email} className="hover:text-indigo-800" />
+                      </span>
+                    ))}
                   </span>
                 </p>
               )}
@@ -269,7 +275,7 @@ export default async function TeamPage({
                 <div key={member.userId} className="px-6 py-3 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3 min-w-0">
                     <span className="text-sm font-medium text-gray-900 truncate">
-                      {member.user.name ?? member.user.email}
+                      <UserLink userId={member.user.id} name={member.user.name} email={member.user.email} className="hover:text-blue-600" />
                     </span>
                     {member.user.name && (
                       <span className="text-xs text-gray-400 truncate hidden sm:block">{member.user.email}</span>
@@ -424,7 +430,7 @@ export default async function TeamPage({
                             <li key={log.id} className="text-sm border-l-2 border-blue-200 pl-3">
                               <span className="text-gray-700">{log.entry}</span>
                               <span className="ml-2 text-xs text-gray-400">
-                                — {log.user.name ?? log.user.email},{' '}
+                                — <UserLink userId={log.user.id} name={log.user.name} email={log.user.email} className="hover:text-blue-600" />,{' '}
                                 {log.createdAt.toLocaleString('en-GB')}
                               </span>
                             </li>
@@ -479,7 +485,7 @@ export default async function TeamPage({
                     <li key={fb.id} className="text-sm border-l-2 border-indigo-200 pl-3">
                       <span className="text-gray-700">{fb.feedback}</span>
                       <span className="ml-2 text-xs text-gray-400">
-                        — {fb.user.name ?? fb.user.email},{' '}
+                        — <UserLink userId={fb.user.id} name={fb.user.name} email={fb.user.email} className="hover:text-indigo-600" />,{' '}
                         {fb.createdAt.toLocaleString('en-GB')}
                       </span>
                     </li>
@@ -516,7 +522,7 @@ export default async function TeamPage({
                       <li key={req.id} className="flex items-center justify-between gap-4 py-2 border-b border-gray-50 last:border-0">
                         <div>
                           <span className="text-sm font-medium text-gray-900">
-                            {req.user.name ?? req.user.email}
+                            <UserLink userId={req.userId} name={req.user.name} email={req.user.email} className="hover:text-blue-600" />
                           </span>
                           {req.user.name && (
                             <span className="text-xs text-gray-400 ml-2">{req.user.email}</span>

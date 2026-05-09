@@ -3,6 +3,7 @@ import NavBar from '@/components/NavBar';
 import { getDb } from '@/lib/db';
 import Link from 'next/link';
 import { requestToJoinTeam } from './actions';
+import UserLink from '@/components/UserLink';
 
 export default async function TeamsPage({
   searchParams,
@@ -29,15 +30,15 @@ export default async function TeamsPage({
 
   // Leaders per team
   const rawLeaders = db.prepare(`
-    SELECT ut.teamId, u.name as uname, u.email as uemail
+    SELECT ut.teamId, u.id as uid, u.name as uname, u.email as uemail
     FROM user_teams ut
     JOIN users u ON ut.userId = u.id
     WHERE ut.isLeader = 1
-  `).all() as { teamId: string; uname: string | null; uemail: string }[];
-  const leadersByTeam = new Map<string, { name: string | null; email: string }[]>();
+  `).all() as { teamId: string; uid: string; uname: string | null; uemail: string }[];
+  const leadersByTeam = new Map<string, { id: string; name: string | null; email: string }[]>();
   for (const l of rawLeaders) {
     if (!leadersByTeam.has(l.teamId)) leadersByTeam.set(l.teamId, []);
-    leadersByTeam.get(l.teamId)!.push({ name: l.uname, email: l.uemail });
+    leadersByTeam.get(l.teamId)!.push({ id: l.uid, name: l.uname, email: l.uemail });
   }
 
   // Active task counts per team
@@ -114,7 +115,13 @@ export default async function TeamsPage({
                       </Link>
                       {leaders.length > 0 && (
                         <p className="text-xs text-indigo-600 mt-0.5">
-                          👤 {leaders.map((l) => l.name ?? l.email).join(', ')}
+                          👤{' '}
+                          {leaders.map((l, i) => (
+                            <span key={l.id}>
+                              {i > 0 && ', '}
+                              <UserLink userId={l.id} name={l.name} email={l.email} className="hover:text-indigo-800" />
+                            </span>
+                          ))}
                         </p>
                       )}
                       <div className="flex flex-wrap items-center gap-3 mt-1.5">
@@ -178,7 +185,13 @@ export default async function TeamsPage({
                       )}
                       {leaders.length > 0 && (
                         <p className="text-xs text-indigo-600 mt-0.5">
-                          👤 {leaders.map((l) => l.name ?? l.email).join(', ')}
+                          👤{' '}
+                          {leaders.map((l, i) => (
+                            <span key={l.id}>
+                              {i > 0 && ', '}
+                              <UserLink userId={l.id} name={l.name} email={l.email} className="hover:text-indigo-800" />
+                            </span>
+                          ))}
                         </p>
                       )}
                       <p className="text-xs text-gray-400 mt-1">

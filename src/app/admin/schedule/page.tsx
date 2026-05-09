@@ -20,6 +20,7 @@ import {
 } from '@/lib/calendar';
 import { createCalendarEvent, deleteCalendarEvent } from './actions';
 import type { CalendarEventType } from '@/lib/db-types';
+import UserLink from '@/components/UserLink';
 
 export default async function AdminSchedulePage({
   searchParams,
@@ -341,7 +342,12 @@ export default async function AdminSchedulePage({
                             {ev.signups.map((s) => (
                               <div key={s.id} className="flex items-center gap-2 text-xs">
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
-                                <span className="font-medium text-gray-700">{s.user.name ?? s.user.email}</span>
+                                <UserLink
+                                  userId={s.user.id}
+                                  name={s.user.name}
+                                  email={s.user.email}
+                                  className="font-medium text-gray-700 hover:text-blue-600"
+                                />
                                 {s.user.name && <span className="text-gray-400">{s.user.email}</span>}
                               </div>
                             ))}
