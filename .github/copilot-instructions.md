@@ -176,3 +176,116 @@ All required config is in `.env` (copy from `.env.example`). Key categories:
 - **Type checking**: `npm run typecheck` is fast and catches many issues before runtime
 - **Development**: Use `npm run dev` to test locally; logs include email output if SMTP is not configured
 - **Database debugging**: SQLite commands can be run directly; schema is always readable in `src/lib/db.ts`
+
+---
+
+## "Trigger QC Checks" — End-of-Session Quality Control Workflow
+
+When the user says **"trigger QC checks"**, execute ALL of the following steps in order. Report results for each step before proceeding to the next. Do not skip any step even if a previous step passes cleanly.
+
+---
+
+### Step 1 — Increment Bugfix Version Number
+
+1. Read the current `version` field from `package.json`.
+2. Increment the **patch** (third) segment by 1 (e.g. `0.10.3` → `0.10.4`).
+3. Write the new version back to `package.json`.
+4. Record the new version string — it will be used in Steps 5 and 6.
+
+---
+
+### Step 2 — Code Efficiency Review
+
+Scan **all files changed during this session** plus any files they import or depend on. Also spot-check the rest of `src/` for pre-existing issues that are directly coupled to changed code. For each file reviewed, check:
+
+- **Dead code**: unused imports, variables, functions, or branches — remove them.
+- **Redundant DB queries**: queries inside loops, duplicate fetches within a single request — consolidate.
+- **Unnecessary re-renders**: React components that re-render without state/prop changes — apply `useMemo` / `useCallback` where appropriate.
+- **Large inline data**: hardcoded arrays or objects that belong in a constant or config file.
+- **Unhandled async errors**: any `async` function or Promise chain that lacks a `catch` / `try-catch`.
+- **TypeScript `any` usage**: replace with proper types.
+
+Apply fixes directly. Report a summary of what was changed and why.
+
+---
+
+### Step 3 — Dependency Health Check
+
+Run the following commands in sequence and report the full output:
+
+```bash
+npm run build
+npm audit
+```
+
+- If `npm run build` fails, diagnose and fix the error before continuing.
+- If `npm audit` reports **critical** or **high** vulnerabilities, attempt `npm audit fix`. If `npm audit fix --force` would be required (breaking changes), report it to the user and do NOT apply it automatically.
+- If all dependencies are clean, state so explicitly.
+
+---
+
+### Step 4 — Security Testing
+
+Systematically review every route, API endpoint, form, and file operation that was added or modified in this session. Test/verify the following threat categories:
+
+#### 4a — Authenticated user deliberate attacks
+- Can a signed-in user escalate privileges by crafting a request with a different `userId` or role?
+- Are all server actions and API routes protected with `requireCapability()` or equivalent?
+- Are IDOR (Insecure Direct Object Reference) attacks blocked — i.e., can user A access user B's data by guessing an ID?
+
+#### 4b — Public / unauthenticated deliberate attacks
+- Are all non-public routes and API endpoints inaccessible without a valid session?
+- Is rate-limiting or Cloudflare Turnstile applied to auth endpoints (login, OTP, password reset)?
+- Are SQL injection vectors blocked — all user-supplied values bound via `?` placeholders, never string-interpolated into SQL?
+- Are XSS vectors blocked — all user content rendered via React (auto-escaped) or explicitly sanitised before output?
+- Are path traversal attacks on file upload/download endpoints blocked?
+
+#### 4c — Content Security Policy & headers
+- Verify `next.config.mjs` headers still include: `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, and a valid `Content-Security-Policy`.
+
+Report each finding with file and line number. Fix any issues found and list the fixes applied.
+
+---
+
+### Step 5 — User Input Protection Review
+
+For every user-facing form, input, or action added or modified in this session:
+
+- **Client-side validation**: Is there immediate feedback for required fields, format errors (email, date, number ranges)?
+- **Server-side validation**: Does the corresponding server action or API route independently re-validate all inputs — never trusting client-side alone?
+- **Sanitisation**: Are text inputs trimmed? Are lengths capped to reasonable maximums?
+- **Confirmation prompts**: Do destructive actions (delete, archive, bulk-update) require an explicit confirmation step before execution?
+- **Friendly error messages**: Are error states surfaced to the user clearly without leaking internal stack traces or SQL errors?
+
+Fix any gaps found and report what was changed.
+
+---
+
+### Step 6 — Documentation Update
+
+Update the following documents to reflect the new version and any new features or functions created during this session:
+
+1. **`package.json`** — already updated in Step 1.
+2. **`docs/user-manual.md`** — update the version number in the header/footer; add a new section or bullet points describing any new user-facing features.
+3. **`docs/technical-architecture.md`** — update the version number; add entries for any new API routes, DB tables, capabilities, or architectural changes.
+4. **`docs/development-log.md`** — append a new dated entry summarising: version bumped, changes made this session, security checks run, issues found and fixed.
+5. **`README.md`** — update the version badge or version reference if one exists.
+
+Use the format `vX.Y.Z` consistently across all documents.
+
+---
+
+### QC Checks — Completion Report
+
+After all steps are done, output a concise summary table:
+
+| Step | Status | Notes |
+|------|--------|-------|
+| 1 — Version bump | ✅ / ❌ | Old → New version |
+| 2 — Code efficiency | ✅ / ⚠️ | Files changed, issues fixed |
+| 3 — Dependencies | ✅ / ⚠️ | Build status, audit result |
+| 4 — Security testing | ✅ / ⚠️ | Findings and fixes |
+| 5 — Input protection | ✅ / ⚠️ | Issues found and fixed |
+| 6 — Documentation | ✅ / ❌ | Docs updated |
+
+If any step has warnings or failures that require user decisions, list them explicitly at the end of the report.
