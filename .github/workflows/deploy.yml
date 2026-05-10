@@ -63,8 +63,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          BUILD_AUTH_SECRET="$(openssl rand -hex 32)"
-          BUILD_DB_ENCRYPTION_KEY="$(openssl rand -hex 32)"
+          BUILD_AUTH_SECRET="$(openssl rand -base64 32)"
+          BUILD_DB_ENCRYPTION_KEY="$(openssl rand -base64 32)"
           echo "::add-mask::$BUILD_AUTH_SECRET"
           echo "::add-mask::$BUILD_DB_ENCRYPTION_KEY"
           echo "BUILD_AUTH_SECRET=$BUILD_AUTH_SECRET" >> "$GITHUB_ENV"

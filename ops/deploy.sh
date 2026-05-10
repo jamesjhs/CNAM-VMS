@@ -23,6 +23,7 @@ if [[ ! -f "$ARTIFACT_PATH" ]]; then
 fi
 
 mkdir -p "$RELEASES_DIR" "$SHARED_DIR/data" "$SHARED_DIR/uploads" "$SHARED_DIR/logs"
+chmod 750 "$RELEASES_DIR" "$SHARED_DIR" "$SHARED_DIR/data" "$SHARED_DIR/uploads" "$SHARED_DIR/logs" || true
 
 if [[ ! -f "$SHARED_DIR/.env" ]]; then
   echo "Missing required environment file: $SHARED_DIR/.env"
@@ -30,7 +31,7 @@ if [[ ! -f "$SHARED_DIR/.env" ]]; then
   exit 1
 fi
 
-RELEASE_ID="$(date -u +%Y%m%d%H%M%S)-$$"
+RELEASE_ID="$(date -u +%Y%m%d%H%M%S)-$(date -u +%N)-$$"
 NEW_RELEASE_DIR="$RELEASES_DIR/$RELEASE_ID"
 mkdir -p "$NEW_RELEASE_DIR"
 
@@ -65,7 +66,7 @@ if ! curl -fsS --max-time 3 "http://127.0.0.1:3001/" >/dev/null; then
   exit 1
 fi
 
-if [[ "$RELEASES_TO_KEEP" =~ ^[1-9][0-9]*$ ]]; then
+if [[ "$RELEASES_TO_KEEP" =~ ^[1-9][0-9]*$ ]] && (( RELEASES_TO_KEEP <= 100 )); then
   mapfile -t RELEASE_LIST < <(ls -1dt "$RELEASES_DIR"/* 2>/dev/null || true)
   if (( ${#RELEASE_LIST[@]} > RELEASES_TO_KEEP )); then
     for OLD_RELEASE in "${RELEASE_LIST[@]:RELEASES_TO_KEEP}"; do
@@ -73,7 +74,7 @@ if [[ "$RELEASES_TO_KEEP" =~ ^[1-9][0-9]*$ ]]; then
     done
   fi
 else
-  echo "Skipping release cleanup because RELEASES_TO_KEEP is not a positive integer: $RELEASES_TO_KEEP"
+  echo "Skipping release cleanup because RELEASES_TO_KEEP must be an integer between 1 and 100: $RELEASES_TO_KEEP"
 fi
 
 echo "Deployment complete: $RELEASE_ID"
