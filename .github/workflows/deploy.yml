@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: deploy-production
   cancel-in-progress: false
@@ -32,7 +35,7 @@ jobs:
         shell: bash
         run: |
           has_script() {
-            node -e "const name = process.argv[1]; const scripts = require('./package.json').scripts || {}; process.exit(scripts[name] ? 0 : 1)" "$1"
+            node -e "const name = process.argv[2]; const scripts = require('./package.json').scripts || {}; process.exit(scripts[name] ? 0 : 1)" "$1"
           }
 
           if has_script lint; then
@@ -124,8 +127,8 @@ EOF
           set -euo pipefail
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
           printf '%s\n' "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
@@ -139,12 +142,13 @@ EOF
           set -euo pipefail
           PORT="${DEPLOY_PORT:-22}"
           ARTIFACT_FILE=$(ls cnam-vms-*.tar.gz)
+          SSH_OPTS="-i ~/.ssh/deploy_key -o IdentitiesOnly=yes"
 
-          ssh -p "$PORT" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p /tmp/cnam-vms-deploy"
+          ssh $SSH_OPTS -p "$PORT" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p /tmp/cnam-vms-deploy"
 
-          scp -P "$PORT" "$ARTIFACT_FILE" "$DEPLOY_USER@$DEPLOY_HOST:/tmp/cnam-vms-deploy/$ARTIFACT_FILE"
-          scp -P "$PORT" ops/deploy.sh "$DEPLOY_USER@$DEPLOY_HOST:/tmp/cnam-vms-deploy/deploy.sh"
-          scp -P "$PORT" ops/rollback.sh "$DEPLOY_USER@$DEPLOY_HOST:/tmp/cnam-vms-deploy/rollback.sh"
+          scp $SSH_OPTS -P "$PORT" "$ARTIFACT_FILE" "$DEPLOY_USER@$DEPLOY_HOST:/tmp/cnam-vms-deploy/$ARTIFACT_FILE"
+          scp $SSH_OPTS -P "$PORT" ops/deploy.sh "$DEPLOY_USER@$DEPLOY_HOST:/tmp/cnam-vms-deploy/deploy.sh"
+          scp $SSH_OPTS -P "$PORT" ops/rollback.sh "$DEPLOY_USER@$DEPLOY_HOST:/tmp/cnam-vms-deploy/rollback.sh"
 
       - name: Run remote deploy
         shell: bash
@@ -156,5 +160,6 @@ EOF
           set -euo pipefail
           PORT="${DEPLOY_PORT:-22}"
           ARTIFACT_FILE=$(ls cnam-vms-*.tar.gz)
+          SSH_OPTS="-i ~/.ssh/deploy_key -o IdentitiesOnly=yes"
 
-          ssh -p "$PORT" "$DEPLOY_USER@$DEPLOY_HOST" "chmod +x /tmp/cnam-vms-deploy/deploy.sh /tmp/cnam-vms-deploy/rollback.sh && /tmp/cnam-vms-deploy/deploy.sh /tmp/cnam-vms-deploy/$ARTIFACT_FILE"
+          ssh $SSH_OPTS -p "$PORT" "$DEPLOY_USER@$DEPLOY_HOST" "chmod +x /tmp/cnam-vms-deploy/deploy.sh /tmp/cnam-vms-deploy/rollback.sh && /tmp/cnam-vms-deploy/deploy.sh /tmp/cnam-vms-deploy/$ARTIFACT_FILE"

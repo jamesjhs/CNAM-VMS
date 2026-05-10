@@ -145,6 +145,8 @@ Use `ops/rollback.sh` on the VPS:
 /tmp/cnam-vms-deploy/rollback.sh 20260510123456
 ```
 
+> `/tmp/cnam-vms-deploy` is a temporary path used by the workflow. Keep a persistent copy of `ops/rollback.sh` (for example in `/var/node/cnamvms.jahosi.co.uk-3001/shared/bin/`) if you want manual rollback available after reboots.
+
 Rollback steps:
 
 1. Repoint `current` to a previous release

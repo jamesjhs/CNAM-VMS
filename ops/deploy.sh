@@ -8,7 +8,7 @@ CURRENT_LINK="$APP_ROOT/current"
 RELEASES_TO_KEEP="${RELEASES_TO_KEEP:-5}"
 
 usage() {
-  echo "Usage: $0 /absolute/path/to/cnam-vms-<sha>.tar.gz"
+  echo "Usage: $0 /absolute/path/to/artifact.tar.gz"
 }
 
 if [[ $# -ne 1 ]]; then
@@ -64,13 +64,15 @@ if ! curl -fsS --max-time 3 "http://127.0.0.1:3001/" >/dev/null; then
   exit 1
 fi
 
-if [[ "$RELEASES_TO_KEEP" =~ ^[0-9]+$ ]] && (( RELEASES_TO_KEEP > 0 )); then
+if [[ "$RELEASES_TO_KEEP" =~ ^[1-9][0-9]*$ ]]; then
   mapfile -t RELEASE_LIST < <(ls -1dt "$RELEASES_DIR"/* 2>/dev/null || true)
   if (( ${#RELEASE_LIST[@]} > RELEASES_TO_KEEP )); then
     for OLD_RELEASE in "${RELEASE_LIST[@]:RELEASES_TO_KEEP}"; do
       rm -rf "$OLD_RELEASE"
     done
   fi
+else
+  echo "Skipping release cleanup because RELEASES_TO_KEEP is not a positive integer: $RELEASES_TO_KEEP"
 fi
 
 echo "Deployment complete: $RELEASE_ID"
