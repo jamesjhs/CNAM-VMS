@@ -30,7 +30,7 @@ if [[ ! -f "$SHARED_DIR/.env" ]]; then
   exit 1
 fi
 
-RELEASE_ID="$(date -u +%Y%m%d%H%M%S)"
+RELEASE_ID="$(date -u +%Y%m%d%H%M%S)-$$"
 NEW_RELEASE_DIR="$RELEASES_DIR/$RELEASE_ID"
 mkdir -p "$NEW_RELEASE_DIR"
 

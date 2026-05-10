@@ -63,8 +63,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "BUILD_AUTH_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
-          echo "BUILD_DB_ENCRYPTION_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          BUILD_AUTH_SECRET="$(openssl rand -hex 32)"
+          BUILD_DB_ENCRYPTION_KEY="$(openssl rand -hex 32)"
+          echo "::add-mask::$BUILD_AUTH_SECRET"
+          echo "::add-mask::$BUILD_DB_ENCRYPTION_KEY"
+          echo "BUILD_AUTH_SECRET=$BUILD_AUTH_SECRET" >> "$GITHUB_ENV"
+          echo "BUILD_DB_ENCRYPTION_KEY=$BUILD_DB_ENCRYPTION_KEY" >> "$GITHUB_ENV"
 
       - name: Build
         run: npm run build

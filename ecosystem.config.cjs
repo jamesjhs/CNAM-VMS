@@ -1,8 +1,12 @@
+const APP_ROOT = '/var/node/cnamvms.jahosi.co.uk-3001';
+const CURRENT_PATH = `${APP_ROOT}/current`;
+const LOG_PATH = `${APP_ROOT}/shared/logs`;
+
 module.exports = {
   apps: [
     {
       name: 'cnam-vms',
-      cwd: '/var/node/cnamvms.jahosi.co.uk-3001/current',
+      cwd: CURRENT_PATH,
       script: '.next/standalone/server.js',
       interpreter: 'node',
       instances: 1,
@@ -13,10 +17,10 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: '3001',
-        APP_ROOT: '/var/node/cnamvms.jahosi.co.uk-3001/current',
+        APP_ROOT: CURRENT_PATH,
       },
-      out_file: '/var/node/cnamvms.jahosi.co.uk-3001/shared/logs/pm2-out.log',
-      error_file: '/var/node/cnamvms.jahosi.co.uk-3001/shared/logs/pm2-error.log',
+      out_file: `${LOG_PATH}/pm2-out.log`,
+      error_file: `${LOG_PATH}/pm2-error.log`,
       merge_logs: true,
       time: true,
       kill_timeout: 10000,
