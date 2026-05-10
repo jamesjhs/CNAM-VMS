@@ -61,6 +61,9 @@ APP_ROOT=/var/node/cnamvms.jahosi.co.uk-3001
 Why: avoids repeating long paths and reduces typing mistakes.  
 Consequence: later commands that use `$APP_ROOT` will point to the correct application root.
 
+If your SSH session disconnects, run the `APP_ROOT=...` command again before continuing.  
+If preferred, add it to `~/.bashrc` so it is available in new terminal sessions.
+
 #### 3) Create required release/shared directory structure
 
 ```bash
@@ -113,6 +116,12 @@ EMAIL_FROM=CNAM VMS <noreply@example.com>
 ROOT_USER_EMAIL=<admin@example.com>
 ROOT_USER_NAME=<Root Admin>
 UPLOAD_MAX_SIZE_MB=10
+```
+
+Generate strong values for `AUTH_SECRET` and `DB_ENCRYPTION_KEY`, for example:
+
+```bash
+openssl rand -base64 32
 ```
 
 #### 5) Install PM2 globally if not already installed
@@ -203,6 +212,8 @@ On VPS:
 ```bash
 /tmp/cnam-vms-deploy/rollback.sh
 ```
+
+> Warning: `/tmp/cnam-vms-deploy` is temporary and may be removed after reboot. See persistent-copy step below.
 
 or target a specific release:
 
