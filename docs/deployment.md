@@ -24,7 +24,7 @@ git pull && npm install && npm run build && pm2 restart
 
 - **VPS** = **Virtual Private Server** (your rented Linux server)
 - **CI** = **Continuous Integration** (GitHub Actions builds/testing in the cloud)
-- **CD** = **Continuous Deployment/Delivery** (automated release from CI to server)
+- **CD** = **Continuous Deployment** (every successful `main` build in this repo is automatically deployed to production)
 - **SSH** = **Secure Shell** (encrypted remote terminal/file transfer protocol)
 - **PM2** = **Process Manager 2** (keeps your Node.js app running and restartable)
 - **URL** = **Uniform Resource Locator** (web address, e.g. `https://cnamvms.jahosi.co.uk`)
@@ -95,7 +95,7 @@ Consequence:
 - Deploy script can symlink this `.env` into each release
 - Secrets are not baked into CI artifacts
 
-Minimum recommended values (example):
+Minimum required values (example):
 
 ```dotenv
 NODE_ENV=production
@@ -103,6 +103,16 @@ PORT=3001
 AUTH_URL=https://cnamvms.jahosi.co.uk
 DATABASE_URL=file:/var/node/cnamvms.jahosi.co.uk-3001/shared/data/cnam-vms.db
 UPLOAD_DIR=/var/node/cnamvms.jahosi.co.uk-3001/shared/uploads
+AUTH_SECRET=<secure-random-value>
+DB_ENCRYPTION_KEY=<secure-random-value>
+EMAIL_SERVER_HOST=<smtp-host>
+EMAIL_SERVER_PORT=587
+EMAIL_SERVER_USER=<smtp-user>
+EMAIL_SERVER_PASSWORD=<smtp-password>
+EMAIL_FROM=CNAM VMS <noreply@example.com>
+ROOT_USER_EMAIL=<admin@example.com>
+ROOT_USER_NAME=<Root Admin>
+UPLOAD_MAX_SIZE_MB=10
 ```
 
 #### 5) Install PM2 globally if not already installed
@@ -126,7 +136,7 @@ Create:
 - `DEPLOY_KNOWN_HOSTS` (output of `ssh-keyscan -H <host>`)
 
 Why: workflow must authenticate to VPS without hardcoded credentials.  
-Consequence: deploy workflow can securely SCP (Secure Copy) and SSH to server.
+Consequence: deploy workflow can securely use SCP (Secure Copy) and SSH (Secure Shell) to the server.
 
 #### 7) Trigger first artifact deployment
 
@@ -202,6 +212,15 @@ or target a specific release:
 
 Why: quickly repoints `current` to an older known-good release and reloads PM2.  
 Consequence: service returns to older code without rebuilding from source.
+
+`/tmp/cnam-vms-deploy/rollback.sh` is uploaded by the deployment workflow during each run.  
+Because `/tmp` is temporary, keep a persistent copy for manual emergency use, for example:
+
+```bash
+mkdir -p "$APP_ROOT/shared/bin"
+cp /tmp/cnam-vms-deploy/rollback.sh "$APP_ROOT/shared/bin/rollback.sh"
+chmod 750 "$APP_ROOT/shared/bin/rollback.sh"
+```
 
 ## VPS Directory Layout
 
