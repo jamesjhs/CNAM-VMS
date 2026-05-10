@@ -94,9 +94,9 @@ jobs:
           cp ecosystem.config.cjs "$ARTIFACT_ROOT/ecosystem.config.cjs"
 
           # Never ship mutable/persistent data in artifacts.
-          if [[ -f "$ARTIFACT_ROOT/.next/standalone/data/cnam-vms.db" ]]; then
-            rm -f "$ARTIFACT_ROOT/.next/standalone/data/cnam-vms.db"
-            echo "Removed CI database from artifact payload"
+          if [[ -d "$ARTIFACT_ROOT/.next/standalone/data" ]]; then
+            rm -rf "$ARTIFACT_ROOT/.next/standalone/data"
+            echo "Removed standalone data directory from artifact payload"
           fi
 
           cat > "$ARTIFACT_ROOT/REVISION" <<EOF
