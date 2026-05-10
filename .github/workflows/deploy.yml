@@ -1,0 +1,160 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build deployment artifact
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Detect optional scripts
+        id: scripts
+        shell: bash
+        run: |
+          has_script() {
+            node -e "const name = process.argv[1]; const scripts = require('./package.json').scripts || {}; process.exit(scripts[name] ? 0 : 1)" "$1"
+          }
+
+          if has_script lint; then
+            echo "run_lint=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_lint=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if has_script typecheck; then
+            echo "run_typecheck=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_typecheck=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Lint
+        if: steps.scripts.outputs.run_lint == 'true'
+        run: npm run lint
+
+      - name: Typecheck
+        if: steps.scripts.outputs.run_typecheck == 'true'
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+        env:
+          AUTH_SECRET: ci-build-secret-not-for-production
+          AUTH_URL: https://cnamvms.jahosi.co.uk
+          DATABASE_URL: file:./data/cnam-vms.db
+          DB_ENCRYPTION_KEY: ci-build-key-not-for-production
+          ROOT_USER_EMAIL: ci@example.com
+          ROOT_USER_NAME: CI Root
+          UPLOAD_DIR: ./uploads
+
+      - name: Package artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARTIFACT_ROOT="release"
+          ARTIFACT_NAME="cnam-vms-${GITHUB_SHA}.tar.gz"
+
+          rm -rf "$ARTIFACT_ROOT"
+          mkdir -p "$ARTIFACT_ROOT/.next"
+
+          cp -R .next/standalone "$ARTIFACT_ROOT/.next/standalone"
+          cp -R .next/static "$ARTIFACT_ROOT/.next/static"
+          cp -R public "$ARTIFACT_ROOT/public"
+          cp package.json "$ARTIFACT_ROOT/package.json"
+          cp ecosystem.config.cjs "$ARTIFACT_ROOT/ecosystem.config.cjs"
+
+          # Never ship mutable/persistent data in artifacts.
+          rm -f "$ARTIFACT_ROOT/.next/standalone/data/cnam-vms.db" || true
+
+          cat > "$ARTIFACT_ROOT/REVISION" <<EOF
+commit=${GITHUB_SHA}
+ref=${GITHUB_REF_NAME}
+built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+run_id=${GITHUB_RUN_ID}
+EOF
+
+          tar -czf "$ARTIFACT_NAME" -C "$ARTIFACT_ROOT" .
+          echo "artifact_name=$ARTIFACT_NAME" >> "$GITHUB_ENV"
+
+      - name: Upload deployment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-artifact
+          path: ${{ env.artifact_name }}
+          retention-days: 14
+
+  deploy:
+    name: Deploy to VPS
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download deployment artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deploy-artifact
+          path: .
+
+      - name: Set up SSH key
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Upload artifact and scripts
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          PORT="${DEPLOY_PORT:-22}"
+          ARTIFACT_FILE=$(ls cnam-vms-*.tar.gz)
+
+          ssh -p "$PORT" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p /tmp/cnam-vms-deploy"
+
+          scp -P "$PORT" "$ARTIFACT_FILE" "$DEPLOY_USER@$DEPLOY_HOST:/tmp/cnam-vms-deploy/$ARTIFACT_FILE"
+          scp -P "$PORT" ops/deploy.sh "$DEPLOY_USER@$DEPLOY_HOST:/tmp/cnam-vms-deploy/deploy.sh"
+          scp -P "$PORT" ops/rollback.sh "$DEPLOY_USER@$DEPLOY_HOST:/tmp/cnam-vms-deploy/rollback.sh"
+
+      - name: Run remote deploy
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          PORT="${DEPLOY_PORT:-22}"
+          ARTIFACT_FILE=$(ls cnam-vms-*.tar.gz)
+
+          ssh -p "$PORT" "$DEPLOY_USER@$DEPLOY_HOST" "chmod +x /tmp/cnam-vms-deploy/deploy.sh /tmp/cnam-vms-deploy/rollback.sh && /tmp/cnam-vms-deploy/deploy.sh /tmp/cnam-vms-deploy/$ARTIFACT_FILE"
