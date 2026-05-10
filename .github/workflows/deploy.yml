@@ -58,13 +58,21 @@ jobs:
         if: steps.scripts.outputs.run_typecheck == 'true'
         run: npm run typecheck
 
+      - name: Generate ephemeral build secrets
+        id: build-secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "BUILD_AUTH_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "BUILD_DB_ENCRYPTION_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
       - name: Build
         run: npm run build
         env:
-          AUTH_SECRET: ci-build-secret-not-for-production
+          AUTH_SECRET: ${{ env.BUILD_AUTH_SECRET }}
           AUTH_URL: https://cnamvms.jahosi.co.uk
           DATABASE_URL: file:./data/cnam-vms.db
-          DB_ENCRYPTION_KEY: ci-build-key-not-for-production
+          DB_ENCRYPTION_KEY: ${{ env.BUILD_DB_ENCRYPTION_KEY }}
           ROOT_USER_EMAIL: ci@example.com
           ROOT_USER_NAME: CI Root
           UPLOAD_DIR: ./uploads
@@ -86,7 +94,10 @@ jobs:
           cp ecosystem.config.cjs "$ARTIFACT_ROOT/ecosystem.config.cjs"
 
           # Never ship mutable/persistent data in artifacts.
-          rm -f "$ARTIFACT_ROOT/.next/standalone/data/cnam-vms.db" || true
+          if [[ -f "$ARTIFACT_ROOT/.next/standalone/data/cnam-vms.db" ]]; then
+            rm -f "$ARTIFACT_ROOT/.next/standalone/data/cnam-vms.db"
+            echo "Removed CI database from artifact payload"
+          fi
 
           cat > "$ARTIFACT_ROOT/REVISION" <<EOF
 commit=${GITHUB_SHA}

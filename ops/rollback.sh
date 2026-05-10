@@ -37,7 +37,9 @@ if [[ -z "$TARGET_RELEASE" ]]; then
 fi
 
 if [[ -z "$TARGET_RELEASE" ]]; then
-  echo "Unable to determine rollback target"
+  echo "Unable to determine rollback target automatically."
+  echo "This usually means only one release exists or all releases match current."
+  echo "Select a target manually from the list above: $0 <release-id>"
   exit 1
 fi
 

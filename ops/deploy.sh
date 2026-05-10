@@ -26,6 +26,7 @@ mkdir -p "$RELEASES_DIR" "$SHARED_DIR/data" "$SHARED_DIR/uploads" "$SHARED_DIR/l
 
 if [[ ! -f "$SHARED_DIR/.env" ]]; then
   echo "Missing required environment file: $SHARED_DIR/.env"
+  echo "Create it from .env.example and follow docs/deployment.md before deploying."
   exit 1
 fi
 
