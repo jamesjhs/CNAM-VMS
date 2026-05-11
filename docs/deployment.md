@@ -139,12 +139,11 @@ Consequence: `pm2` command becomes available for `nodeapp`.
 Go to: **Repository → Settings → Secrets and variables → Actions → New repository secret**  
 Create:
 
-- `DEPLOY_HOST` (deploy target hostname)
+- `DEPLOY_HOST` (deploy target hostname or IP; SSH connects directly to this, not through Cloudflare Tunnel)
 - `DEPLOY_USER` (`nodeapp`)
 - `DEPLOY_SSH_KEY` (private SSH key text)
 - `DEPLOY_KNOWN_HOSTS` (one known_hosts line: `<DEPLOY_HOST secret value> $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub)`)
-- `CF_CLIENT_ID` (Cloudflare Access client ID used for tunnel-protected access)
-- `CF_CLIENT_SECRET` (Cloudflare Access client secret used for tunnel-protected access)
+- `DEPLOY_PORT` (optional — SSH port; defaults to `22` if not set)
 
 For `DEPLOY_KNOWN_HOSTS`, create the value on the VPS with:
 
@@ -204,7 +203,9 @@ Open in browser:
 Why: validates end-to-end path (Cloudflare Tunnel → Nginx → PM2/Node app).  
 Consequence: confirms users can reach production over public URL.
 
-#### 11) (Optional) Connect through Cloudflare Tunnel using Client ID + Client Secret
+#### 11) (Optional) Test Cloudflare Tunnel access manually with a service token
+
+> **Note:** `CF_CLIENT_ID` and `CF_CLIENT_SECRET` are Cloudflare Access service token credentials used for manual verification only. The deployment workflow does **not** use them — SSH deploys go directly to the server, and the Cloudflare Tunnel is managed separately by the root user.
 
 If your tunnel is protected by Cloudflare Access service tokens, test access with:
 
@@ -341,12 +342,11 @@ Workflow file: `.github/workflows/deploy.yml`
 
 Set these repository secrets before enabling production deploys:
 
-- `DEPLOY_HOST` — deploy target hostname (for tunnel/SSH access; not a raw server IP)
+- `DEPLOY_HOST` — SSH target hostname or IP (SSH connects directly; Cloudflare Tunnel is managed separately by root and is not involved in deployments)
 - `DEPLOY_USER` — SSH username (`nodeapp`)
 - `DEPLOY_SSH_KEY` — private key for the deploy user (PEM/OpenSSH format)
 - `DEPLOY_KNOWN_HOSTS` — one known_hosts-formatted line built from the exact `DEPLOY_HOST` secret value + `sudo cat /etc/ssh/ssh_host_ed25519_key.pub` output
-- `CF_CLIENT_ID` — Cloudflare Access service token client ID
-- `CF_CLIENT_SECRET` — Cloudflare Access service token client secret
+- `DEPLOY_PORT` — (optional) SSH port; omit to use the default port 22
 
 Build `DEPLOY_KNOWN_HOSTS` value using:
 
