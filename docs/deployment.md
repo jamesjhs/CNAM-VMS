@@ -142,14 +142,14 @@ Create:
 - `DEPLOY_HOST` (deploy target hostname)
 - `DEPLOY_USER` (`nodeapp`)
 - `DEPLOY_SSH_KEY` (private SSH key text)
-- `DEPLOY_KNOWN_HOSTS` (one known_hosts line: `<deploy-hostname> $(cat /etc/ssh/ssh_host_ed25519_key.pub)`)
+- `DEPLOY_KNOWN_HOSTS` (one known_hosts line: `<DEPLOY_HOST secret value> $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub)`)
 - `CF_CLIENT_ID` (Cloudflare Access client ID used for tunnel-protected access)
 - `CF_CLIENT_SECRET` (Cloudflare Access client secret used for tunnel-protected access)
 
 For `DEPLOY_KNOWN_HOSTS`, create the value on the VPS with:
 
 ```bash
-echo "<deploy-hostname> $(cat /etc/ssh/ssh_host_ed25519_key.pub)"
+echo "<exact DEPLOY_HOST secret value> $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub)"
 ```
 
 Why: workflow must authenticate to VPS without hardcoded credentials.  
@@ -344,14 +344,14 @@ Set these repository secrets before enabling production deploys:
 - `DEPLOY_HOST` — deploy target hostname (for tunnel/SSH access; not a raw server IP)
 - `DEPLOY_USER` — SSH username (`nodeapp`)
 - `DEPLOY_SSH_KEY` — private key for the deploy user (PEM/OpenSSH format)
-- `DEPLOY_KNOWN_HOSTS` — one known_hosts-formatted line built from deploy hostname + `cat /etc/ssh/ssh_host_ed25519_key.pub` output
+- `DEPLOY_KNOWN_HOSTS` — one known_hosts-formatted line built from the exact `DEPLOY_HOST` secret value + `sudo cat /etc/ssh/ssh_host_ed25519_key.pub` output
 - `CF_CLIENT_ID` — Cloudflare Access service token client ID
 - `CF_CLIENT_SECRET` — Cloudflare Access service token client secret
 
 Build `DEPLOY_KNOWN_HOSTS` value using:
 
 ```bash
-echo "<deploy-hostname> $(cat /etc/ssh/ssh_host_ed25519_key.pub)"
+echo "<exact DEPLOY_HOST secret value> $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub)"
 ```
 
 ## First-time Server Bootstrap
