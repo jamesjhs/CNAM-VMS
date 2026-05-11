@@ -1,108 +1,429 @@
 # CNAM-VMS Deployment Guide
 
-## Requirements
+This project now uses an **artifact-based deployment** flow built in GitHub Actions. The VPS no longer needs a local Git checkout or build toolchain for routine releases.
 
-- Node.js 20+
-- SMTP server or mail service
-- Linux VPS (Ubuntu 22.04 recommended)
+## Production Host Details
 
-## Environment Variables
+- Public URL: `https://cnamvms.jahosi.co.uk`
+- Linux user: `nodeapp`
+- App root: `/var/node/cnamvms.jahosi.co.uk-3001`
+- Runtime: PM2 + Node.js 24
+- Reverse proxy: Nginx
+- Ingress/TLS: Cloudflare Tunnel
 
-Copy `.env.example` to `.env` and fill in the values:
+## Step-by-step Migration Manual (from `git pull` deploys to artifact deploys)
 
-| Variable | Description | Example |
-|---|---|---|
-| `DATABASE_URL` | SQLite file path | `file:./data/cnam-vms.db` |
-| `DB_ENCRYPTION_KEY` | AES-256/SQLCipher key (generate with `openssl rand -base64 32`) | — |
-| `AUTH_SECRET` | NextAuth secret (generate with `openssl rand -base64 32`) | — |
-| `AUTH_URL` | Public URL of the app | `http://vms.example.com` |
-| `EMAIL_SERVER_HOST` | SMTP hostname | `smtp.example.com` |
-| `EMAIL_SERVER_PORT` | SMTP port | `587` |
-| `EMAIL_SERVER_USER` | SMTP username | `noreply@example.com` |
-| `EMAIL_SERVER_PASSWORD` | SMTP password | — |
-| `EMAIL_FROM` | Sender address | `CNAM VMS <noreply@example.com>` |
-| `ROOT_USER_EMAIL` | Bootstrap admin email | `admin@example.com` |
-| `ROOT_USER_NAME` | Bootstrap admin name | `Root Admin` |
-| `UPLOAD_DIR` | File upload directory | `/var/uploads/cnam-vms` |
-| `UPLOAD_MAX_SIZE_MB` | Max upload size (MB) | `10` |
-
-## First-time Setup
+This section is written as a plain-English migration checklist.  
+It assumes you are moving away from this old pattern on the VPS:
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/jamesjhs/CNAM-VMS.git
-cd CNAM-VMS
-
-# 2. Install dependencies
-# (legacy-peer-deps is configured in .npmrc — no extra flag needed)
-npm ci
-
-# 3. Configure environment
-cp .env.example .env
-# Edit .env with your values
-
-# 4. Seed initial data (creates root user and roles)
-npm run db:seed
-
-# 5. Build for production
-# The postbuild step automatically copies .next/static and public/ into
-# .next/standalone/ so the standalone server can serve CSS/JS assets.
-npm run build
-
-# 6. Start the server
-npm start
+git pull && npm install && npm run build && pm2 restart
 ```
 
-## Running with PM2
+### What key terms mean (abbreviations expanded)
+
+- **VPS** = **Virtual Private Server** (your rented Linux server)
+- **CI** = **Continuous Integration** (GitHub Actions builds/testing in the cloud)
+- **CD** = **Continuous Deployment** (every successful `main` build in this repo is automatically deployed to production)
+- **SSH** = **Secure Shell** (encrypted remote terminal/file transfer protocol)
+- **PM2** = **Process Manager 2** (keeps your Node.js app running and restartable)
+- **URL** = **Uniform Resource Locator** (web address, e.g. `https://cnamvms.jahosi.co.uk`)
+- **CF Access** = **Cloudflare Access** (Cloudflare Zero Trust protection in front of your tunnel)
+
+### Why this migration is safer and better
+
+With artifact deploys, your server becomes a runtime host only. It no longer needs to compile/build app source code every deploy.  
+Consequences:
+
+- Deploys are faster and more repeatable (same artifact every time)
+- Server CPU/RAM is not wasted building
+- Rollback is easier (switch symlink to previous release)
+- Server does not need Git checkout credentials for routine deploys
+
+### Migration checklist
+
+Run these steps in order.
+
+#### 1) Connect to the VPS as the runtime user
+
+```bash
+ssh nodeapp@<your-server-host>
+```
+
+Why: opens a secure terminal session on the production server as `nodeapp`.  
+Consequence: all following commands affect production directories, so type carefully.
+
+#### 2) Define one reusable path variable for this session
+
+```bash
+APP_ROOT=/var/node/cnamvms.jahosi.co.uk-3001
+```
+
+Why: avoids repeating long paths and reduces typing mistakes.  
+Consequence: later commands that use `$APP_ROOT` will point to the correct application root.
+
+If your SSH session disconnects, run the `APP_ROOT=...` command again before continuing.  
+If preferred, add it to `~/.bashrc` so it is available in new terminal sessions.
+
+#### 3) Create required release/shared directory structure
+
+```bash
+mkdir -p "$APP_ROOT/releases" "$APP_ROOT/shared/data" "$APP_ROOT/shared/uploads" "$APP_ROOT/shared/logs"
+chmod 750 "$APP_ROOT/shared" "$APP_ROOT/shared/data" "$APP_ROOT/shared/uploads" "$APP_ROOT/shared/logs"
+```
+
+Why:
+
+- `mkdir -p` creates the folder layout needed by deploy/rollback scripts
+- `chmod 750` sets owner/group access and prevents world access
+
+Consequence:
+
+- Releases can be unpacked into `releases/`
+- Database/uploads/logs persist in `shared/` when code releases change
+
+#### 4) Create production environment file (secrets/config)
+
+```bash
+nano "$APP_ROOT/shared/.env"
+chmod 600 "$APP_ROOT/shared/.env"
+```
+
+Why:
+
+- `.env` stores runtime config and secrets outside release artifacts
+- `chmod 600` restricts file access to owner only
+
+Consequence:
+
+- Deploy script can symlink this `.env` into each release
+- Secrets are not baked into CI artifacts
+
+Minimum required values (example):
+
+```dotenv
+NODE_ENV=production
+PORT=3001
+AUTH_URL=https://cnamvms.jahosi.co.uk
+DATABASE_URL=file:/var/node/cnamvms.jahosi.co.uk-3001/shared/data/cnam-vms.db
+UPLOAD_DIR=/var/node/cnamvms.jahosi.co.uk-3001/shared/uploads
+AUTH_SECRET=<secure-random-value>
+DB_ENCRYPTION_KEY=<secure-random-value>
+EMAIL_SERVER_HOST=<smtp-host>
+EMAIL_SERVER_PORT=587
+EMAIL_SERVER_USER=<smtp-user>
+EMAIL_SERVER_PASSWORD=<smtp-password>
+EMAIL_FROM=CNAM VMS <noreply@example.com>
+ROOT_USER_EMAIL=<admin@example.com>
+ROOT_USER_NAME=<Root Admin>
+UPLOAD_MAX_SIZE_MB=10
+```
+
+Generate strong values for `AUTH_SECRET` and `DB_ENCRYPTION_KEY`, for example:
+
+```bash
+openssl rand -base64 32
+```
+
+#### 5) Install PM2 globally if not already installed
 
 ```bash
 npm install -g pm2
-pm2 start ecosystem.config.cjs
-pm2 save
+```
+
+Why: PM2 is the runtime process manager used by deploy scripts to start/reload app safely.  
+Consequence: `pm2` command becomes available for `nodeapp`.
+
+#### 6) Configure GitHub repository secrets (in GitHub web UI)
+
+Go to: **Repository → Settings → Secrets and variables → Actions → New repository secret**  
+Create:
+
+- `DEPLOY_HOST` (deploy target hostname)
+- `DEPLOY_USER` (`nodeapp`)
+- `DEPLOY_SSH_KEY` (private SSH key text)
+- `DEPLOY_KNOWN_HOSTS` (one known_hosts line: `<DEPLOY_HOST secret value> $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub)`)
+- `CF_CLIENT_ID` (Cloudflare Access client ID used for tunnel-protected access)
+- `CF_CLIENT_SECRET` (Cloudflare Access client secret used for tunnel-protected access)
+
+For `DEPLOY_KNOWN_HOSTS`, create the value on the VPS with:
+
+```bash
+echo "<exact DEPLOY_HOST secret value> $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub)"
+```
+
+Why: workflow must authenticate to VPS without hardcoded credentials.  
+Consequence: deploy workflow can securely use SCP (Secure Copy) and SSH (Secure Shell) to the server.
+
+#### 7) Trigger first artifact deployment
+
+Option A: push commit to `main`  
+Option B: run workflow manually from **Actions → Build and Deploy → Run workflow**
+
+Why: this creates a CI-built artifact and runs remote `ops/deploy.sh`.  
+Consequence:
+
+- New release folder appears under `releases/<release-id>`
+- `current` symlink points to new release
+- PM2 starts/reloads `cnam-vms`
+
+#### 8) Verify service health on the server
+
+```bash
+pm2 status cnam-vms
+curl -I http://127.0.0.1:3001/
+```
+
+Why:
+
+- `pm2 status` checks process state (online/restarting/errored)
+- `curl -I` checks local HTTP response headers quickly
+
+Consequence: confirms app is serving before checking external URL.
+
+#### 9) Persist PM2 startup configuration (one-time)
+
+```bash
 pm2 startup
+pm2 save
 ```
 
-## Backup & Restore
+Why:
 
-### Backup
+- `pm2 startup` generates boot-time service setup instructions
+- `pm2 save` saves current process list
+
+Consequence: app auto-recovers on VPS reboot (after completing printed `sudo` command, if prompted).
+
+#### 10) Confirm public endpoint
+
+Open in browser:
+
+`https://cnamvms.jahosi.co.uk`
+
+Why: validates end-to-end path (Cloudflare Tunnel → Nginx → PM2/Node app).  
+Consequence: confirms users can reach production over public URL.
+
+#### 11) (Optional) Connect through Cloudflare Tunnel using Client ID + Client Secret
+
+If your tunnel is protected by Cloudflare Access service tokens, test access with:
 
 ```bash
-# Set environment variables
-export BACKUP_DIR="/var/backups/cnam-vms"
-export UPLOAD_DIR="/var/uploads/cnam-vms"
+export CF_CLIENT_ID="<your-client-id>"
+export CF_CLIENT_SECRET="<your-client-secret>"
 
-# Run backup
-chmod +x scripts/backup.sh
-./scripts/backup.sh
+curl -I "https://cnamvms.jahosi.co.uk/" \
+  -H "CF-Access-Client-Id: $CF_CLIENT_ID" \
+  -H "CF-Access-Client-Secret: $CF_CLIENT_SECRET"
 ```
 
-### Schedule automatic backups (cron)
+Why:
+
+- the two `export` commands store your Cloudflare Access credentials in this terminal session only
+- the `curl` command sends the required Cloudflare Access headers so the request is allowed through the tunnel
+
+Consequence:
+
+- if credentials and policy are correct, you should receive a normal HTTP response (for example `200 OK` or a valid redirect)
+- if credentials are wrong or missing, Cloudflare Access blocks the request (for example `401`/`403`)
+
+Security consequence: do not paste these secrets into screenshots, chat logs, or committed files. They are effectively passwords for automated access.
+
+### How normal deployments work after migration
+
+1. You merge/push to `main`
+2. GitHub Actions builds artifact in CI
+3. Workflow copies artifact to VPS
+4. `ops/deploy.sh` creates new release, switches `current`, reloads PM2, health-checks
+
+No server-side `git pull` and no server-side build required.
+
+### How rollback works (if a bad release goes live)
+
+On VPS:
 
 ```bash
-# Daily backup at 2am
-0 2 * * * cd /opt/cnam-vms && ./scripts/backup.sh >> /var/log/cnam-vms-backup.log 2>&1
+/tmp/cnam-vms-deploy/rollback.sh
 ```
 
-### Restore
+> Warning: `/tmp/cnam-vms-deploy` is temporary and may be removed after reboot. See persistent-copy step below.
+
+or target a specific release:
 
 ```bash
-# Restore database only
-./scripts/restore.sh --db /var/backups/cnam-vms/db_20260101_020000.sqlite3
-
-# Restore database and uploads
-./scripts/restore.sh --db /var/backups/cnam-vms/db_20260101_020000.sqlite3 \
-  --uploads /var/backups/cnam-vms/uploads_20260101_020000.tar.gz
+/tmp/cnam-vms-deploy/rollback.sh <release-id>
 ```
 
-## Nginx Configuration (example)
+Why: quickly repoints `current` to an older known-good release and reloads PM2.  
+Consequence: service returns to older code without rebuilding from source.
+
+`/tmp/cnam-vms-deploy/rollback.sh` is uploaded by the deployment workflow during each run.  
+Because `/tmp` is temporary, keep a persistent copy for manual emergency use, for example:
+
+```bash
+mkdir -p "$APP_ROOT/shared/bin"
+cp /tmp/cnam-vms-deploy/rollback.sh "$APP_ROOT/shared/bin/rollback.sh"
+chmod 750 "$APP_ROOT/shared/bin/rollback.sh"
+```
+
+## VPS Directory Layout
+
+```text
+/var/node/cnamvms.jahosi.co.uk-3001/
+  releases/                       # immutable extracted build artifacts
+  shared/
+    .env                          # production runtime secrets/config
+    data/                         # persistent SQLite database location
+    uploads/                      # persistent uploaded files
+    logs/                         # shared PM2 logs
+  current -> releases/<release-id>
+```
+
+## Required Production `.env`
+
+Store this file at:
+
+`/var/node/cnamvms.jahosi.co.uk-3001/shared/.env`
+
+Example:
+
+```dotenv
+NODE_ENV=production
+PORT=3001
+AUTH_URL=https://cnamvms.jahosi.co.uk
+DATABASE_URL=file:/var/node/cnamvms.jahosi.co.uk-3001/shared/data/cnam-vms.db
+UPLOAD_DIR=/var/node/cnamvms.jahosi.co.uk-3001/shared/uploads
+DB_ENCRYPTION_KEY=<secure-random-value>
+AUTH_SECRET=<secure-random-value>
+EMAIL_SERVER_HOST=<smtp-host>
+EMAIL_SERVER_PORT=587
+EMAIL_SERVER_USER=<smtp-user>
+EMAIL_SERVER_PASSWORD=<smtp-password>
+EMAIL_FROM=CNAM VMS <noreply@example.com>
+ROOT_USER_EMAIL=<admin@example.com>
+ROOT_USER_NAME=<Root Admin>
+UPLOAD_MAX_SIZE_MB=10
+```
+
+> Keep mutable state and secrets in `shared/`. Do **not** store database files, uploads, or secrets inside release artifacts.
+
+## GitHub Actions Deployment Workflow
+
+Workflow file: `.github/workflows/deploy.yml`
+
+### Trigger
+
+- Push to `main`
+- Manual `workflow_dispatch`
+
+### Build job
+
+1. Uses Node.js 24
+2. Runs `npm ci`
+3. Runs `npm run lint` and `npm run typecheck` if scripts exist
+4. Runs `npm run build`
+5. Packages deployment artifact containing:
+   - `.next/standalone`
+   - `.next/static`
+   - `public`
+   - `package.json`
+   - `ecosystem.config.cjs`
+   - `REVISION` metadata
+6. Uploads artifact with GitHub Actions artifact storage
+
+### Deploy job
+
+1. Downloads artifact
+2. Uploads artifact plus `ops/deploy.sh` and `ops/rollback.sh` to VPS over SSH
+3. Runs remote deploy script (`/tmp/cnam-vms-deploy/deploy.sh <artifact>`) on VPS
+
+## Required GitHub Secrets
+
+Set these repository secrets before enabling production deploys:
+
+- `DEPLOY_HOST` — deploy target hostname (for tunnel/SSH access; not a raw server IP)
+- `DEPLOY_USER` — SSH username (`nodeapp`)
+- `DEPLOY_SSH_KEY` — private key for the deploy user (PEM/OpenSSH format)
+- `DEPLOY_KNOWN_HOSTS` — one known_hosts-formatted line built from the exact `DEPLOY_HOST` secret value + `sudo cat /etc/ssh/ssh_host_ed25519_key.pub` output
+- `CF_CLIENT_ID` — Cloudflare Access service token client ID
+- `CF_CLIENT_SECRET` — Cloudflare Access service token client secret
+
+Build `DEPLOY_KNOWN_HOSTS` value using:
+
+```bash
+echo "<exact DEPLOY_HOST secret value> $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub)"
+```
+
+## First-time Server Bootstrap
+
+Run these once on the VPS as `nodeapp`:
+
+```bash
+APP_ROOT=/var/node/cnamvms.jahosi.co.uk-3001
+
+mkdir -p "$APP_ROOT/releases" "$APP_ROOT/shared/data" "$APP_ROOT/shared/uploads" "$APP_ROOT/shared/logs"
+chmod 750 "$APP_ROOT/shared" "$APP_ROOT/shared/data" "$APP_ROOT/shared/uploads" "$APP_ROOT/shared/logs"
+
+# Create production env file
+nano "$APP_ROOT/shared/.env"
+chmod 600 "$APP_ROOT/shared/.env"
+
+# Install runtime tools
+npm install -g pm2
+```
+
+After the first successful GitHub Actions deployment:
+
+```bash
+pm2 status cnam-vms
+pm2 startup
+pm2 save
+```
+
+## Deploy Script Behavior
+
+`ops/deploy.sh`:
+
+- Accepts artifact path argument
+- Creates timestamped release in `releases/`
+- Extracts artifact into the new release
+- Ensures `shared/data`, `shared/uploads`, and `shared/logs` exist
+- Requires `shared/.env`
+- Symlinks `.env` and `uploads` into the new release
+- Atomically repoints `current`
+- Starts/reloads PM2 using `ecosystem.config.cjs`
+- Runs localhost health check on `http://127.0.0.1:3001/`
+- Keeps only a small number of recent releases (default: 5)
+
+## Rollback
+
+Use `ops/rollback.sh` on the VPS:
+
+```bash
+# Auto-select previous release
+/tmp/cnam-vms-deploy/rollback.sh
+
+# Roll back to a specific release ID
+/tmp/cnam-vms-deploy/rollback.sh 20260510123456
+```
+
+> `/tmp/cnam-vms-deploy` is a temporary path used by the workflow. Keep a persistent copy of `ops/rollback.sh` (for example in `/var/node/cnamvms.jahosi.co.uk-3001/shared/bin/`) if you want manual rollback available after reboots.
+
+Rollback steps:
+
+1. Repoint `current` to a previous release
+2. Reload PM2
+3. Run localhost health check
+
+## Nginx Example (upstream to PM2 on 3001)
 
 ```nginx
 server {
     listen 80;
-    server_name vms.example.com;
+    server_name cnamvms.jahosi.co.uk;
 
     location / {
-        proxy_pass http://localhost:3001;
+        proxy_pass http://127.0.0.1:3001;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -115,11 +436,4 @@ server {
 }
 ```
 
-## Upload Directory Permissions
-
-```bash
-# Create upload directory
-sudo mkdir -p /var/uploads/cnam-vms
-sudo chown www-data:www-data /var/uploads/cnam-vms
-sudo chmod 750 /var/uploads/cnam-vms
-```
+Cloudflare Tunnel should continue forwarding to the Nginx listener as currently configured.

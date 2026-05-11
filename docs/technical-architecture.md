@@ -496,23 +496,25 @@ Outputs:
 
 ### 7.2 Production Deployment
 
-Copy **only** `.next/standalone/` and `public/` to server:
+Deployments are artifact-based via GitHub Actions (`.github/workflows/deploy.yml`):
 
-```bash
-# On production server:
-cd /app/cnam-vms
-node .next/standalone/server.js
-# Listens on PORT (default 3001)
-```
+1. Build in CI with Node.js 24 (`npm ci`, optional `lint`/`typecheck`, `npm run build`)
+2. Package release artifact (`.next/standalone`, `.next/static`, `public`, `package.json`, PM2 ecosystem file, revision metadata)
+3. Upload artifact to GitHub Actions storage
+4. Copy artifact to VPS and execute remote `ops/deploy.sh`
+5. Extract to timestamped `releases/<id>`, repoint `current` symlink, reload PM2, run health check
 
-Can be managed with PM2:
-```bash
-npm install -g pm2
-pm2 start .next/standalone/server.js \
-  --name cnam-vms \
-  --env production \
-  --error /var/log/cnam-vms.log \
-  --output /var/log/cnam-vms.log
+Recommended VPS layout:
+
+```text
+/var/node/cnamvms.jahosi.co.uk-3001/
+  releases/
+  shared/
+    .env
+    data/
+    uploads/
+    logs/
+  current -> releases/<release-id>
 ```
 
 ### 7.3 Environment Setup
@@ -520,10 +522,11 @@ pm2 start .next/standalone/server.js \
 Copy `.env.example` to `.env` and configure:
 
 ```bash
-DATABASE_URL="file:./data/cnam-vms.db"
+DATABASE_URL="file:/var/node/cnamvms.jahosi.co.uk-3001/shared/data/cnam-vms.db"
 DB_ENCRYPTION_KEY="$(openssl rand -base64 32)"
 AUTH_SECRET="$(openssl rand -base64 32)"
-AUTH_URL="https://vms.example.com"
+AUTH_URL="https://cnamvms.jahosi.co.uk"
+UPLOAD_DIR="/var/node/cnamvms.jahosi.co.uk-3001/shared/uploads"
 # ... SMTP, file upload, bootstrap variables
 ```
 
