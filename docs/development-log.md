@@ -34,7 +34,7 @@ Minor version bumped from 0.10.4 to 0.11.0. Linting issues were fixed, dependenc
 Resolved React and Next.js lint failures in the profile page:
 
 - Removed JSX returns from inside `try/catch` blocks by moving UI branches outside the `try`.
-- Replaced sign-out `<a>` usage with `next/link` to satisfy Next.js navigation linting.
+- Replaced sign-out `<a>` usage with a POST form button so sign-out remains a proper non-GET action and passes linting.
 - Replaced `any[]` profile collections with explicit typed structures.
 
 **Files changed:**

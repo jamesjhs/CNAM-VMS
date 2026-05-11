@@ -81,12 +81,14 @@ export default async function ProfilePage({
               Your account details could not be loaded. This can happen if your session has become out of sync.
               Please sign out and sign back in to resolve this.
             </p>
-            <Link
-              href="/api/auth/signout"
-              className="inline-block bg-yellow-700 hover:bg-yellow-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            >
-              Sign out and sign back in
-            </Link>
+            <form action="/api/auth/signout" method="post">
+              <button
+                type="submit"
+                className="inline-block bg-yellow-700 hover:bg-yellow-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Sign out and sign back in
+              </button>
+            </form>
           </div>
         </main>
       </div>
