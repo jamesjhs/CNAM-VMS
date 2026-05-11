@@ -2,7 +2,7 @@
 
 **City of Norwich Aviation Museum — Volunteer Management System**
 
-**Version 0.10.4 — May 2026**
+**Version 0.11.0 — May 2026**
 
 ---
 
@@ -915,4 +915,4 @@ Please contact your administrator and describe what you were doing, what you exp
 
 ---
 
-*This manual will be updated as new features are added to the system. Last updated: May 2026 (v0.10.3).*
+*This manual will be updated as new features are added to the system. Last updated: May 2026 (v0.11.0).*

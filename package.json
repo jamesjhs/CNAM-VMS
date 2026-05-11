@@ -1,6 +1,6 @@
 {
   "name": "cnam-vms",
-  "version": "0.10.4",
+  "version": "0.11.0",
   "private": true,
   "scripts": {
     "dev": "cross-env PORT=3001 next dev -p 3001",
@@ -16,21 +16,21 @@
     "db:promote-to-root": "ts-node --project tsconfig.seed.json scripts/promote-to-root.ts"
   },
   "dependencies": {
-    "@azure/msal-node": "^5.1.5",
+    "@azure/msal-node": "^5.2.1",
     "@paralleldrive/cuid2": "^3.3.0",
     "better-sqlite3-multiple-ciphers": "^12.9.0",
-    "next": "^16.2.4",
+    "next": "^16.2.6",
     "next-auth": "^5.0.0-beta.31",
     "nodemailer": "^8.0.7",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
   },
   "overrides": {
-    "postcss": "^8.5.12"
+    "postcss": "^8.5.14"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^20.19.39",
+    "@types/node": "^20.19.41",
     "@types/nodemailer": "^8.0.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -38,8 +38,8 @@
     "cross-env": "^10.1.0",
     "dotenv": "^17.4.2",
     "eslint": "^9.39.4",
-    "eslint-config-next": "^16.2.4",
-    "postcss": "^8.5.12",
+    "eslint-config-next": "^16.2.6",
+    "postcss": "^8.5.14",
     "tailwindcss": "^3.4.19",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"

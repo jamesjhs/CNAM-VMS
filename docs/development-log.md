@@ -21,6 +21,54 @@ Entries are listed in reverse chronological order (newest first). Each entry rec
 
 ---
 
+## 11 May 2026 — Lint Remediation, Dependency Refresh & Documentation Update (v0.11.0)
+
+**Agent session:** GitHub Copilot CLI Agent
+
+**What was done:**
+
+Minor version bumped from 0.10.4 to 0.11.0. Linting issues were fixed, dependencies were updated to the latest compatible releases, and versioned documentation was refreshed.
+
+### 1. Fixed profile page lint errors
+
+Resolved React and Next.js lint failures in the profile page:
+
+- Removed JSX returns from inside `try/catch` blocks by moving UI branches outside the `try`.
+- Replaced sign-out `<a>` usage with `next/link` to satisfy Next.js navigation linting.
+- Replaced `any[]` profile collections with explicit typed structures.
+
+**Files changed:**
+- `src/app/profile/page.tsx`
+
+### 2. Refreshed dependencies
+
+Updated dependency set to current compatible releases and refreshed lockfile:
+
+- Runtime/dev package ranges updated for: `@azure/msal-node`, `next`, `react`, `react-dom`, `eslint-config-next`, `@types/node`, and `postcss` (including override).
+- Reinstalled and refreshed `package-lock.json` after updates.
+
+**Files changed:**
+- `package.json`
+- `package-lock.json`
+
+### 3. Updated versioned documentation
+
+Documentation version references were aligned to `v0.11.0` in the primary versioned docs.
+
+**Files changed:**
+- `README.md`
+- `docs/user-manual.md`
+- `docs/technical-architecture.md`
+
+### Validation
+
+- Lint: ✅ clean (`npm run lint`)
+- Build: ✅ clean (`npm run build`)
+- Audit: ✅ 0 vulnerabilities (`npm audit --audit-level=high`)
+- Outdated check: ✅ all dependencies updated to latest versions within configured major/version tracks; remaining majors shown by `npm outdated` are `@types/node` 25.x, `eslint` 10.x, `tailwindcss` 4.x, and `typescript` 6.x (breaking migrations not applied in this maintenance pass)
+
+---
+
 ## 9 May 2026 — Clickable Usernames, Profile Page Fix (v0.10.4)
 
 **Agent session:** GitHub Copilot CLI Agent
@@ -1098,4 +1146,3 @@ Capabilities are attached to the user's session when they sign in, so page-level
 ---
 
 *This log is maintained by the GitHub Copilot Agent. Each development session adds a new entry at the top.*
-

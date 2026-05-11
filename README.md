@@ -2,7 +2,7 @@
 
 City of Norwich Aviation Museum — Volunteer Management System
 
-**Version 0.10.4**
+**Version 0.11.0**
 
 A web-based volunteer and task management application built with Next.js, TypeScript, Tailwind CSS, and SQLite.
 
