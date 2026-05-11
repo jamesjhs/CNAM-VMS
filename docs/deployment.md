@@ -139,12 +139,18 @@ Consequence: `pm2` command becomes available for `nodeapp`.
 Go to: **Repository → Settings → Secrets and variables → Actions → New repository secret**  
 Create:
 
-- `DEPLOY_HOST` (server DNS name/IP)
+- `DEPLOY_HOST` (deploy target hostname)
 - `DEPLOY_USER` (`nodeapp`)
 - `DEPLOY_SSH_KEY` (private SSH key text)
-- `DEPLOY_KNOWN_HOSTS` (paste the exact output of `cat /etc/ssh/ssh_host_ed25519_key.pub` from the VPS)
+- `DEPLOY_KNOWN_HOSTS` (one known_hosts line: `<deploy-hostname> $(cat /etc/ssh/ssh_host_ed25519_key.pub)`)
 - `CF_CLIENT_ID` (Cloudflare Access client ID used for tunnel-protected access)
 - `CF_CLIENT_SECRET` (Cloudflare Access client secret used for tunnel-protected access)
+
+For `DEPLOY_KNOWN_HOSTS`, create the value on the VPS with:
+
+```bash
+echo "<deploy-hostname> $(cat /etc/ssh/ssh_host_ed25519_key.pub)"
+```
 
 Why: workflow must authenticate to VPS without hardcoded credentials.  
 Consequence: deploy workflow can securely use SCP (Secure Copy) and SSH (Secure Shell) to the server.
@@ -338,9 +344,15 @@ Set these repository secrets before enabling production deploys:
 - `DEPLOY_HOST` — deploy target hostname (for tunnel/SSH access; not a raw server IP)
 - `DEPLOY_USER` — SSH username (`nodeapp`)
 - `DEPLOY_SSH_KEY` — private key for the deploy user (PEM/OpenSSH format)
-- `DEPLOY_KNOWN_HOSTS` — raw VPS host key from `cat /etc/ssh/ssh_host_ed25519_key.pub`
+- `DEPLOY_KNOWN_HOSTS` — one known_hosts-formatted line built from deploy hostname + `cat /etc/ssh/ssh_host_ed25519_key.pub` output
 - `CF_CLIENT_ID` — Cloudflare Access service token client ID
 - `CF_CLIENT_SECRET` — Cloudflare Access service token client secret
+
+Build `DEPLOY_KNOWN_HOSTS` value using:
+
+```bash
+echo "<deploy-hostname> $(cat /etc/ssh/ssh_host_ed25519_key.pub)"
+```
 
 ## First-time Server Bootstrap
 
