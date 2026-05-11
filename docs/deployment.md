@@ -28,6 +28,7 @@ git pull && npm install && npm run build && pm2 restart
 - **SSH** = **Secure Shell** (encrypted remote terminal/file transfer protocol)
 - **PM2** = **Process Manager 2** (keeps your Node.js app running and restartable)
 - **URL** = **Uniform Resource Locator** (web address, e.g. `https://cnamvms.jahosi.co.uk`)
+- **CF Access** = **Cloudflare Access** (Cloudflare Zero Trust protection in front of your tunnel)
 
 ### Why this migration is safer and better
 
@@ -195,6 +196,31 @@ Open in browser:
 
 Why: validates end-to-end path (Cloudflare Tunnel → Nginx → PM2/Node app).  
 Consequence: confirms users can reach production over public URL.
+
+#### 11) (Optional) Connect through Cloudflare Tunnel using Client ID + Client Secret
+
+If your tunnel is protected by Cloudflare Access service tokens, test access with:
+
+```bash
+export CF_ACCESS_CLIENT_ID="<your-client-id>"
+export CF_ACCESS_CLIENT_SECRET="<your-client-secret>"
+
+curl -I "https://cnamvms.jahosi.co.uk/" \
+  -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+  -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"
+```
+
+Why:
+
+- the two `export` commands store your Cloudflare Access credentials in this terminal session only
+- the `curl` command sends the required Cloudflare Access headers so the request is allowed through the tunnel
+
+Consequence:
+
+- if credentials and policy are correct, you should receive a normal HTTP response (for example `200 OK` or a valid redirect)
+- if credentials are wrong or missing, Cloudflare Access blocks the request (for example `401`/`403`)
+
+Security consequence: do not paste these secrets into screenshots, chat logs, or committed files. They are effectively passwords for automated access.
 
 ### How normal deployments work after migration
 
