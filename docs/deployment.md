@@ -140,10 +140,11 @@ Go to: **Repository → Settings → Secrets and variables → Actions → New r
 Create:
 
 - `DEPLOY_HOST` (server DNS name/IP)
-- `DEPLOY_PORT` (SSH port, usually `22`)
 - `DEPLOY_USER` (`nodeapp`)
 - `DEPLOY_SSH_KEY` (private SSH key text)
-- `DEPLOY_KNOWN_HOSTS` (output of `ssh-keyscan -H <host>`)
+- `DEPLOY_KNOWN_HOSTS` (paste the exact output of `cat /etc/ssh/ssh_host_ed25519_key.pub` from the VPS)
+- `CF_CLIENT_ID` (Cloudflare Access client ID used for tunnel-protected access)
+- `CF_CLIENT_SECRET` (Cloudflare Access client secret used for tunnel-protected access)
 
 Why: workflow must authenticate to VPS without hardcoded credentials.  
 Consequence: deploy workflow can securely use SCP (Secure Copy) and SSH (Secure Shell) to the server.
@@ -202,12 +203,12 @@ Consequence: confirms users can reach production over public URL.
 If your tunnel is protected by Cloudflare Access service tokens, test access with:
 
 ```bash
-export CF_ACCESS_CLIENT_ID="<your-client-id>"
-export CF_ACCESS_CLIENT_SECRET="<your-client-secret>"
+export CF_CLIENT_ID="<your-client-id>"
+export CF_CLIENT_SECRET="<your-client-secret>"
 
 curl -I "https://cnamvms.jahosi.co.uk/" \
-  -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
-  -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"
+  -H "CF-Access-Client-Id: $CF_CLIENT_ID" \
+  -H "CF-Access-Client-Secret: $CF_CLIENT_SECRET"
 ```
 
 Why:
@@ -334,11 +335,12 @@ Workflow file: `.github/workflows/deploy.yml`
 
 Set these repository secrets before enabling production deploys:
 
-- `DEPLOY_HOST` — VPS host/IP
-- `DEPLOY_PORT` — SSH port (usually `22`)
+- `DEPLOY_HOST` — deploy target hostname (for tunnel/SSH access; not a raw server IP)
 - `DEPLOY_USER` — SSH username (`nodeapp`)
 - `DEPLOY_SSH_KEY` — private key for the deploy user (PEM/OpenSSH format)
-- `DEPLOY_KNOWN_HOSTS` — strict host key entry from `ssh-keyscan -H <host>`
+- `DEPLOY_KNOWN_HOSTS` — raw VPS host key from `cat /etc/ssh/ssh_host_ed25519_key.pub`
+- `CF_CLIENT_ID` — Cloudflare Access service token client ID
+- `CF_CLIENT_SECRET` — Cloudflare Access service token client secret
 
 ## First-time Server Bootstrap
 
