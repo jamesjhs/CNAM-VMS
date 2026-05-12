@@ -110,11 +110,11 @@ jobs:
           fi
 
           cat > "$ARTIFACT_ROOT/REVISION" <<EOF
-commit=${GITHUB_SHA}
-ref=${GITHUB_REF_NAME}
-built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-run_id=${GITHUB_RUN_ID}
-EOF
+          commit=${GITHUB_SHA}
+          ref=${GITHUB_REF_NAME}
+          built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          run_id=${GITHUB_RUN_ID}
+          EOF
 
           tar -czf "$ARTIFACT_NAME" -C "$ARTIFACT_ROOT" .
           echo "artifact_name=$ARTIFACT_NAME" >> "$GITHUB_ENV"
@@ -137,7 +137,7 @@ EOF
         uses: actions/checkout@v4
 
       - name: Download deployment artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.1.3
         with:
           name: deploy-artifact
           path: .
