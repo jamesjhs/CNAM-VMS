@@ -12,13 +12,16 @@
 const path = require('path');
 const { spawn } = require('child_process');
 const { config } = require('dotenv');
-const { resolve } = require('path');
+const { resolveEnvPath } = require('./resolve-env-path.cjs');
 
 // Get the directory where this script lives (project root)
 const projectRoot = path.dirname(path.dirname(path.resolve(__filename)));
 
-// Load .env file so we can read PORT and other environment variables
-config({ path: resolve(projectRoot, '.env'), override: false });
+const envPath = resolveEnvPath(projectRoot);
+
+if (envPath) {
+  config({ path: envPath, override: false });
+}
 
 // Prepare environment with .env values loaded
 const env = {

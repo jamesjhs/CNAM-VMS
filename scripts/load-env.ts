@@ -10,6 +10,10 @@
  */
 
 import { config } from 'dotenv';
-import { resolve } from 'path';
+const { resolveEnvPath } = require('./resolve-env-path.cjs');
 
-config({ path: resolve(process.cwd(), '.env'), override: false });
+const envPath = resolveEnvPath(process.cwd());
+
+if (envPath) {
+  config({ path: envPath, override: false });
+}

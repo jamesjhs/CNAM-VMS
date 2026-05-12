@@ -27,48 +27,36 @@ export default async function ProfilePage({
 
   let rawUser: UserRow | undefined;
   let phones: PhoneRow[] = [];
-  let userRoles: any[] = [];
-  let userTeams: any[] = [];
+  let userRoles: { roleId: string; role: { name: string; description: string | null } }[] = [];
+  let userTeams: { teamId: string; team: { name: string; description: string | null } }[] = [];
+  let dbError = false;
 
   try {
     rawUser = db.prepare('SELECT id, email, name, status, createdAt FROM users WHERE id = ?').get(sessionUser.id) as UserRow | undefined;
     if (!rawUser) {
       console.error(`[profile] User ${sessionUser.id} has a valid session but no matching DB record — stale session?`);
-      return (
-        <div className="min-h-screen flex flex-col">
-          <NavBar />
-          <main className="flex-1 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
-            <div className="p-6 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <h2 className="text-lg font-bold text-yellow-800 mb-2">Profile Not Found</h2>
-              <p className="text-yellow-700 mb-4">
-                Your account details could not be loaded. This can happen if your session has become out of sync.
-                Please sign out and sign back in to resolve this.
-              </p>
-              <a
-                href="/api/auth/signout"
-                className="inline-block bg-yellow-700 hover:bg-yellow-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                Sign out and sign back in
-              </a>
-            </div>
-          </main>
-        </div>
-      );
+      rawUser = undefined;
     }
 
-    phones = db.prepare('SELECT id, number, label FROM user_phones WHERE userId = ? ORDER BY createdAt ASC').all(sessionUser.id) as PhoneRow[];
+    if (rawUser) {
+      phones = db.prepare('SELECT id, number, label FROM user_phones WHERE userId = ? ORDER BY createdAt ASC').all(sessionUser.id) as PhoneRow[];
 
-    userRoles = (db.prepare(
-      `SELECT ur.roleId, r.name as roleName, r.description as roleDescription
-       FROM user_roles ur JOIN roles r ON r.id = ur.roleId WHERE ur.userId = ?`
-    ).all(sessionUser.id) as RoleRow[]).map(r => ({ roleId: r.roleId, role: { name: r.roleName, description: r.roleDescription } }));
+      userRoles = (db.prepare(
+        `SELECT ur.roleId, r.name as roleName, r.description as roleDescription
+         FROM user_roles ur JOIN roles r ON r.id = ur.roleId WHERE ur.userId = ?`
+      ).all(sessionUser.id) as RoleRow[]).map(r => ({ roleId: r.roleId, role: { name: r.roleName, description: r.roleDescription } }));
 
-    userTeams = (db.prepare(
-      `SELECT ut.teamId, t.name as teamName, t.description as teamDescription
-       FROM user_teams ut JOIN teams t ON t.id = ut.teamId WHERE ut.userId = ?`
-    ).all(sessionUser.id) as TeamRow[]).map(t => ({ teamId: t.teamId, team: { name: t.teamName, description: t.teamDescription } }));
+      userTeams = (db.prepare(
+        `SELECT ut.teamId, t.name as teamName, t.description as teamDescription
+         FROM user_teams ut JOIN teams t ON t.id = ut.teamId WHERE ut.userId = ?`
+      ).all(sessionUser.id) as TeamRow[]).map(t => ({ teamId: t.teamId, team: { name: t.teamName, description: t.teamDescription } }));
+    }
   } catch (error) {
     console.error('Database error in profile page:', error);
+    dbError = true;
+  }
+
+  if (dbError) {
     return (
       <div className="min-h-screen flex flex-col">
         <NavBar />
@@ -76,6 +64,31 @@ export default async function ProfilePage({
           <div className="p-6 bg-red-50 border border-red-200 rounded-lg">
             <h2 className="text-lg font-bold text-red-800 mb-2">Database Error</h2>
             <p className="text-red-700">Unable to load your profile. Please try again later.</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!rawUser) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <NavBar />
+        <main className="flex-1 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
+          <div className="p-6 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <h2 className="text-lg font-bold text-yellow-800 mb-2">Profile Not Found</h2>
+            <p className="text-yellow-700 mb-4">
+              Your account details could not be loaded. This can happen if your session has become out of sync.
+              Please sign out and sign back in to resolve this.
+            </p>
+            <form action="/api/auth/signout" method="post">
+              <button
+                type="submit"
+                className="inline-block bg-yellow-700 hover:bg-yellow-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Sign out and sign back in
+              </button>
+            </form>
           </div>
         </main>
       </div>

@@ -391,7 +391,7 @@ pm2 save
 - Requires `shared/.env`
 - Symlinks `.env` and `uploads` into the new release
 - Atomically repoints `current`
-- Starts/reloads PM2 using `ecosystem.config.cjs`
+- Starts/reloads PM2 using `ecosystem.config.cjs`, which reads runtime environment values from `shared/.env`
 - Runs localhost health check on `http://127.0.0.1:3001/`
 - Keeps only a small number of recent releases (default: 5)
 
