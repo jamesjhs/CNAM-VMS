@@ -136,23 +136,91 @@ jobs:
           name: deploy-artifact
           path: .
 
+      - name: Resolve deploy configuration
+        id: deploy-config
+        shell: bash
+        env:
+          DEPLOY_HOST_RAW: ${{ secrets.DEPLOY_HOST != '' && secrets.DEPLOY_HOST || vars.DEPLOY_HOST }}
+          DEPLOY_PORT_RAW: ${{ secrets.DEPLOY_PORT != '' && secrets.DEPLOY_PORT || vars.DEPLOY_PORT }}
+          DEPLOY_USER_RAW: ${{ secrets.DEPLOY_USER != '' && secrets.DEPLOY_USER || vars.DEPLOY_USER }}
+          DEPLOY_SSH_KEY_RAW: ${{ secrets.DEPLOY_SSH_KEY != '' && secrets.DEPLOY_SSH_KEY || vars.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS_RAW: ${{ secrets.DEPLOY_KNOWN_HOSTS != '' && secrets.DEPLOY_KNOWN_HOSTS || vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          DEPLOY_HOST="$DEPLOY_HOST_RAW"
+          DEPLOY_PORT="${DEPLOY_PORT_RAW:-22}"
+          DEPLOY_USER="$DEPLOY_USER_RAW"
+          DEPLOY_SSH_KEY="$DEPLOY_SSH_KEY_RAW"
+          DEPLOY_KNOWN_HOSTS="$DEPLOY_KNOWN_HOSTS_RAW"
+
+          echo "::add-mask::$DEPLOY_SSH_KEY"
+          echo "::add-mask::$DEPLOY_KNOWN_HOSTS"
+
+          missing=()
+          [[ -n "$DEPLOY_HOST" ]] || missing+=("DEPLOY_HOST")
+          [[ -n "$DEPLOY_USER" ]] || missing+=("DEPLOY_USER")
+          [[ -n "$DEPLOY_SSH_KEY" ]] || missing+=("DEPLOY_SSH_KEY")
+          [[ -n "$DEPLOY_KNOWN_HOSTS" ]] || missing+=("DEPLOY_KNOWN_HOSTS")
+
+          if ((${#missing[@]} > 0)); then
+            printf '::error::Missing required deploy configuration: %s. Define these under GitHub Settings -> Secrets and variables -> Actions (repository or environment).\n' "$(IFS=', '; echo "${missing[*]}")"
+            exit 1
+          fi
+
+          if ! [[ "$DEPLOY_PORT" =~ ^[0-9]+$ ]]; then
+            echo "::error::DEPLOY_PORT must be numeric; received '$DEPLOY_PORT'."
+            exit 1
+          fi
+          if ((DEPLOY_PORT < 1 || DEPLOY_PORT > 65535)); then
+            echo "::error::DEPLOY_PORT must be between 1 and 65535; received '$DEPLOY_PORT'."
+            exit 1
+          fi
+
+          if ! grep -Eq '-----BEGIN [A-Z ]*PRIVATE KEY-----' <<<"$DEPLOY_SSH_KEY"; then
+            echo "::error::DEPLOY_SSH_KEY does not look like a valid private key format."
+            exit 1
+          fi
+          if ! grep -Eq '^[^[:space:]]+[[:space:]]+[^[:space:]]+([[:space:]]+[^[:space:]]+)?$' <<<"$DEPLOY_KNOWN_HOSTS"; then
+            echo "::error::DEPLOY_KNOWN_HOSTS does not look like a valid known_hosts entry structure."
+            exit 1
+          fi
+
+          {
+            echo "deploy_host=$DEPLOY_HOST"
+            echo "deploy_port=$DEPLOY_PORT"
+            echo "deploy_user=$DEPLOY_USER"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "deploy_ssh_key<<__DEPLOY_SSH_KEY__"
+            printf '%s\n' "$DEPLOY_SSH_KEY"
+            echo "__DEPLOY_SSH_KEY__"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "deploy_known_hosts<<__DEPLOY_KNOWN_HOSTS__"
+            printf '%s\n' "$DEPLOY_KNOWN_HOSTS"
+            echo "__DEPLOY_KNOWN_HOSTS__"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Set up SSH key
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          printf '%s\n' "${{ steps.deploy-config.outputs.deploy_ssh_key }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          printf '%s\n' "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          printf '%s\n' "${{ steps.deploy-config.outputs.deploy_known_hosts }}" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
       - name: Upload artifact and scripts
         shell: bash
         env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ steps.deploy-config.outputs.deploy_host }}
+          DEPLOY_PORT: ${{ steps.deploy-config.outputs.deploy_port }}
+          DEPLOY_USER: ${{ steps.deploy-config.outputs.deploy_user }}
         run: |
           set -euo pipefail
           PORT="${DEPLOY_PORT:-22}"
@@ -168,9 +236,9 @@ jobs:
       - name: Run remote deploy
         shell: bash
         env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ steps.deploy-config.outputs.deploy_host }}
+          DEPLOY_PORT: ${{ steps.deploy-config.outputs.deploy_port }}
+          DEPLOY_USER: ${{ steps.deploy-config.outputs.deploy_user }}
         run: |
           set -euo pipefail
           PORT="${DEPLOY_PORT:-22}"
