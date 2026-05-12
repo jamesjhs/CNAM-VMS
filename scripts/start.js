@@ -10,6 +10,7 @@
  */
 
 const path = require('path');
+const fs = require('fs');
 const { spawn } = require('child_process');
 const { config } = require('dotenv');
 const { resolve } = require('path');
@@ -17,8 +18,19 @@ const { resolve } = require('path');
 // Get the directory where this script lives (project root)
 const projectRoot = path.dirname(path.dirname(path.resolve(__filename)));
 
-// Load .env file so we can read PORT and other environment variables
-config({ path: resolve(projectRoot, '.env'), override: false });
+const envCandidates = [
+  process.env.ENV_FILE,
+  process.env.APP_ROOT ? resolve(process.env.APP_ROOT, 'shared/.env') : null,
+  resolve(projectRoot, '../shared/.env'),
+  resolve(projectRoot, 'shared/.env'),
+  resolve(projectRoot, '.env'),
+].filter(Boolean);
+
+const envPath = envCandidates.find((candidate) => fs.existsSync(candidate));
+
+if (envPath) {
+  config({ path: envPath, override: false });
+}
 
 // Prepare environment with .env values loaded
 const env = {

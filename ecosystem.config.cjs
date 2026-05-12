@@ -1,5 +1,6 @@
 const APP_ROOT = '/var/node/cnamvms.jahosi.co.uk-3001';
 const CURRENT_PATH = `${APP_ROOT}/current`;
+const SHARED_ENV_PATH = `${APP_ROOT}/shared/.env`;
 const LOG_PATH = `${APP_ROOT}/shared/logs`;
 
 module.exports = {
@@ -9,6 +10,7 @@ module.exports = {
       cwd: CURRENT_PATH,
       script: '.next/standalone/server.js',
       interpreter: 'node',
+      env_file: SHARED_ENV_PATH,
       instances: 1,
       exec_mode: 'fork',
       autorestart: true,

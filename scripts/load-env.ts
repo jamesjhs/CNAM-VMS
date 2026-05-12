@@ -10,6 +10,19 @@
  */
 
 import { config } from 'dotenv';
+import { existsSync } from 'fs';
 import { resolve } from 'path';
 
-config({ path: resolve(process.cwd(), '.env'), override: false });
+const envCandidates = [
+  process.env.ENV_FILE,
+  process.env.APP_ROOT ? resolve(process.env.APP_ROOT, 'shared/.env') : null,
+  resolve(process.cwd(), '../shared/.env'),
+  resolve(process.cwd(), 'shared/.env'),
+  resolve(process.cwd(), '.env'),
+].filter((candidate): candidate is string => !!candidate);
+
+const envPath = envCandidates.find((candidate) => existsSync(candidate));
+
+if (envPath) {
+  config({ path: envPath, override: false });
+}
