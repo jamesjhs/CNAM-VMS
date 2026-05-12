@@ -10,23 +10,14 @@
  */
 
 const path = require('path');
-const fs = require('fs');
 const { spawn } = require('child_process');
 const { config } = require('dotenv');
-const { resolve } = require('path');
+const { resolveEnvPath } = require('./resolve-env-path.cjs');
 
 // Get the directory where this script lives (project root)
 const projectRoot = path.dirname(path.dirname(path.resolve(__filename)));
 
-const envCandidates = [
-  process.env.ENV_FILE,
-  process.env.APP_ROOT ? resolve(process.env.APP_ROOT, 'shared/.env') : null,
-  resolve(projectRoot, '../shared/.env'),
-  resolve(projectRoot, 'shared/.env'),
-  resolve(projectRoot, '.env'),
-].filter(Boolean);
-
-const envPath = envCandidates.find((candidate) => fs.existsSync(candidate));
+const envPath = resolveEnvPath(projectRoot);
 
 if (envPath) {
   config({ path: envPath, override: false });
